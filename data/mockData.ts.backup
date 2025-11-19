@@ -1,0 +1,1565 @@
+import { Lawyer, UserRole, LegalSpecialty, Review } from '../types';
+
+export const MOCK_LAWYERS: Lawyer[] = [
+  // ========== ÎLE-DE-FRANCE (PARIS) ==========
+  {
+    id: 'l1',
+    name: 'Maître Sarah Martin',
+    email: 'sarah.martin@avocats.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.FAMILY,
+    bio: 'Avocate passionnée en droit de la famille avec plus de 15 ans d\'expérience. Je privilégie la médiation mais défends fermement vos intérêts devant les tribunaux.',
+    location: 'Paris, Île-de-France',
+    coordinates: { lat: 48.8566, lng: 2.3522 },
+    hourlyRate: 250,
+    rating: 4.9,
+    reviewCount: 124,
+    languages: ['Français', 'Anglais', 'Espagnol'],
+    firmName: 'Cabinet Martin & Associés',
+    yearsExperience: 15,
+    availableSlots: [
+      new Date(Date.now() + 86400000).toISOString(),
+      new Date(Date.now() + 172800000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=1'
+  },
+  {
+    id: 'l6',
+    name: 'Maître Luc Bernard',
+    email: 'luc.bernard@fiscal.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.TAX,
+    bio: 'Expert en fiscalité des entreprises et des particuliers. J\'optimise votre situation fiscale et vous défends lors des contrôles fiscaux.',
+    location: 'Paris, Île-de-France',
+    coordinates: { lat: 48.8606, lng: 2.3376 },
+    hourlyRate: 350,
+    rating: 4.8,
+    reviewCount: 92,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Bernard Fiscalité',
+    yearsExperience: 12,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=6'
+  },
+  {
+    id: 'l7',
+    name: 'Maître Antoine Roux',
+    email: 'antoine.roux@justice.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CRIMINAL,
+    bio: 'Ténor du barreau, spécialisé dans les affaires pénales complexes. Disponible 24/7 pour les urgences et gardes à vue.',
+    location: 'Paris, Île-de-France',
+    coordinates: { lat: 48.8530, lng: 2.3499 },
+    hourlyRate: 400,
+    rating: 5.0,
+    reviewCount: 310,
+    languages: ['Français'],
+    firmName: 'Roux Pénal',
+    yearsExperience: 22,
+    availableSlots: [],
+    avatarUrl: 'https://picsum.photos/200/200?random=7'
+  },
+  {
+    id: 'l8',
+    name: 'Maître Marc Durand',
+    email: 'm.durand@corporate-law.com',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CORPORATE,
+    bio: 'Avocat d\'affaires à La Défense. Accompagnement stratégique pour les levées de fonds et restructurations.',
+    location: 'Paris (La Défense), Île-de-France',
+    coordinates: { lat: 48.8924, lng: 2.2361 },
+    hourlyRate: 500,
+    rating: 4.6,
+    reviewCount: 45,
+    languages: ['Français', 'Anglais', 'Mandarin'],
+    firmName: 'Durand Global Legal',
+    yearsExperience: 18,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 5).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=8'
+  },
+  {
+    id: 'l20',
+    name: 'Maître Isabelle Moreau',
+    email: 'i.moreau@paris-avocats.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.FAMILY,
+    bio: 'Spécialiste des divorces amiables et contentieux, garde d\'enfants et pensions alimentaires. Approche humaine et écoute active.',
+    location: 'Paris 16e, Île-de-France',
+    coordinates: { lat: 48.8655, lng: 2.2750 },
+    hourlyRate: 280,
+    rating: 4.7,
+    reviewCount: 156,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Moreau Famille',
+    yearsExperience: 11,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=20'
+  },
+  {
+    id: 'l21',
+    name: 'Maître François Dubois',
+    email: 'f.dubois@corporate.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CORPORATE,
+    bio: 'Conseil en droit des sociétés et gouvernance. Expert en création d\'entreprises, pactes d\'actionnaires et M&A.',
+    location: 'Paris 8e, Île-de-France',
+    coordinates: { lat: 48.8738, lng: 2.3124 },
+    hourlyRate: 450,
+    rating: 4.8,
+    reviewCount: 78,
+    languages: ['Français', 'Anglais', 'Allemand'],
+    firmName: 'Dubois & Partners',
+    yearsExperience: 16,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 4).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=21'
+  },
+  {
+    id: 'l22',
+    name: 'Maître Nathalie Lambert',
+    email: 'n.lambert@labor.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.LABOR,
+    bio: 'Défense des salariés depuis 10 ans. Licenciements abusifs, harcèlement moral, discrimination. Je me bats pour vos droits.',
+    location: 'Paris 11e, Île-de-France',
+    coordinates: { lat: 48.8634, lng: 2.3796 },
+    hourlyRate: 260,
+    rating: 4.9,
+    reviewCount: 203,
+    languages: ['Français'],
+    firmName: 'Lambert Avocats',
+    yearsExperience: 10,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=22'
+  },
+  {
+    id: 'l23',
+    name: 'Maître David Cohen',
+    email: 'd.cohen@immobilier.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.REAL_ESTATE,
+    bio: 'Expert en transactions immobilières et droit de la construction. Accompagnement des investisseurs et promoteurs.',
+    location: 'Paris 17e, Île-de-France',
+    coordinates: { lat: 48.8850, lng: 2.3089 },
+    hourlyRate: 320,
+    rating: 4.6,
+    reviewCount: 89,
+    languages: ['Français', 'Anglais', 'Hébreu'],
+    firmName: 'Cohen Immobilier',
+    yearsExperience: 14,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=23'
+  },
+  {
+    id: 'l24',
+    name: 'Maître Sylvie Rousseau',
+    email: 's.rousseau@ip.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IP,
+    bio: 'Propriété intellectuelle et droit d\'auteur. Protection des marques, brevets et créations artistiques.',
+    location: 'Paris 9e, Île-de-France',
+    coordinates: { lat: 48.8756, lng: 2.3391 },
+    hourlyRate: 380,
+    rating: 4.8,
+    reviewCount: 67,
+    languages: ['Français', 'Anglais', 'Italien'],
+    firmName: 'Rousseau IP',
+    yearsExperience: 13,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=24'
+  },
+  {
+    id: 'l25',
+    name: 'Maître Jean-Pierre Martin',
+    email: 'jp.martin@penal.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CRIMINAL,
+    bio: 'Ancien magistrat reconverti en avocat pénaliste. Défense des prévenus et victimes. Expertise en droit pénal des affaires.',
+    location: 'Paris 1er, Île-de-France',
+    coordinates: { lat: 48.8635, lng: 2.3373 },
+    hourlyRate: 420,
+    rating: 4.9,
+    reviewCount: 145,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Martin Pénal',
+    yearsExperience: 20,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=25'
+  },
+  {
+    id: 'l26',
+    name: 'Maître Émilie Girard',
+    email: 'e.girard@tax.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.TAX,
+    bio: 'Fiscaliste internationale. Optimisation fiscale pour particuliers et entreprises. Contentieux fiscal et douanier.',
+    location: 'Paris 2e, Île-de-France',
+    coordinates: { lat: 48.8688, lng: 2.3418 },
+    hourlyRate: 390,
+    rating: 4.7,
+    reviewCount: 71,
+    languages: ['Français', 'Anglais', 'Espagnol'],
+    firmName: 'Girard Fiscalité',
+    yearsExperience: 15,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 4).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=26'
+  },
+  {
+    id: 'l27',
+    name: 'Maître Alexandre Blanc',
+    email: 'a.blanc@immigration.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IMMIGRATION,
+    bio: 'Spécialiste du droit des étrangers et de l\'asile. Titres de séjour, regroupement familial, contentieux préfectoral.',
+    location: 'Paris 18e, Île-de-France',
+    coordinates: { lat: 48.8918, lng: 2.3446 },
+    hourlyRate: 220,
+    rating: 4.8,
+    reviewCount: 198,
+    languages: ['Français', 'Anglais', 'Arabe', 'Chinois'],
+    firmName: 'Blanc Immigration',
+    yearsExperience: 9,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=27'
+  },
+  {
+    id: 'l28',
+    name: 'Maître Christine Dupont',
+    email: 'c.dupont@general.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.GENERAL,
+    bio: 'Avocate généraliste de proximité. Litiges locatifs, voisinage, consommation. Tarifs accessibles.',
+    location: 'Paris 13e, Île-de-France',
+    coordinates: { lat: 48.8322, lng: 2.3561 },
+    hourlyRate: 180,
+    rating: 4.5,
+    reviewCount: 234,
+    languages: ['Français'],
+    firmName: 'Cabinet Dupont',
+    yearsExperience: 17,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=28'
+  },
+  {
+    id: 'l29',
+    name: 'Maître Vincent Mercier',
+    email: 'v.mercier@labor.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.LABOR,
+    bio: 'Conseil aux entreprises en droit social. Licenciements, ruptures conventionnelles, PSE. Prévention des risques.',
+    location: 'Paris 15e, Île-de-France',
+    coordinates: { lat: 48.8420, lng: 2.3009 },
+    hourlyRate: 310,
+    rating: 4.6,
+    reviewCount: 83,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Mercier Social',
+    yearsExperience: 12,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 5).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=29'
+  },
+  {
+    id: 'l30',
+    name: 'Maître Caroline Lefevre',
+    email: 'c.lefevre@famille.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.FAMILY,
+    bio: 'Médiatrice familiale et avocate. Résolution amiable des conflits familiaux. Divorces, successions.',
+    location: 'Paris 7e, Île-de-France',
+    coordinates: { lat: 48.8566, lng: 2.3119 },
+    hourlyRate: 290,
+    rating: 4.9,
+    reviewCount: 167,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Lefevre Médiation',
+    yearsExperience: 14,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=30'
+  },
+
+  // ========== LYON ==========
+  {
+    id: 'l2',
+    name: 'Maître Michel Rousseau',
+    email: 'm.rousseau@business-law.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CORPORATE,
+    bio: 'Spécialisé dans les fusions-acquisitions et la gouvernance d\'entreprise. J\'accompagne les startups et grands groupes dans leur conformité réglementaire.',
+    location: 'Lyon, Auvergne-Rhône-Alpes',
+    coordinates: { lat: 45.7640, lng: 4.8357 },
+    hourlyRate: 450,
+    rating: 4.7,
+    reviewCount: 89,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Rousseau Légal',
+    yearsExperience: 8,
+    availableSlots: [
+      new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=2'
+  },
+  {
+    id: 'l9',
+    name: 'Maître Laura Garnier',
+    email: 'l.garnier@lyon-avocats.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.REAL_ESTATE,
+    bio: 'Droit de la construction et baux commerciaux. Je sécurise vos investissements immobiliers à Lyon et sa région.',
+    location: 'Lyon, Auvergne-Rhône-Alpes',
+    coordinates: { lat: 45.7570, lng: 4.8427 },
+    hourlyRate: 220,
+    rating: 4.5,
+    reviewCount: 67,
+    languages: ['Français', 'Italien'],
+    firmName: 'Garnier Immobilier',
+    yearsExperience: 9,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=9'
+  },
+  {
+    id: 'l31',
+    name: 'Maître Paul Bertrand',
+    email: 'p.bertrand@lyon-penal.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CRIMINAL,
+    bio: 'Avocat pénaliste reconnu à Lyon. Crimes, délits, comparutions immédiates. Disponible 24h/24.',
+    location: 'Lyon, Auvergne-Rhône-Alpes',
+    coordinates: { lat: 45.7600, lng: 4.8400 },
+    hourlyRate: 340,
+    rating: 4.8,
+    reviewCount: 112,
+    languages: ['Français'],
+    firmName: 'Bertrand Défense',
+    yearsExperience: 16,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=31'
+  },
+  {
+    id: 'l32',
+    name: 'Maître Sophie André',
+    email: 's.andre@travail.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.LABOR,
+    bio: 'Droit du travail pour salariés et employeurs. Expertise en licenciements et contentieux prud\'homaux.',
+    location: 'Lyon, Auvergne-Rhône-Alpes',
+    coordinates: { lat: 45.7650, lng: 4.8300 },
+    hourlyRate: 270,
+    rating: 4.7,
+    reviewCount: 94,
+    languages: ['Français', 'Anglais'],
+    firmName: 'André Social',
+    yearsExperience: 11,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=32'
+  },
+
+  // ========== MARSEILLE ==========
+  {
+    id: 'l3',
+    name: 'Maître Alice Fontaine',
+    email: 'a.fontaine@penal.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CRIMINAL,
+    bio: 'Ancienne procureure devenue avocate de la défense. J\'apporte une perspective unique pour garantir que vos droits soient protégés à chaque étape de la procédure.',
+    location: 'Marseille, Provence-Alpes-Côte d\'Azur',
+    coordinates: { lat: 43.2965, lng: 5.3698 },
+    hourlyRate: 300,
+    rating: 5.0,
+    reviewCount: 210,
+    languages: ['Français', 'Italien'],
+    firmName: 'Fontaine Défense',
+    yearsExperience: 20,
+    availableSlots: [
+      new Date(Date.now() + 86400000).toISOString(),
+      new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=3'
+  },
+  {
+    id: 'l10',
+    name: 'Maître Pierre Fournier',
+    email: 'pierre.fournier@marseille-law.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.GENERAL,
+    bio: 'Avocat généraliste de proximité. Litiges locatifs, conflits de voisinage et droit de la consommation.',
+    location: 'Marseille, Provence-Alpes-Côte d\'Azur',
+    coordinates: { lat: 43.2950, lng: 5.3700 },
+    hourlyRate: 150,
+    rating: 4.3,
+    reviewCount: 112,
+    languages: ['Français', 'Arabe'],
+    firmName: 'Cabinet Fournier',
+    yearsExperience: 14,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=10'
+  },
+  {
+    id: 'l33',
+    name: 'Maître Rachid Benali',
+    email: 'r.benali@marseille-avocats.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IMMIGRATION,
+    bio: 'Spécialiste du droit des étrangers. Naturalisation, regroupement familial, OQTF. Accompagnement humain.',
+    location: 'Marseille, Provence-Alpes-Côte d\'Azur',
+    coordinates: { lat: 43.3000, lng: 5.3800 },
+    hourlyRate: 200,
+    rating: 4.9,
+    reviewCount: 178,
+    languages: ['Français', 'Arabe', 'Anglais'],
+    firmName: 'Benali Immigration',
+    yearsExperience: 10,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=33'
+  },
+
+  // ========== BORDEAUX ==========
+  {
+    id: 'l4',
+    name: 'Maître Simon Grand',
+    email: 'simon.grand@droitpourtous.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.GENERAL,
+    bio: 'Je me bats pour les particuliers. Droit de la consommation, litiges de voisinage ou délits mineurs. Une représentation accessible à tous.',
+    location: 'Bordeaux, Nouvelle-Aquitaine',
+    coordinates: { lat: 44.8378, lng: -0.5792 },
+    hourlyRate: 120,
+    rating: 4.2,
+    reviewCount: 340,
+    languages: ['Français'],
+    firmName: 'Grand Avocat',
+    yearsExperience: 25,
+    availableSlots: [],
+    avatarUrl: 'https://picsum.photos/200/200?random=4'
+  },
+  {
+    id: 'l11',
+    name: 'Maître Camille Henry',
+    email: 'c.henry@vin-law.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IP,
+    bio: 'Spécialiste en propriété intellectuelle, notamment pour les marques viticoles et les brevets technologiques.',
+    location: 'Bordeaux, Nouvelle-Aquitaine',
+    coordinates: { lat: 44.8404, lng: -0.5805 },
+    hourlyRate: 290,
+    rating: 4.9,
+    reviewCount: 55,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Henry IP & Tech',
+    yearsExperience: 10,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=11'
+  },
+  {
+    id: 'l34',
+    name: 'Maître Julien Garnier',
+    email: 'j.garnier@bordeaux-corporate.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CORPORATE,
+    bio: 'Droit des affaires et fusions-acquisitions. Conseil aux PME et ETI bordelaises.',
+    location: 'Bordeaux, Nouvelle-Aquitaine',
+    coordinates: { lat: 44.8450, lng: -0.5750 },
+    hourlyRate: 380,
+    rating: 4.6,
+    reviewCount: 72,
+    languages: ['Français', 'Anglais', 'Espagnol'],
+    firmName: 'Garnier Business',
+    yearsExperience: 13,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 4).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=34'
+  },
+
+  // ========== LILLE ==========
+  {
+    id: 'l5',
+    name: 'Maître Hélène Petit',
+    email: 'helene@droit-travail.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.LABOR,
+    bio: 'Dédiée à la protection des droits des salariés. Licenciement abusif, harcèlement et discrimination. Je tiens tête aux grandes entreprises.',
+    location: 'Lille, Hauts-de-France',
+    coordinates: { lat: 50.6292, lng: 3.0573 }, 
+    hourlyRate: 280,
+    rating: 4.8,
+    reviewCount: 56,
+    languages: ['Français', 'Néerlandais'],
+    firmName: 'Petit & Associés',
+    yearsExperience: 6,
+    availableSlots: [
+      new Date(Date.now() + 86400000 * 4).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=5'
+  },
+  {
+    id: 'l12',
+    name: 'Maître Lucas Perrin',
+    email: 'l.perrin@immigration.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IMMIGRATION,
+    bio: 'Aide pour les titres de séjour, naturalisations et demandes d\'asile. Un accompagnement humain dans vos démarches.',
+    location: 'Lille, Hauts-de-France',
+    coordinates: { lat: 50.6312, lng: 3.0600 },
+    hourlyRate: 180,
+    rating: 4.6,
+    reviewCount: 88,
+    languages: ['Français', 'Anglais', 'Arabe'],
+    firmName: 'Perrin Avocats',
+    yearsExperience: 7,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=12'
+  },
+  {
+    id: 'l35',
+    name: 'Maître Marie Lefebvre',
+    email: 'm.lefebvre@lille-famille.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.FAMILY,
+    bio: 'Droit de la famille et des personnes. Divorces, autorité parentale, adoption.',
+    location: 'Lille, Hauts-de-France',
+    coordinates: { lat: 50.6350, lng: 3.0650 },
+    hourlyRate: 240,
+    rating: 4.7,
+    reviewCount: 103,
+    languages: ['Français'],
+    firmName: 'Lefebvre Famille',
+    yearsExperience: 12,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=35'
+  },
+
+  // ========== TOULOUSE ==========
+  {
+    id: 'l13',
+    name: 'Maître Sophie Dubois',
+    email: 's.dubois@aero-law.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IP,
+    bio: 'Avocate spécialisée dans l\'industrie aérospatiale et la protection des innovations technologiques.',
+    location: 'Toulouse, Occitanie',
+    coordinates: { lat: 43.6047, lng: 1.4442 },
+    hourlyRate: 320,
+    rating: 4.7,
+    reviewCount: 42,
+    languages: ['Français', 'Anglais', 'Espagnol'],
+    firmName: 'Dubois Innovation',
+    yearsExperience: 13,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=13'
+  },
+  {
+    id: 'l14',
+    name: 'Maître Hugo Mathieu',
+    email: 'h.mathieu@famille.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.FAMILY,
+    bio: 'Divorces amiables et contentieux, garde d\'enfants. Une approche psychologique et juridique pour apaiser les conflits.',
+    location: 'Toulouse, Occitanie',
+    coordinates: { lat: 43.6000, lng: 1.4400 },
+    hourlyRate: 200,
+    rating: 4.4,
+    reviewCount: 105,
+    languages: ['Français'],
+    firmName: 'Cabinet Mathieu',
+    yearsExperience: 11,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=14'
+  },
+  {
+    id: 'l36',
+    name: 'Maître Philippe Roche',
+    email: 'p.roche@toulouse-penal.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CRIMINAL,
+    bio: 'Avocat pénaliste, défense des victimes et prévenus. Violences, vols, infractions routières.',
+    location: 'Toulouse, Occitanie',
+    coordinates: { lat: 43.6100, lng: 1.4500 },
+    hourlyRate: 290,
+    rating: 4.5,
+    reviewCount: 87,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Roche Pénal',
+    yearsExperience: 14,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=36'
+  },
+
+  // ========== NICE ==========
+  {
+    id: 'l15',
+    name: 'Maître Thomas Leroy',
+    email: 't.leroy@cotedazur.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.REAL_ESTATE,
+    bio: 'Expert en transactions immobilières de luxe sur la Côte d\'Azur. Conseil pour les investisseurs internationaux.',
+    location: 'Nice, Provence-Alpes-Côte d\'Azur',
+    coordinates: { lat: 43.7102, lng: 7.2620 },
+    hourlyRate: 400,
+    rating: 4.9,
+    reviewCount: 78,
+    languages: ['Français', 'Anglais', 'Russe'],
+    firmName: 'Leroy & Partners',
+    yearsExperience: 16,
+    availableSlots: [],
+    avatarUrl: 'https://picsum.photos/200/200?random=15'
+  },
+  {
+    id: 'l37',
+    name: 'Maître Marina Ivanova',
+    email: 'm.ivanova@nice-tax.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.TAX,
+    bio: 'Fiscaliste internationale. Optimisation fiscale pour résidents et non-résidents.',
+    location: 'Nice, Provence-Alpes-Côte d\'Azur',
+    coordinates: { lat: 43.7150, lng: 7.2700 },
+    hourlyRate: 360,
+    rating: 4.8,
+    reviewCount: 64,
+    languages: ['Français', 'Anglais', 'Russe', 'Italien'],
+    firmName: 'Ivanova Fiscal',
+    yearsExperience: 12,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 5).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=37'
+  },
+
+  // ========== NANTES ==========
+  {
+    id: 'l16',
+    name: 'Maître Claire Lefebvre',
+    email: 'c.lefebvre@nantes-avocats.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.FAMILY,
+    bio: 'Successions et patrimoines familiaux. Je vous assiste dans la gestion et la transmission de vos biens.',
+    location: 'Nantes, Pays de la Loire',
+    coordinates: { lat: 47.2184, lng: -1.5536 },
+    hourlyRate: 230,
+    rating: 4.8,
+    reviewCount: 95,
+    languages: ['Français'],
+    firmName: 'Lefebvre Patrimoine',
+    yearsExperience: 19,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=16'
+  },
+  {
+    id: 'l38',
+    name: 'Maître Olivier Martin',
+    email: 'o.martin@nantes-corporate.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CORPORATE,
+    bio: 'Droit des sociétés et startups. Accompagnement juridique des entrepreneurs nantais.',
+    location: 'Nantes, Pays de la Loire',
+    coordinates: { lat: 47.2200, lng: -1.5500 },
+    hourlyRate: 310,
+    rating: 4.6,
+    reviewCount: 79,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Martin Business Law',
+    yearsExperience: 11,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=38'
+  },
+
+  // ========== STRASBOURG ==========
+  {
+    id: 'l17',
+    name: 'Maître Julie Moreau',
+    email: 'j.moreau@europe-law.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IMMIGRATION,
+    bio: 'Spécialisée en droit européen et droits de l\'homme. Située près des institutions européennes.',
+    location: 'Strasbourg, Grand Est',
+    coordinates: { lat: 48.5734, lng: 7.7521 },
+    hourlyRate: 260,
+    rating: 4.7,
+    reviewCount: 130,
+    languages: ['Français', 'Allemand', 'Anglais'],
+    firmName: 'Moreau Europe',
+    yearsExperience: 14,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=17'
+  },
+  {
+    id: 'l39',
+    name: 'Maître Hans Schmidt',
+    email: 'h.schmidt@strasbourg-corporate.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CORPORATE,
+    bio: 'Avocat franco-allemand en droit des affaires. Expertise transfrontalière.',
+    location: 'Strasbourg, Grand Est',
+    coordinates: { lat: 48.5800, lng: 7.7600 },
+    hourlyRate: 340,
+    rating: 4.8,
+    reviewCount: 91,
+    languages: ['Français', 'Allemand', 'Anglais'],
+    firmName: 'Schmidt & Partners',
+    yearsExperience: 15,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 4).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=39'
+  },
+
+  // ========== MONTPELLIER ==========
+  {
+    id: 'l18',
+    name: 'Maître Émilie Blanc',
+    email: 'e.blanc@sud-droit.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.LABOR,
+    bio: 'Conseil aux entreprises et CSE. Négociation d\'accords collectifs et gestion des conflits sociaux.',
+    location: 'Montpellier, Occitanie',
+    coordinates: { lat: 43.6108, lng: 3.8767 },
+    hourlyRate: 240,
+    rating: 4.5,
+    reviewCount: 60,
+    languages: ['Français', 'Espagnol'],
+    firmName: 'Blanc Social',
+    yearsExperience: 8,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=18'
+  },
+  {
+    id: 'l40',
+    name: 'Maître Fabien Durand',
+    email: 'f.durand@montpellier-immobilier.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.REAL_ESTATE,
+    bio: 'Expert en promotion immobilière et vente en l\'état futur d\'achèvement (VEFA).',
+    location: 'Montpellier, Occitanie',
+    coordinates: { lat: 43.6150, lng: 3.8800 },
+    hourlyRate: 260,
+    rating: 4.6,
+    reviewCount: 73,
+    languages: ['Français'],
+    firmName: 'Durand Immobilier',
+    yearsExperience: 10,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=40'
+  },
+
+  // ========== RENNES ==========
+  {
+    id: 'l19',
+    name: 'Maître Nicolas Andre',
+    email: 'n.andre@bretagne-law.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.GENERAL,
+    bio: 'Avocat généraliste avec une forte dominante en droit rural et environnemental en Bretagne.',
+    location: 'Rennes, Bretagne',
+    coordinates: { lat: 48.1173, lng: -1.6778 },
+    hourlyRate: 190,
+    rating: 4.6,
+    reviewCount: 82,
+    languages: ['Français'],
+    firmName: 'Cabinet Andre',
+    yearsExperience: 12,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 4).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=19'
+  },
+  {
+    id: 'l41',
+    name: 'Maître Anne Guillou',
+    email: 'a.guillou@rennes-famille.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.FAMILY,
+    bio: 'Spécialiste des divorces et successions. Médiation familiale certifiée.',
+    location: 'Rennes, Bretagne',
+    coordinates: { lat: 48.1200, lng: -1.6750 },
+    hourlyRate: 220,
+    rating: 4.7,
+    reviewCount: 98,
+    languages: ['Français'],
+    firmName: 'Guillou Famille',
+    yearsExperience: 13,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=41'
+  },
+
+  // ========== AUTRES PARIS/ÎLE-DE-FRANCE ==========
+  {
+    id: 'l42',
+    name: 'Maître Stéphane Mercier',
+    email: 's.mercier@defense-avocats.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CRIMINAL,
+    bio: 'Cabinet spécialisé en droit pénal des affaires. Fraude, escroquerie, abus de biens sociaux.',
+    location: 'Paris 14e, Île-de-France',
+    coordinates: { lat: 48.8340, lng: 2.3270 },
+    hourlyRate: 410,
+    rating: 4.7,
+    reviewCount: 86,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Mercier Pénal Affaires',
+    yearsExperience: 17,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=42'
+  },
+  {
+    id: 'l43',
+    name: 'Maître Amina El Kadi',
+    email: 'a.elkadi@immigration-paris.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IMMIGRATION,
+    bio: 'Avocate spécialisée en droit des étrangers. Contentieux OFPRA et CNDA. Langue arabe.',
+    location: 'Paris 10e, Île-de-France',
+    coordinates: { lat: 48.8760, lng: 2.3640 },
+    hourlyRate: 210,
+    rating: 4.9,
+    reviewCount: 215,
+    languages: ['Français', 'Arabe', 'Anglais'],
+    firmName: 'El Kadi Immigration',
+    yearsExperience: 9,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=43'
+  },
+  {
+    id: 'l44',
+    name: 'Maître Maxime Renault',
+    email: 'm.renault@ip-paris.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.IP,
+    bio: 'Expert en propriété intellectuelle numérique. Protection des logiciels, noms de domaine, RGPD.',
+    location: 'Paris 3e, Île-de-France',
+    coordinates: { lat: 48.8644, lng: 2.3632 },
+    hourlyRate: 370,
+    rating: 4.8,
+    reviewCount: 102,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Renault IP Digital',
+    yearsExperience: 11,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 4).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=44'
+  },
+  {
+    id: 'l45',
+    name: 'Maître Béatrice Fontaine',
+    email: 'b.fontaine@paris-travail.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.LABOR,
+    bio: 'Avocate en droit du travail depuis 18 ans. Protection des salariés, harcèlement, discriminations.',
+    location: 'Paris 12e, Île-de-France',
+    coordinates: { lat: 48.8412, lng: 2.3880 },
+    hourlyRate: 290,
+    rating: 4.9,
+    reviewCount: 187,
+    languages: ['Français'],
+    firmName: 'Fontaine Social',
+    yearsExperience: 18,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=45'
+  },
+  {
+    id: 'l46',
+    name: 'Maître Thomas Giraud',
+    email: 't.giraud@general-paris.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.GENERAL,
+    bio: 'Cabinet généraliste. Litiges civils, baux d\'habitation, copropriété, conflits familiaux.',
+    location: 'Paris 19e, Île-de-France',
+    coordinates: { lat: 48.8828, lng: 2.3848 },
+    hourlyRate: 160,
+    rating: 4.4,
+    reviewCount: 156,
+    languages: ['Français'],
+    firmName: 'Cabinet Giraud',
+    yearsExperience: 14,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=46'
+  },
+  {
+    id: 'l47',
+    name: 'Maître Cécile Roussel',
+    email: 'c.roussel@fiscal-paris.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.TAX,
+    bio: 'Fiscaliste des particuliers. ISF/IFI, plus-values immobilières, successions.',
+    location: 'Paris 6e, Île-de-France',
+    coordinates: { lat: 48.8503, lng: 2.3352 },
+    hourlyRate: 360,
+    rating: 4.7,
+    reviewCount: 94,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Roussel Fiscalité',
+    yearsExperience: 16,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 5).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=47'
+  },
+  {
+    id: 'l48',
+    name: 'Maître Karim Ziani',
+    email: 'k.ziani@paris-penal.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CRIMINAL,
+    bio: 'Avocat pénaliste. Défense en comparution immédiate, stupéfiants, violences.',
+    location: 'Paris 20e, Île-de-France',
+    coordinates: { lat: 48.8654, lng: 2.3985 },
+    hourlyRate: 280,
+    rating: 4.6,
+    reviewCount: 119,
+    languages: ['Français', 'Arabe'],
+    firmName: 'Ziani Défense',
+    yearsExperience: 10,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 2).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=48'
+  },
+  {
+    id: 'l49',
+    name: 'Maître Lucie Bonnet',
+    email: 'l.bonnet@immobilier-paris.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.REAL_ESTATE,
+    bio: 'Avocate en droit immobilier. Copropriété, travaux, troubles de voisinage.',
+    location: 'Paris 5e, Île-de-France',
+    coordinates: { lat: 48.8467, lng: 2.3444 },
+    hourlyRate: 270,
+    rating: 4.5,
+    reviewCount: 108,
+    languages: ['Français'],
+    firmName: 'Bonnet Immobilier',
+    yearsExperience: 12,
+    availableSlots: [
+        new Date(Date.now() + 86400000).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=49'
+  },
+  {
+    id: 'l50',
+    name: 'Maître Guillaume Faure',
+    email: 'g.faure@corporate-paris.fr',
+    role: UserRole.LAWYER,
+    specialty: LegalSpecialty.CORPORATE,
+    bio: 'Droit des sociétés et corporate. Création, cession, pactes d\'associés.',
+    location: 'Paris 4e, Île-de-France',
+    coordinates: { lat: 48.8558, lng: 2.3600 },
+    hourlyRate: 420,
+    rating: 4.8,
+    reviewCount: 76,
+    languages: ['Français', 'Anglais'],
+    firmName: 'Faure Corporate',
+    yearsExperience: 14,
+    availableSlots: [
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+    ],
+    avatarUrl: 'https://picsum.photos/200/200?random=50'
+  },
+];
+
+export const MOCK_REVIEWS: Review[] = [
+  // Reviews pour Sarah Martin (l1)
+  {
+    id: 'r1',
+    lawyerId: 'l1',
+    clientId: 'c1',
+    clientName: 'Jean Dupont',
+    rating: 5,
+    comment: 'Maître Martin a été incroyablement utile pendant mon divorce. Hautement recommandée.',
+    date: '2023-10-15T10:00:00Z'
+  },
+  {
+    id: 'r2',
+    lawyerId: 'l1',
+    clientId: 'c2',
+    clientName: 'Marie Leroy',
+    rating: 4,
+    comment: 'Très bonne avocate, mais difficile d\'obtenir un rendez-vous rapidement.',
+    date: '2023-11-01T14:30:00Z',
+    response: 'Merci Marie. Nous travaillons à élargir nos disponibilités.'
+  },
+  {
+    id: 'r3',
+    lawyerId: 'l1',
+    clientId: 'c5',
+    clientName: 'Amélie Petit',
+    rating: 5,
+    comment: 'Excellente médiation lors de mon divorce. Très à l\'écoute et professionnelle.',
+    date: '2024-01-20T11:00:00Z'
+  },
+
+  // Reviews pour Antoine Roux (l7)
+  {
+    id: 'r4',
+    lawyerId: 'l7',
+    clientId: 'c3',
+    clientName: 'Karim Benali',
+    rating: 5,
+    comment: 'Un avocat brillant qui m\'a sorti d\'une situation très compliquée. Merci Maître Roux !',
+    date: '2023-12-10T09:15:00Z'
+  },
+  {
+    id: 'r5',
+    lawyerId: 'l7',
+    clientId: 'c6',
+    clientName: 'Thomas Girard',
+    rating: 5,
+    comment: 'Excellent avocat pénaliste. Disponible même en urgence. Je recommande vivement.',
+    date: '2024-02-05T16:30:00Z'
+  },
+
+  // Reviews pour Alice Fontaine (l3)
+  {
+    id: 'r6',
+    lawyerId: 'l3',
+    clientId: 'c4',
+    clientName: 'Sophie Bernard',
+    rating: 5,
+    comment: 'Excellente défense, très humaine et professionnelle.',
+    date: '2024-01-05T16:20:00Z'
+  },
+  {
+    id: 'r7',
+    lawyerId: 'l3',
+    clientId: 'c7',
+    clientName: 'Marc Laurent',
+    rating: 5,
+    comment: 'Maître Fontaine m\'a défendu avec brio. Son expérience de procureure est un vrai atout.',
+    date: '2023-11-22T10:45:00Z'
+  },
+
+  // Reviews pour Nathalie Lambert (l22)
+  {
+    id: 'r8',
+    lawyerId: 'l22',
+    clientId: 'c8',
+    clientName: 'Pierre Dubois',
+    rating: 5,
+    comment: 'M\'a aidé à obtenir gain de cause face à mon employeur. Merci infiniment !',
+    date: '2024-01-18T14:00:00Z'
+  },
+  {
+    id: 'r9',
+    lawyerId: 'l22',
+    clientId: 'c9',
+    clientName: 'Fatima Mansouri',
+    rating: 5,
+    comment: 'Avocate combative qui n\'a pas peur des grandes entreprises. Très satisfaite.',
+    date: '2023-12-03T09:30:00Z'
+  },
+
+  // Reviews pour Luc Bernard (l6)
+  {
+    id: 'r10',
+    lawyerId: 'l6',
+    clientId: 'c10',
+    clientName: 'André Moreau',
+    rating: 5,
+    comment: 'Excellent fiscaliste. M\'a fait économiser beaucoup d\'argent légalement.',
+    date: '2023-10-28T11:15:00Z'
+  },
+  {
+    id: 'r11',
+    lawyerId: 'l6',
+    clientId: 'c11',
+    clientName: 'Claire Dubois',
+    rating: 4,
+    comment: 'Très compétent mais un peu cher. Résultat au rendez-vous néanmoins.',
+    date: '2024-01-10T15:20:00Z'
+  },
+
+  // Reviews pour Hélène Petit (l5)
+  {
+    id: 'r12',
+    lawyerId: 'l5',
+    clientId: 'c12',
+    clientName: 'Julien Martin',
+    rating: 5,
+    comment: 'A obtenu ma réintégration après un licenciement abusif. Merci !',
+    date: '2023-11-15T10:00:00Z'
+  },
+
+  // Reviews pour Alexandre Blanc (l27)
+  {
+    id: 'r13',
+    lawyerId: 'l27',
+    clientId: 'c13',
+    clientName: 'Ahmed Mansour',
+    rating: 5,
+    comment: 'Très compétent en droit des étrangers. M\'a aidé à obtenir mon titre de séjour.',
+    date: '2024-01-25T14:30:00Z'
+  },
+  {
+    id: 'r14',
+    lawyerId: 'l27',
+    clientId: 'c14',
+    clientName: 'Lin Wang',
+    rating: 5,
+    comment: 'Maître Blanc speaks multiple languages and understands international cases well.',
+    date: '2023-12-12T16:00:00Z'
+  },
+
+  // Reviews pour Isabelle Moreau (l20)
+  {
+    id: 'r15',
+    lawyerId: 'l20',
+    clientId: 'c15',
+    clientName: 'Stéphane Roussel',
+    rating: 4,
+    comment: 'Bonne avocate en droit de la famille. Divorce réglé rapidement.',
+    date: '2024-02-01T11:00:00Z'
+  },
+
+  // Reviews pour Marc Durand (l8)
+  {
+    id: 'r16',
+    lawyerId: 'l8',
+    clientId: 'c16',
+    clientName: 'Philippe Arnaud',
+    rating: 5,
+    comment: 'Expert en M&A. A géré notre acquisition avec professionnalisme.',
+    date: '2023-11-20T09:00:00Z'
+  },
+
+  // Reviews pour Caroline Lefevre (l30)
+  {
+    id: 'r17',
+    lawyerId: 'l30',
+    clientId: 'c17',
+    clientName: 'Isabelle Garnier',
+    rating: 5,
+    comment: 'La médiation familiale proposée par Maître Lefevre a sauvé notre famille. Merci.',
+    date: '2024-01-08T10:30:00Z'
+  },
+
+  // Reviews pour Michel Rousseau (l2)
+  {
+    id: 'r18',
+    lawyerId: 'l2',
+    clientId: 'c18',
+    clientName: 'Bruno Leclerc',
+    rating: 4,
+    comment: 'Bon avocat d\'affaires à Lyon. Tarifs élevés mais qualité au rendez-vous.',
+    date: '2023-12-18T14:00:00Z'
+  },
+
+  // Reviews pour David Cohen (l23)
+  {
+    id: 'r19',
+    lawyerId: 'l23',
+    clientId: 'c19',
+    clientName: 'Sarah Levy',
+    rating: 5,
+    comment: 'Excellent en transactions immobilières. Très réactif et efficace.',
+    date: '2024-01-15T15:45:00Z'
+  },
+
+  // Reviews pour Sylvie Rousseau (l24)
+  {
+    id: 'r20',
+    lawyerId: 'l24',
+    clientId: 'c20',
+    clientName: 'François Dubois',
+    rating: 5,
+    comment: 'A protégé efficacement notre marque. Expertise en IP impressionnante.',
+    date: '2023-11-08T11:30:00Z'
+  },
+
+  // Reviews pour Jean-Pierre Martin (l25)
+  {
+    id: 'r21',
+    lawyerId: 'l25',
+    clientId: 'c21',
+    clientName: 'Nicolas Bertrand',
+    rating: 5,
+    comment: 'Ancien magistrat, il connaît le système par cœur. Excellent résultat.',
+    date: '2024-01-22T09:15:00Z'
+  },
+
+  // Reviews pour Christine Dupont (l28)
+  {
+    id: 'r22',
+    lawyerId: 'l28',
+    clientId: 'c22',
+    clientName: 'Marie Lemoine',
+    rating: 4,
+    comment: 'Avocate accessible et compétente. A réglé mon litige locatif rapidement.',
+    date: '2023-12-05T16:30:00Z'
+  },
+
+  // Reviews pour Camille Henry (l11)
+  {
+    id: 'r23',
+    lawyerId: 'l11',
+    clientId: 'c23',
+    clientName: 'Jacques Dubois',
+    rating: 5,
+    comment: 'Expert en PI viticole. A protégé notre domaine viticole efficacement.',
+    date: '2024-01-30T10:00:00Z'
+  },
+
+  // Reviews pour Laura Garnier (l9)
+  {
+    id: 'r24',
+    lawyerId: 'l9',
+    clientId: 'c24',
+    clientName: 'Antoine Mercier',
+    rating: 4,
+    comment: 'Bonne avocate en droit immobilier. Tarifs raisonnables.',
+    date: '2023-11-25T14:20:00Z'
+  },
+
+  // Reviews pour Lucas Perrin (l12)
+  {
+    id: 'r25',
+    lawyerId: 'l12',
+    clientId: 'c25',
+    clientName: 'Youssef Amrani',
+    rating: 5,
+    comment: 'Très humain et efficace. M\'a aidé pour mon regroupement familial.',
+    date: '2024-02-10T11:00:00Z'
+  },
+
+  // Reviews pour Thomas Leroy (l15)
+  {
+    id: 'r26',
+    lawyerId: 'l15',
+    clientId: 'c26',
+    clientName: 'Vladimir Petrov',
+    rating: 5,
+    comment: 'Best real estate lawyer on the French Riviera. Highly recommend.',
+    date: '2023-12-20T15:00:00Z'
+  },
+
+  // Reviews pour Rachid Benali (l33)
+  {
+    id: 'r27',
+    lawyerId: 'l33',
+    clientId: 'c27',
+    clientName: 'Fatima Zahra',
+    rating: 5,
+    comment: 'Avocat très compétent et humain. A géré mon dossier OFPRA avec succès.',
+    date: '2024-01-12T10:30:00Z'
+  },
+
+  // Reviews pour Sophie Dubois (l13)
+  {
+    id: 'r28',
+    lawyerId: 'l13',
+    clientId: 'c28',
+    clientName: 'Pierre Airbus',
+    rating: 5,
+    comment: 'Spécialiste aérospatial reconnue. Excellent travail sur notre brevet.',
+    date: '2023-11-30T09:45:00Z'
+  },
+
+  // Reviews pour Hugo Mathieu (l14)
+  {
+    id: 'r29',
+    lawyerId: 'l14',
+    clientId: 'c29',
+    clientName: 'Valérie Durand',
+    rating: 4,
+    comment: 'Divorce géré avec tact. Approche psychologique appréciée.',
+    date: '2024-01-05T16:00:00Z'
+  },
+
+  // Reviews pour Claire Lefebvre (l16)
+  {
+    id: 'r30',
+    lawyerId: 'l16',
+    clientId: 'c30',
+    clientName: 'Paul Moreau',
+    rating: 5,
+    comment: 'Excellente gestion de notre succession familiale. Très professionnelle.',
+    date: '2023-12-28T11:15:00Z'
+  },
+
+  // Reviews pour Julie Moreau (l17)
+  {
+    id: 'r31',
+    lawyerId: 'l17',
+    clientId: 'c31',
+    clientName: 'Hans Mueller',
+    rating: 5,
+    comment: 'Sehr kompetent in europäischem Recht. Excellent lawyer.',
+    date: '2024-01-18T14:30:00Z'
+  },
+
+  // Reviews pour Émilie Blanc (l18)
+  {
+    id: 'r32',
+    lawyerId: 'l18',
+    clientId: 'c32',
+    clientName: 'Robert Sanchez',
+    rating: 4,
+    comment: 'Bonne négociatrice en droit social. Accord collectif bien ficelé.',
+    date: '2023-12-10T10:00:00Z'
+  },
+
+  // Reviews pour Nicolas Andre (l19)
+  {
+    id: 'r33',
+    lawyerId: 'l19',
+    clientId: 'c33',
+    clientName: 'Yves Le Gall',
+    rating: 5,
+    comment: 'Connaît très bien le droit rural breton. Excellent.',
+    date: '2024-01-28T15:20:00Z'
+  },
+
+  // Reviews pour François Dubois (l21)
+  {
+    id: 'r34',
+    lawyerId: 'l21',
+    clientId: 'c34',
+    clientName: 'Laurent Martin',
+    rating: 5,
+    comment: 'Création de notre startup parfaitement gérée. Merci !',
+    date: '2023-11-12T09:30:00Z'
+  },
+
+  // Reviews pour Émilie Girard (l26)
+  {
+    id: 'r35',
+    lawyerId: 'l26',
+    clientId: 'c35',
+    clientName: 'Michel Rousseau',
+    rating: 4,
+    comment: 'Optimisation fiscale réussie. Recommandé.',
+    date: '2024-02-03T11:00:00Z'
+  },
+
+  // Reviews pour Vincent Mercier (l29)
+  {
+    id: 'r36',
+    lawyerId: 'l29',
+    clientId: 'c36',
+    clientName: 'Directeur RH TechCo',
+    rating: 5,
+    comment: 'Conseil juridique précieux pour notre PSE. Très professionnel.',
+    date: '2023-12-15T14:00:00Z'
+  },
+
+  // Reviews pour Paul Bertrand (l31)
+  {
+    id: 'r37',
+    lawyerId: 'l31',
+    clientId: 'c37',
+    clientName: 'Julien Bernard',
+    rating: 5,
+    comment: 'Avocat pénaliste très efficace. M\'a défendu avec succès.',
+    date: '2024-01-20T10:30:00Z'
+  },
+
+  // Reviews pour Sophie André (l32)
+  {
+    id: 'r38',
+    lawyerId: 'l32',
+    clientId: 'c38',
+    clientName: 'Catherine Blanc',
+    rating: 4,
+    comment: 'Bonne avocate en droit du travail. Contentieux prud\'hommal bien géré.',
+    date: '2023-11-18T15:45:00Z'
+  },
+
+  // Reviews pour Julien Garnier (l34)
+  {
+    id: 'r39',
+    lawyerId: 'l34',
+    clientId: 'c39',
+    clientName: 'PDG VinoTech',
+    rating: 5,
+    comment: 'A géré notre acquisition avec brio. Excellent avocat d\'affaires.',
+    date: '2024-01-25T09:00:00Z'
+  },
+
+  // Reviews pour Marie Lefebvre (l35)
+  {
+    id: 'r40',
+    lawyerId: 'l35',
+    clientId: 'c40',
+    clientName: 'Anne Dupont',
+    rating: 5,
+    comment: 'Très à l\'écoute lors de mon divorce. Je recommande.',
+    date: '2023-12-22T11:30:00Z'
+  },
+
+  // Reviews pour Philippe Roche (l36)
+  {
+    id: 'r41',
+    lawyerId: 'l36',
+    clientId: 'c41',
+    clientName: 'Marc Laurent',
+    rating: 4,
+    comment: 'Bon avocat pénaliste. Défense efficace.',
+    date: '2024-02-05T14:15:00Z'
+  },
+
+  // Reviews pour Marina Ivanova (l37)
+  {
+    id: 'r42',
+    lawyerId: 'l37',
+    clientId: 'c42',
+    clientName: 'Dmitri Sokolov',
+    rating: 5,
+    comment: 'Отличный налоговый юрист. Excellent fiscaliste international.',
+    date: '2023-11-28T10:00:00Z'
+  },
+
+  // Reviews pour Olivier Martin (l38)
+  {
+    id: 'r43',
+    lawyerId: 'l38',
+    clientId: 'c43',
+    clientName: 'Start-up Founder',
+    rating: 5,
+    comment: 'A accompagné notre levée de fonds. Top !',
+    date: '2024-01-15T16:30:00Z'
+  },
+
+  // Reviews pour Hans Schmidt (l39)
+  {
+    id: 'r44',
+    lawyerId: 'l39',
+    clientId: 'c44',
+    clientName: 'Klaus Werner',
+    rating: 5,
+    comment: 'Perfekt für deutsch-französische Geschäfte. Highly recommended.',
+    date: '2023-12-08T09:45:00Z'
+  },
+
+  // Reviews pour Fabien Durand (l40)
+  {
+    id: 'r45',
+    lawyerId: 'l40',
+    clientId: 'c45',
+    clientName: 'Investisseur Immo',
+    rating: 4,
+    comment: 'Expert en VEFA. Bonne sécurisation de notre projet immobilier.',
+    date: '2024-01-22T11:00:00Z'
+  },
+
+  // Reviews pour Anne Guillou (l41)
+  {
+    id: 'r46',
+    lawyerId: 'l41',
+    clientId: 'c46',
+    clientName: 'Sylvie Le Goff',
+    rating: 5,
+    comment: 'Médiation familiale excellente. Succession réglée à l\'amiable.',
+    date: '2023-12-30T15:00:00Z'
+  },
+
+  // Reviews pour Amina El Kadi (l43)
+  {
+    id: 'r47',
+    lawyerId: 'l43',
+    clientId: 'c47',
+    clientName: 'Hassan Idrissi',
+    rating: 5,
+    comment: 'محامية ممتازة. M\'a aidé pour mon recours CNDA. Succès !',
+    date: '2024-02-08T10:30:00Z'
+  },
+  {
+    id: 'r48',
+    lawyerId: 'l43',
+    clientId: 'c48',
+    clientName: 'Leila Mansour',
+    rating: 5,
+    comment: 'Très compétente et disponible. Mon dossier a été accepté grâce à elle.',
+    date: '2023-11-20T14:00:00Z'
+  },
+
+  // Reviews pour Béatrice Fontaine (l45)
+  {
+    id: 'r49',
+    lawyerId: 'l45',
+    clientId: 'c49',
+    clientName: 'Bernard Dubois',
+    rating: 5,
+    comment: 'Expert en droit des assurances. Aidez à résoudre notre litige.',
+    date: '2024-01-28T16:30:00Z'
+  },
+  {
+    id: 'r50',
+    lawyerId: 'l45',
+    clientId: 'c50',
+    clientName: 'Bernard Dubois',
+    rating: 5,
+    comment: 'Expert en droit des assurances. Aidez à résoudre notre litige.',
+    date: '2024-01-28T16:30:00Z'
+  }]

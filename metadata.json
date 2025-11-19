@@ -1,0 +1,7 @@
+{
+  "name": "Jurilab",
+  "description": "A premium platform connecting clients with top-tier legal professionals through smart matching and seamless booking.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
