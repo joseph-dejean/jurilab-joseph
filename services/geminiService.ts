@@ -1,11 +1,11 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LegalSpecialty } from '../types';
 
 // In a real app, ensure API_KEY is handled securely via backend proxy.
 // Here we use process.env.API_KEY as instructed.
 const getAI = () => {
   const apiKey = process.env.API_KEY || '';
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenerativeAI(apiKey);
 };
 
 // Helper function to retry API calls with exponential backoff
@@ -48,8 +48,13 @@ export const analyzeLegalCase = async (userQuery: string, availableLawyers: any[
   recommendedLawyers: string[];
 }> => {
   try {
-    const ai = getAI();
-    const model = 'gemini-1.5-flash-latest';
+    const genAI = getAI();
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    });
     
     console.log(`Analyzing case with ${availableLawyers.length} lawyers available`);
     
@@ -72,16 +77,10 @@ export const analyzeLegalCase = async (userQuery: string, availableLawyers: any[
     `;
 
     const specialtyResponse = await retryWithBackoff(() => 
-      ai.models.generateContent({
-        model,
-        contents: specialtyPrompt,
-        config: {
-          responseMimeType: 'application/json'
-        }
-      })
+      model.generateContent(specialtyPrompt)
     );
 
-    const specialtyText = specialtyResponse.text;
+    const specialtyText = specialtyResponse.response.text();
     if (!specialtyText) throw new Error('No response from AI for specialty detection');
     
     const specialtyResult = JSON.parse(specialtyText);
@@ -146,16 +145,10 @@ export const analyzeLegalCase = async (userQuery: string, availableLawyers: any[
     `;
     
     const rankingResponse = await retryWithBackoff(() =>
-      ai.models.generateContent({
-        model,
-        contents: rankingPrompt,
-        config: {
-          responseMimeType: 'application/json'
-        }
-      })
+      model.generateContent(rankingPrompt)
     );
     
-    const rankingText = rankingResponse.text;
+    const rankingText = rankingResponse.response.text();
     if (!rankingText) throw new Error('No response from AI for lawyer ranking');
     
     const rankingResult = JSON.parse(rankingText);
@@ -201,38 +194,39 @@ export const streamLegalChat = async function* (
   history: { role: 'user' | 'model'; parts: { text: string }[] }[], 
   currentMessage: string
 ) {
-  const ai = getAI();
-  const model = 'gemini-1.5-flash-latest';
-  
-  const chat = ai.chats.create({
-    model,
-    history: history,
-    config: {
-      tools: [{ googleSearch: {} }], // Enable Google Search
-      systemInstruction: `
-        Tu es Juribot, l'assistant virtuel intelligent de Jurilab.
-        Ta mission est d'aider les utilisateurs à comprendre le droit français, à vulgariser des termes juridiques complexes (contrats, actes) et à trouver des jurisprudences pertinentes.
+  const genAI = getAI();
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    systemInstruction: `
+      Tu es Juribot, l'assistant virtuel intelligent de Jurilab.
+      Ta mission est d'aider les utilisateurs à comprendre le droit français, à vulgariser des termes juridiques complexes (contrats, actes) et à trouver des jurisprudences pertinentes.
 
-        RÈGLES STRICTES :
-        1. **CLAUSE DE NON-RESPONSABILITÉ** : Tu n'es PAS un avocat. Tu ne donnes pas de conseils juridiques personnalisés, mais uniquement des informations à caractère documentaire. Rappelle souvent à l'utilisateur de consulter un avocat pour son cas précis.
-        2. **SOURCES** : Pour tes recherches, tu dois privilégier EXCLUSIVEMENT les sources officielles :
-           - legifrance.gouv.fr
-           - service-public.fr
-           - dalloz.fr
-           - courdecassation.fr
-           - autres sites en .gouv.fr
-        3. Si une question est floue, demande des précisions.
-        4. Sois clair, concis et pédagogique. Utilise un ton professionnel mais bienveillant.
-        5. Si tu utilises l'outil de recherche, cite tes sources à la fin.
-      `,
-    }
+      RÈGLES STRICTES :
+      1. **CLAUSE DE NON-RESPONSABILITÉ** : Tu n'es PAS un avocat. Tu ne donnes pas de conseils juridiques personnalisés, mais uniquement des informations à caractère documentaire. Rappelle souvent à l'utilisateur de consulter un avocat pour son cas précis.
+      2. **SOURCES** : Pour tes recherches, tu dois privilégier EXCLUSIVEMENT les sources officielles :
+         - legifrance.gouv.fr
+         - service-public.fr
+         - dalloz.fr
+         - courdecassation.fr
+         - autres sites en .gouv.fr
+      3. Si une question est floue, demande des précisions.
+      4. Sois clair, concis et pédagogique. Utilise un ton professionnel mais bienveillant.
+      5. Cite toujours tes sources à la fin.
+    `,
+  });
+  
+  const chat = model.startChat({
+    history: history.map(msg => ({
+      role: msg.role,
+      parts: msg.parts
+    })),
   });
 
-  const result = await chat.sendMessageStream({ message: currentMessage });
+  const result = await chat.sendMessageStream(currentMessage);
 
-  for await (const chunk of result) {
+  for await (const chunk of result.stream) {
     yield {
-      text: chunk.text,
+      text: chunk.text(),
       groundingMetadata: chunk.candidates?.[0]?.groundingMetadata
     };
   }

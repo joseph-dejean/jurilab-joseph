@@ -10,7 +10,7 @@
     "upload-firebase": "node scripts/uploadToFirebase.cjs"
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
+    "@google/generative-ai": "^0.24.1",
     "@types/papaparse": "^5.5.0",
     "lucide-react": "^0.553.0",
     "papaparse": "^5.5.3",
