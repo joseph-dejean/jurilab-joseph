@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { Lawyer, LegalSpecialty } from '../types';
@@ -9,7 +9,7 @@ import { Search, Filter, DollarSign, Sparkles } from 'lucide-react';
 import { analyzeLegalCase } from '../services/geminiService';
 
 export const SearchPage: React.FC = () => {
-  const { lawyers, t, translateSpecialty } = useApp();
+  const { lawyers, t, translateSpecialty, isLoadingLawyers } = useApp();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialQuery = searchParams.get('q') || '';
@@ -37,15 +37,19 @@ export const SearchPage: React.FC = () => {
   const [citySearch, setCitySearch] = useState<string>('');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
 
-  // Extract all unique cities - NO LIMIT!
-  const allCities = Array.from(new Set(lawyers.map(l => l.location.split(',')[0]?.trim() || l.location)))
-    .filter(c => c && c !== '')
-    .sort();
+  // Extract all unique cities - OPTIMIZED with useMemo
+  const allCities = useMemo(() => {
+    if (lawyers.length === 0) return [];
+    return Array.from(new Set(lawyers.map(l => l.location.split(',')[0]?.trim() || l.location)))
+      .filter(c => c && c !== '')
+      .sort();
+  }, [lawyers]);
   
   // Filter cities based on search input
-  const filteredCities = citySearch 
-    ? allCities.filter(city => city.toLowerCase().startsWith(citySearch.toLowerCase()))
-    : allCities;
+  const filteredCities = useMemo(() => {
+    if (!citySearch) return allCities;
+    return allCities.filter(city => city.toLowerCase().startsWith(citySearch.toLowerCase()));
+  }, [citySearch, allCities]);
 
   // Pagination State
   const [displayLimit, setDisplayLimit] = useState(20);
@@ -156,6 +160,17 @@ export const SearchPage: React.FC = () => {
     setModalLawyer(lawyer);
     setIsProfileModalOpen(true);
   };
+
+  // Show loading indicator while lawyers are being fetched from Firebase
+  if (isLoadingLawyers) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] bg-slate-100/50 dark:bg-navy/50">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-brand border-t-transparent mb-4"></div>
+        <p className="text-lg font-semibold text-navy dark:text-white">Chargement des avocats...</p>
+        <p className="text-sm text-slate-500 mt-2">Connexion à Firebase en cours</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden bg-slate-100/50 dark:bg-navy/50">

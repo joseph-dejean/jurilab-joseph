@@ -216,6 +216,7 @@ interface AppState {
   appointments: Appointment[];
   darkMode: boolean;
   language: Language;
+  isLoadingLawyers: boolean;
   t: typeof TRANSLATIONS['en'];
   // Chat State
   isChatOpen: boolean;
@@ -238,11 +239,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [darkMode, setDarkMode] = useState(false);
   const [language, setLanguage] = useState<Language>('fr');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isLoadingLawyers, setIsLoadingLawyers] = useState(true);
 
   // Load lawyers from Firebase on mount
   useEffect(() => {
     const loadLawyers = async () => {
       try {
+        setIsLoadingLawyers(true);
         console.log('🔥 Loading lawyers from Firebase...');
         const lawyersData = await loadLawyersFromFirebase();
         
@@ -258,6 +261,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         console.error('1. Firebase config is correct');
         console.error('2. Database rules allow read access');
         console.error('3. Data has been uploaded to Firebase');
+      } finally {
+        setIsLoadingLawyers(false);
       }
     };
     loadLawyers();
@@ -317,7 +322,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{ 
       currentUser, lawyers, appointments, darkMode, 
       language, setLanguage, t: TRANSLATIONS[language], translateSpecialty,
-      isChatOpen, toggleChat,
+      isChatOpen, toggleChat, isLoadingLawyers,
       login, logout, toggleDarkMode, bookAppointment 
     }}>
       {children}
