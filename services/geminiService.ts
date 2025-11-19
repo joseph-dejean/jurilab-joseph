@@ -49,7 +49,7 @@ export const analyzeLegalCase = async (userQuery: string, availableLawyers: any[
 }> => {
   try {
     const ai = getAI();
-    const model = 'gemini-1.5-flash';
+    const model = 'gemini-1.5-flash-latest';
     
     console.log(`Analyzing case with ${availableLawyers.length} lawyers available`);
     
@@ -202,7 +202,7 @@ export const streamLegalChat = async function* (
   currentMessage: string
 ) {
   const ai = getAI();
-  const model = 'gemini-1.5-flash';
+  const model = 'gemini-1.5-flash-latest';
   
   const chat = ai.chats.create({
     model,
