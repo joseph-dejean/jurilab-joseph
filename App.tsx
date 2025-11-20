@@ -7,6 +7,7 @@ import { SearchPage } from './pages/SearchPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { LawyerRegistrationPage } from './pages/LawyerRegistrationPage';
+import { LawyerProfileEditor } from './pages/LawyerProfileEditor';
 import VideoCallPage from './pages/VideoCallPage';
 import { AdminPage } from './pages/AdminPage';
 
@@ -21,6 +22,7 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register-lawyer" element={<LawyerRegistrationPage />} />
+            <Route path="/lawyer/profile-editor" element={<LawyerProfileEditor />} />
             <Route path="/video-call" element={<VideoCallPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

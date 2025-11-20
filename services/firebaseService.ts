@@ -1,7 +1,7 @@
 import { ref, get, set, onValue, push, update, remove } from 'firebase/database';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
 import { database, auth, googleProvider } from '../firebaseConfig';
-import { Lawyer, Client, UserRole, Appointment, User } from '../types';
+import { Lawyer, Client, UserRole, Appointment, User, ProfileBlock } from '../types';
 
 /**
  * Load all lawyers from Firebase Realtime Database
@@ -101,6 +101,84 @@ export const addLawyerToFirebase = async (lawyer: Lawyer): Promise<void> => {
   } catch (error) {
     console.error('❌ Error adding lawyer to Firebase:', error);
     throw error;
+  }
+};
+
+/**
+ * Update a lawyer's profile configuration (ProfileBuilder blocks)
+ * This only updates the profileConfig field without overwriting other lawyer data
+ */
+export const updateLawyerProfileConfig = async (
+  lawyerId: string, 
+  profileConfig: ProfileBlock[]
+): Promise<void> => {
+  try {
+    console.log(`📝 Updating profile config for lawyer: ${lawyerId}`);
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    
+    // Use update() to only modify the profileConfig field
+    await update(lawyerRef, {
+      profileConfig: profileConfig
+    });
+    
+    console.log(`✅ Successfully updated profile config (${profileConfig.length} blocks)`);
+  } catch (error) {
+    console.error('❌ Error updating profile config:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a user (lawyer or client) by email
+ * Used for the Profile Builder login system
+ */
+export const getUserByEmail = async (email: string): Promise<User | Lawyer | null> => {
+  try {
+    // Try to find in 'users' node first
+    const usersRef = ref(database, 'users');
+    const usersSnapshot = await get(usersRef);
+    
+    if (usersSnapshot.exists()) {
+      const users: User[] = Object.values(usersSnapshot.val());
+      const user = users.find(u => u.email === email);
+      if (user) {
+        // If it's a lawyer, get full profile from lawyers node
+        if (user.role === UserRole.LAWYER) {
+          const lawyerProfile = await getLawyerById(user.id);
+          return lawyerProfile || user;
+        }
+        return user;
+      }
+    }
+    
+    // Try to find as lawyer in 'lawyers' node
+    const lawyersRef = ref(database, 'lawyers');
+    const lawyersSnapshot = await get(lawyersRef);
+    
+    if (lawyersSnapshot.exists()) {
+      const lawyers: Lawyer[] = Object.values(lawyersSnapshot.val());
+      const lawyer = lawyers.find(l => l.email === email);
+      if (lawyer) {
+        return lawyer;
+      }
+    }
+    
+    // Try to find as client in 'clients' node (legacy support)
+    const clientsRef = ref(database, 'clients');
+    const clientsSnapshot = await get(clientsRef);
+    
+    if (clientsSnapshot.exists()) {
+      const clients: Client[] = Object.values(clientsSnapshot.val());
+      const client = clients.find(c => c.email === email);
+      if (client) {
+        return client;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Error getting user by email:', error);
+    return null;
   }
 };
 

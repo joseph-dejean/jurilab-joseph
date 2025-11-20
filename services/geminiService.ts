@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
-const API_KEY = "AIzaSyDKD-ca9QFpkmajrHnFj8rQjXfPLQIVt78";
+// Load API key from environment variable (from parent .env file)
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 

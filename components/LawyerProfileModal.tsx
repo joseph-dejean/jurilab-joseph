@@ -3,6 +3,7 @@ import { Lawyer, Appointment } from '../types';
 import { useApp } from '../store/store';
 import { Button } from './Button';
 import { BookingCalendar } from './BookingCalendar';
+import { ProfileViewer } from './profile-builder/ProfileViewer';
 import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, Video, MapPin, Phone } from 'lucide-react';
 import { format, addDays, setHours, setMinutes, setSeconds, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -140,9 +141,33 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
               <X className="w-6 h-6 text-slate-500" />
             </button>
            </div>
-           <p className="mt-4 text-slate-600 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none flex-shrink-0">{lawyer.bio}</p>
            
-           <div className="mt-8 flex-grow flex flex-col">
+           {/* Show profile blocks if they exist, otherwise show classic bio */}
+           {lawyer.profileConfig && lawyer.profileConfig.length > 0 ? (
+             <div className="mt-4">
+               <ProfileViewer 
+                 blocks={lawyer.profileConfig}
+                 lawyerData={{
+                   coordinates: lawyer.coordinates,
+                   location: lawyer.location
+                 }}
+                 onContactClick={() => {
+                   // Scroll to booking section
+                   const bookingSection = document.querySelector('[data-booking-section]');
+                   bookingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                 }}
+                 onVideoClick={() => {
+                   setConsultationType('VIDEO');
+                   const bookingSection = document.querySelector('[data-booking-section]');
+                   bookingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                 }}
+               />
+             </div>
+           ) : (
+             <p className="mt-4 text-slate-600 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none flex-shrink-0">{lawyer.bio}</p>
+           )}
+           
+           <div className="mt-8 flex-grow flex flex-col" data-booking-section>
               <h2 className="text-xl font-semibold text-navy dark:text-white mb-4">{t.modal.bookTitle}</h2>
               
               {/* Consultation Type Selection */}

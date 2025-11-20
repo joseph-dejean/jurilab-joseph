@@ -16,6 +16,31 @@ export enum LegalSpecialty {
   GENERAL = 'General Practice'
 }
 
+export enum ProfileBlockType {
+  TEXT = 'TEXT',
+  MEDIA = 'MEDIA',
+  VIDEO = 'VIDEO',
+  CONTACT = 'CONTACT',
+  LOGO = 'LOGO',
+  MAP = 'MAP',
+  STATS = 'STATS',
+  TESTIMONIALS = 'TESTIMONIALS',
+  CERTIFICATIONS = 'CERTIFICATIONS',
+  SOCIAL = 'SOCIAL',
+  COLLABORATORS = 'COLLABORATORS',
+}
+
+export type ProfileBlockSize = 'small' | 'medium' | 'large' | 'full' | 'tall' | 'wide' | 'hero' | 'square';
+
+export interface ProfileBlock {
+  id: string;
+  type: ProfileBlockType;
+  title?: string;
+  content?: string; // For text or media URL
+  order: number;
+  size: ProfileBlockSize;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -35,6 +60,7 @@ export interface Lawyer extends User {
   availableSlots: string[]; // ISO date strings
   firmName?: string;
   yearsExperience: number;
+  profileConfig?: ProfileBlock[];
   rating?: number;
   reviewCount?: number;
 }
