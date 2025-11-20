@@ -15,7 +15,7 @@ Ouvrez `firebaseConfig.ts` et remplacez:
 
 ```typescript
 const firebaseConfig = {
-  apiKey: "COLLEZ_VOTRE_API_KEY_ICI",
+  apiKey: "VOTRE_CLE_API_FIREBASE",
   authDomain: "jurilab-8bc6d.firebaseapp.com",
   databaseURL: "https://jurilab-8bc6d-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "jurilab-8bc6d",

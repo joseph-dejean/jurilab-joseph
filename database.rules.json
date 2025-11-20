@@ -1,0 +1,37 @@
+{
+  "rules": {
+    "lawyers": {
+      ".read": true,
+      // Admins can write to any lawyer profile
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      "$uid": {
+        // A user can write to their own lawyer profile if authenticated
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "users": {
+      // Admins can read and write all user data
+      ".read": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      "$uid": {
+        // A user can read or write to their own user profile
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "appointments": {
+      // Admins can read and write all appointment data
+      ".read": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".indexOn": ["clientId", "lawyerId"], // Improves query performance
+      "$appointmentId": {
+        // A user can read an appointment if they are the client or the lawyer
+        ".read": "auth != null && (data.child('clientId').val() === auth.uid || data.child('lawyerId').val() === auth.uid)",
+        // A user can create an appointment if they are authenticated and are the client for that appointment
+        // Allow client to create, and anyone to update (admins)
+        ".write": "!data.exists() && auth != null && newData.child('clientId').val() === auth.uid || data.exists()",
+        ".validate": "newData.hasChildren(['id', 'lawyerId', 'clientId', 'date', 'status', 'type'])"
+      }
+    }
+  }
+}

@@ -44,6 +44,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                {t.nav.dashboard}
              </Link>
             )}
+            {currentUser?.role === UserRole.ADMIN && (
+               <Link 
+               to="/admin" 
+               className={`text-sm font-semibold transition-colors ${isActive('/admin') ? 'text-brand-dark dark:text-brand' : 'text-slate-600 dark:text-slate-300 hover:text-brand-dark dark:hover:text-brand'}`}
+             >
+               Admin
+             </Link>
+            )}
           </nav>
 
           {/* Actions */}
@@ -133,7 +141,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </div>
           </div>
           <div className="border-t pt-8 flex justify-between items-center text-sm text-slate-500 dark:text-slate-400">
-            <p>&copy; 2024 Jurilab. {language === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}</p>
+            <p>&copy; 2025 Jurilab. {language === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}</p>
             <div className="flex space-x-6">
               <a href="#" className="hover:text-brand-dark dark:hover:text-brand">Mentions Légales</a>
               <a href="#" className="hover:text-brand-dark dark:hover:text-brand">CGU</a>

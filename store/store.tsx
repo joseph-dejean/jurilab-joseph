@@ -1,6 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Lawyer, Appointment, UserRole, LegalSpecialty, ChatMessage } from '../types';
-import { loadLawyersFromFirebase } from '../services/firebaseService';
+import { 
+  loadLawyersFromFirebase, 
+  loginUser, 
+  loginWithGoogle,
+  logoutUser, 
+  registerUser, 
+  getUserProfile, 
+  createAppointment,
+  getUserAppointments,
+  subscribeToAppointments
+} from '../services/firebaseService';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
 
 type Language = 'en' | 'fr';
 
@@ -71,7 +83,8 @@ const TRANSLATIONS = {
       lawyer: "Lawyer",
       signIn: "Sign In",
       haveAccount: "Already have an account?",
-      dontHaveAccount: "Don't have an account?"
+      dontHaveAccount: "Don't have an account?",
+      google: "Continue with Google"
     },
     modal: {
       about: "About",
@@ -98,6 +111,15 @@ const TRANSLATIONS = {
       disclaimer: "⚠️ IMPORTANT: Juribot is an AI assistant, not a lawyer. It can make errors. Information provided is for educational purposes only. Always consult a professional.",
       welcome: "Hello! I am Juribot. I can help you research French law (Légifrance, Dalloz) or explain complex terms. How can I help you today?",
       sources: "Sources found:"
+    },
+    booking: {
+      youSelected: "You have selected",
+      selectDay: "Please select a day.",
+      availableSlotsFor: "Available slots for",
+      noSlots: "No slots available.",
+      confirmMessage: "Appointment confirmed with",
+      confirmOn: "on",
+      selectSlotFirst: "Please select a time slot first."
     }
   },
   fr: {
@@ -166,7 +188,8 @@ const TRANSLATIONS = {
       lawyer: "Avocat",
       signIn: "Se Connecter",
       haveAccount: "Déjà un compte ?",
-      dontHaveAccount: "Pas encore de compte ?"
+      dontHaveAccount: "Pas encore de compte ?",
+      google: "Continuer avec Google"
     },
     modal: {
       about: "À Propos",
@@ -193,6 +216,15 @@ const TRANSLATIONS = {
       disclaimer: "⚠️ IMPORTANT : Juribot est une IA, pas un avocat. Elle peut faire des erreurs. Les infos sont à titre documentaire. Consultez toujours un professionnel.",
       welcome: "Bonjour ! Je suis Juribot. Je peux vous aider à rechercher des textes de loi (Légifrance, Dalloz) ou vulgariser des termes. Comment puis-je vous aider ?",
       sources: "Sources trouvées :"
+    },
+    booking: {
+      youSelected: "Vous avez sélectionné le",
+      selectDay: "Veuillez sélectionner un jour.",
+      availableSlotsFor: "Créneaux disponibles pour le",
+      noSlots: "Aucun créneau disponible.",
+      confirmMessage: "Rendez-vous confirmé avec",
+      confirmOn: "le",
+      selectSlotFirst: "Veuillez d'abord sélectionner un créneau horaire."
     }
   }
 };
@@ -224,10 +256,12 @@ interface AppState {
   
   translateSpecialty: (s: LegalSpecialty) => string;
   setLanguage: (lang: Language) => void;
-  login: (email: string, role: UserRole) => void;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  loginGoogle: (role?: UserRole) => Promise<void>;
+  register: (email: string, password: string, role: UserRole, name: string) => Promise<void>;
+  logout: () => Promise<void>;
   toggleDarkMode: () => void;
-  bookAppointment: (lawyerId: string, date: string, type: Appointment['type'], notes: string) => void;
+  bookAppointment: (lawyerId: string, date: string, type: Appointment['type'], notes: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -240,6 +274,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [language, setLanguage] = useState<Language>('fr');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isLoadingLawyers, setIsLoadingLawyers] = useState(true);
+
+  // Auth listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('👤 User logged in:', firebaseUser.email);
+        try {
+            const userProfile = await getUserProfile(firebaseUser.uid);
+            if (userProfile) {
+                setCurrentUser(userProfile);
+                
+                // Load appointments (this is now handled by the real-time listener below)
+                // const userAppointments = await getUserAppointments(userProfile.id, userProfile.role);
+                // setAppointments(userAppointments);
+            } else {
+                // Fallback if profile creation is delayed
+                console.warn('User profile not found in DB immediately.');
+                // Retry logic could go here, but for now relying on create logic to have finished
+            }
+        } catch (e) {
+            console.error('Error fetching user profile', e);
+        }
+      } else {
+        console.log('👋 User logged out');
+        setCurrentUser(null);
+        setAppointments([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time appointment listener
+  useEffect(() => {
+    if (!currentUser) {
+      setAppointments([]);
+      return;
+    }
+
+    const unsubscribe = subscribeToAppointments(currentUser.id, currentUser.role, (newAppointments) => {
+      setAppointments(newAppointments);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
 
   // Load lawyers from Firebase on mount
   useEffect(() => {
@@ -285,22 +364,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [darkMode]);
 
-  const login = (email: string, role: UserRole) => {
-    const user: User = {
-      id: 'u_' + Date.now(),
-      name: email.split('@')[0],
-      email,
-      role,
-      avatarUrl: `https://ui-avatars.com/api/?name=${email.split('@')[0]}`
-    };
-    setCurrentUser(user);
+  const login = async (email: string, password: string) => {
+    await loginUser(email, password);
   };
 
-  const logout = () => setCurrentUser(null);
+  const loginGoogle = async (role?: UserRole) => {
+    await loginWithGoogle(role);
+  };
+
+  const register = async (email: string, password: string, role: UserRole, name: string) => {
+    await registerUser(email, password, role, name);
+  };
+
+  const logout = async () => {
+      await logoutUser();
+  };
+
   const toggleDarkMode = () => setDarkMode(prev => !prev);
   const toggleChat = () => setIsChatOpen(prev => !prev);
 
-  const bookAppointment = (lawyerId: string, date: string, type: Appointment['type'], notes: string) => {
+  const bookAppointment = async (lawyerId: string, date: string, type: Appointment['type'], notes: string) => {
     if (!currentUser) return;
     const newAppt: Appointment = {
       id: 'appt_' + Date.now(),
@@ -311,7 +394,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       type,
       notes
     };
-    setAppointments([...appointments, newAppt]);
+    
+    try {
+        await createAppointment(newAppt);
+        // TODO: Notify lawyer or update availability
+    } catch (e) {
+        console.error("Error booking appointment:", e);
+        alert("Erreur lors de la réservation.");
+    }
   };
 
   const translateSpecialty = (s: LegalSpecialty) => {
@@ -323,7 +413,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       currentUser, lawyers, appointments, darkMode, 
       language, setLanguage, t: TRANSLATIONS[language], translateSpecialty,
       isChatOpen, toggleChat, isLoadingLawyers,
-      login, logout, toggleDarkMode, bookAppointment 
+      login, loginGoogle, register, logout, toggleDarkMode, bookAppointment 
     }}>
       {children}
     </AppContext.Provider>

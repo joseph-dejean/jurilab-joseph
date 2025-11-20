@@ -39,61 +39,52 @@ export const LegalChatbot: React.FC = () => {
       text: userText
     };
 
-    // Optimistic update
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
-    // Prepare history for API
-    const history = messages.map(m => ({
+    // The history sent to the API must start with a user message.
+    // We find the first user message and slice the array from there.
+    const firstUserMessageIndex = messages.findIndex(m => m.role === 'user');
+    const historyMessages = firstUserMessageIndex === -1 ? [] : messages.slice(firstUserMessageIndex);
+
+    const history = historyMessages.map(m => ({
       role: m.role,
       parts: [{ text: m.text }]
     }));
 
     try {
-      // Create placeholder for model response
       const modelMsgId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, { id: modelMsgId, role: 'model', text: '', isStreaming: true }]);
 
       const stream = streamLegalChat(history, userText);
       
       let fullText = '';
-      let sources: any[] = [];
 
       for await (const chunk of stream) {
         if (chunk.text) {
           fullText += chunk.text;
         }
-        if (chunk.groundingMetadata?.groundingChunks) {
-           // Extract chunks that are 'web' type
-           const webSources = chunk.groundingMetadata.groundingChunks
-             .filter((c: any) => c.web)
-             .map((c: any) => ({ title: c.web.title, uri: c.web.uri }));
-           
-           if (webSources.length > 0) {
-              sources = [...sources, ...webSources];
-           }
-        }
 
-        // Update message in place
         setMessages(prev => prev.map(m => 
           m.id === modelMsgId 
-            ? { ...m, text: fullText, sources: sources.length > 0 ? sources : undefined } 
+            ? { ...m, text: fullText } 
             : m
         ));
       }
       
-      // Finalize
       setMessages(prev => prev.map(m => 
         m.id === modelMsgId ? { ...m, isStreaming: false } : m
       ));
 
-    } catch (error) {
-      console.error(error);
-      setMessages(prev => [...prev, { 
-        id: Date.now().toString(), 
-        role: 'model', 
-        text: "Désolé, je rencontre une erreur technique pour le moment." 
-      }]);
+    } catch (error: any) {
+      console.error("Chat stream failed:", error);
+      const errorMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'model',
+        text: error.message || "Désolé, une erreur est survenue.",
+        isError: true,
+      };
+      setMessages(prev => [...prev.filter(m => !m.isStreaming), errorMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +113,7 @@ export const LegalChatbot: React.FC = () => {
                <h3 className="font-bold text-sm">{t.chatbot.title}</h3>
                <p className="text-xs opacity-80 flex items-center gap-1">
                  <span className="w-2 h-2 bg-green-400 rounded-full inline-block animate-pulse"></span>
-                 Online • Gemini 2.5
+                 Online • Gemini 1.5
                </p>
              </div>
              <button onClick={toggleChat} className="ml-auto hover:bg-white/20 p-1 rounded">
@@ -146,6 +137,8 @@ export const LegalChatbot: React.FC = () => {
                   className={`max-w-[85%] rounded-2xl p-3 text-sm shadow-sm 
                     ${msg.role === 'user' 
                       ? 'bg-primary-600 text-white rounded-tr-none' 
+                      : msg.isError
+                      ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800/30 rounded-tl-none'
                       : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-tl-none'
                     }`}
                 >

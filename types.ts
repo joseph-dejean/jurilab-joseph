@@ -35,6 +35,8 @@ export interface Lawyer extends User {
   availableSlots: string[]; // ISO date strings
   firmName?: string;
   yearsExperience: number;
+  rating?: number;
+  reviewCount?: number;
 }
 
 export interface Client extends User {
@@ -66,5 +68,6 @@ export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
   isStreaming?: boolean;
-  sources?: Array<{ title: string; uri: string }>;
+  sources?: { title: string; uri: string }[];
+  isError?: boolean;
 }

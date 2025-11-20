@@ -1,8 +1,12 @@
-import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
+// Import firebase modules with type-only import to avoid type declaration errors
+import type { FirebaseApp } from "firebase/app";
+import type { Database } from "firebase/database";
+import type { Analytics } from "firebase/analytics";
+import { initializeApp } from "firebase/app";
+import { getDatabase } from "firebase/database";
 import { getAnalytics } from "firebase/analytics";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "FIREBASE_API_KEY_REMOVED",
   authDomain: "jurilab-8bc6d.firebaseapp.com",
@@ -20,3 +24,5 @@ const analytics = getAnalytics(app);
 
 // Initialize Realtime Database and get a reference to the service
 export const database = getDatabase(app);
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();

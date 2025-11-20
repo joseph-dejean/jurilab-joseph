@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { LegalSpecialty, UserRole, Lawyer } from '../types';
 import { Button } from '../components/Button';
-import { addLawyerToFirebase } from '../services/firebaseService';
+import { registerLawyer, getAuthErrorMessage } from '../services/firebaseService';
 import { 
   User, Briefcase, MapPin, DollarSign, Languages, 
   FileText, Upload, Check, ChevronRight, ChevronLeft 
@@ -150,62 +150,6 @@ export const LawyerRegistrationPage: React.FC = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateStep(currentStep)) return;
-
-    setIsSubmitting(true);
-    
-    try {
-      // Generate unique lawyer ID based on timestamp and random string
-      const timestamp = Date.now();
-      const randomStr = Math.random().toString(36).substring(2, 7);
-      const lawyerId = `lawyer_${timestamp}_${randomStr}`;
-      
-      // Get coordinates for the city (basic implementation)
-      const coordinates = getCityCoordinates(formData.city);
-      
-      // Create Lawyer object
-      const newLawyer: Lawyer = {
-        id: lawyerId,
-        name: `${formData.firstName} ${formData.lastName}`,
-        specialty: formData.specialty,
-        location: `${formData.city}, France`,
-        hourlyRate: formData.hourlyRate,
-        experience: formData.yearsExperience,
-        languages: formData.languages,
-        availability: 'available',
-        bio: formData.bio,
-        education: [],
-        certifications: [],
-        cases: {
-          total: 0,
-          won: 0,
-          settled: 0
-        },
-        phone: formData.phone,
-        email: formData.email,
-        address: formData.address,
-        coordinates,
-        verified: false, // Will be verified by admin
-        firmName: formData.firmName,
-        barNumber: formData.barNumber,
-        responseTime: '24h'
-      };
-      
-      // Save to Firebase
-      await addLawyerToFirebase(newLawyer);
-      
-      alert('✅ Inscription réussie! Votre compte sera activé après vérification de vos documents (24-48h).');
-      navigate('/');
-    } catch (error) {
-      console.error('❌ Error during registration:', error);
-      alert('❌ Erreur lors de l\'inscription. Veuillez réessayer.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   // Helper function to get coordinates for common cities
   const getCityCoordinates = (city: string): { lat: number; lng: number } => {
     const cityCoords: Record<string, { lat: number; lng: number }> = {
@@ -233,6 +177,57 @@ export const LawyerRegistrationPage: React.FC = () => {
     
     const normalizedCity = city.toUpperCase().trim();
     return cityCoords[normalizedCity] || { lat: 46.2276, lng: 2.2137 }; // Default: center of France
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateStep(currentStep)) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      // Get coordinates for the city (basic implementation)
+      const coordinates = getCityCoordinates(formData.city);
+      
+      // Prepare lawyer data (excluding id and email which are handled by auth)
+      const lawyerData = {
+        name: `${formData.firstName} ${formData.lastName}`,
+        specialty: formData.specialty,
+        location: `${formData.city}, France`,
+        hourlyRate: formData.hourlyRate,
+        experience: formData.yearsExperience,
+        languages: formData.languages,
+        availableSlots: [], // Empty initially
+        bio: formData.bio,
+        education: [],
+        certifications: [],
+        cases: {
+          total: 0,
+          won: 0,
+          settled: 0
+        },
+        phone: formData.phone,
+        address: formData.address,
+        coordinates,
+        verified: false, // Will be verified by admin
+        firmName: formData.firmName,
+        barNumber: formData.barNumber,
+        responseTime: '24h',
+        role: UserRole.LAWYER,
+        avatarUrl: `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}`
+      };
+      
+      // Register via Firebase Auth and save profile
+      await registerLawyer(formData.email, formData.password, lawyerData);
+      
+      alert('✅ Inscription réussie! Votre compte sera activé après vérification de vos documents (24-48h).');
+      navigate('/');
+    } catch (error: any) {
+      console.error('❌ Error during registration:', error);
+      alert('❌ Erreur lors de l\'inscription: ' + getAuthErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderProgressBar = () => (
@@ -741,4 +736,3 @@ export const LawyerRegistrationPage: React.FC = () => {
     </div>
   );
 };
-

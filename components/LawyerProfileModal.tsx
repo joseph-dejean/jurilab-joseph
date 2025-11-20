@@ -1,212 +1,228 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Lawyer, Appointment } from '../types';
-import { BookingCalendar } from './BookingCalendar';
-import { Button } from './Button';
 import { useApp } from '../store/store';
-import { X, Check, MapPin, Briefcase, Clock, Globe } from 'lucide-react';
+import { Button } from './Button';
+import { BookingCalendar } from './BookingCalendar';
+import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, Video, MapPin, Phone } from 'lucide-react';
+import { format, addDays, setHours, setMinutes, setSeconds, isPast } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 
 interface LawyerProfileModalProps {
-  lawyer: Lawyer | null;
-  isOpen: boolean;
+  lawyer: Lawyer;
   onClose: () => void;
 }
 
-export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, isOpen, onClose }) => {
-  const { t, translateSpecialty, bookAppointment, currentUser, appointments } = useApp();
-  const navigate = useNavigate();
-  
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, onClose }) => {
+  const { t, translateSpecialty, currentUser, bookAppointment } = useApp();
+  const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [consultationType, setConsultationType] = useState<Appointment['type']>('VIDEO');
   const [notes, setNotes] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
+  const navigate = useNavigate();
 
-  if (!isOpen || !lawyer) return null;
-
-  // Filter out slots that are already booked in the system
-  const availableSlots = lawyer.availableSlots.filter(slot => {
-    return !appointments.some(a => a.lawyerId === lawyer.id && a.date === slot && a.status === 'CONFIRMED');
-  });
-
-  // If mock data has no slots, generate some for the demo to look good
-  const displaySlots = availableSlots.length > 0 ? availableSlots : [
-     new Date(Date.now() + 86400000 * 1 + 3600000 * 10).toISOString(),
-     new Date(Date.now() + 86400000 * 2 + 3600000 * 14).toISOString(),
-     new Date(Date.now() + 86400000 * 3 + 3600000 * 9).toISOString(),
-     new Date(Date.now() + 86400000 * 3 + 3600000 * 16).toISOString(),
-     new Date(Date.now() + 86400000 * 5 + 3600000 * 11).toISOString(),
-  ];
-
-  const handleBook = () => {
-    if (!currentUser) {
-      onClose();
-      navigate('/login');
-      return;
+  // Generate mock slots if the lawyer has none, for demonstration purposes
+  const availableSlots = useMemo(() => {
+    if (lawyer.availableSlots && lawyer.availableSlots.length > 0) {
+      return lawyer.availableSlots;
     }
-    if (selectedSlot) {
-      bookAppointment(lawyer.id, selectedSlot, consultationType, notes);
-      setIsSuccess(true);
-      setTimeout(() => {
-        setIsSuccess(false);
-        setSelectedSlot(null);
+    const mockSlots: string[] = [];
+    const now = new Date();
+    const hours = [9, 10, 11, 14, 15, 16];
+    for (let i = 1; i < 8; i++) {
+      for (const hour of hours) {
+        const slotDate = setSeconds(setMinutes(setHours(addDays(now, i), hour), 0), 0);
+        if (!isPast(slotDate)) {
+          mockSlots.push(slotDate.toISOString());
+        }
+      }
+    }
+    return mockSlots;
+  }, [lawyer.availableSlots]);
+
+  const handleBooking = async () => {
+    if (selectedSlot && currentUser) {
+      setIsBooking(true);
+      try {
+        await bookAppointment(lawyer.id, selectedSlot.toISOString(), consultationType, notes);
+        alert(`${t.booking.confirmMessage} ${lawyer.name} ${t.booking.confirmOn} ${format(selectedSlot, 'PPPP p', { locale: fr })}`);
         onClose();
-        navigate('/dashboard');
-      }, 2000);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsBooking(false);
+      }
+    } else {
+      alert(t.booking.selectSlotFirst);
     }
   };
 
+  const handleLoginRedirect = () => {
+      onClose();
+      navigate('/login');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div 
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-      
-      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row animate-fade-in-up">
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-        >
-          <X className="h-5 w-5 text-slate-500" />
-        </button>
-
-        {/* Left Column: Profile Info */}
-        <div className="w-full md:w-5/12 bg-slate-50 dark:bg-navy-dark p-6 md:p-8 border-b md:border-b-0 md:border-r">
-          <div className="flex flex-col items-center text-center mb-6">
-            <img 
-              src={lawyer.avatarUrl} 
-              alt={lawyer.name} 
-              className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-slate-800 shadow-lg mb-4"
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white dark:bg-navy-dark rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] grid grid-cols-1 lg:grid-cols-3 overflow-hidden">
+        
+        {/* Left Column: Info & Contact */}
+        <div className="lg:col-span-1 bg-slate-50 dark:bg-navy p-6 flex flex-col overflow-y-auto">
+          <div className="text-center">
+            <img
+              src={lawyer.avatarUrl}
+              alt={lawyer.name}
+              className="w-32 h-32 rounded-full object-cover ring-4 ring-white dark:ring-navy mx-auto"
             />
-            <h2 className="text-2xl font-serif text-navy dark:text-white">{lawyer.name}</h2>
-            <p className="text-brand-dark dark:text-brand font-medium">{lawyer.firmName}</p>
-          </div>
-
-          <div className="space-y-4 text-sm">
-            <div className="flex items-start gap-3">
-               <Briefcase className="h-5 w-5 text-slate-400 mt-0.5" />
-               <div>
-                 <h4 className="font-semibold text-navy dark:text-white">{t.modal.specialties}</h4>
-                 <p className="text-slate-600 dark:text-slate-400">{translateSpecialty(lawyer.specialty)}</p>
-               </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-               <MapPin className="h-5 w-5 text-slate-400 mt-0.5" />
-               <div>
-                 <h4 className="font-semibold text-navy dark:text-white">{lawyer.location}</h4>
-               </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-               <Clock className="h-5 w-5 text-slate-400 mt-0.5" />
-               <div>
-                 <h4 className="font-semibold text-navy dark:text-white">{t.modal.experience}</h4>
-                 <p className="text-slate-600 dark:text-slate-400">{lawyer.yearsExperience} {t.modal.years}</p>
-               </div>
-            </div>
-
-             <div className="flex items-start gap-3">
-               <Globe className="h-5 w-5 text-slate-400 mt-0.5" />
-               <div>
-                 <h4 className="font-semibold text-navy dark:text-white">{t.modal.languages}</h4>
-                 <div className="flex flex-wrap gap-1 mt-1">
-                    {lawyer.languages.map(lang => (
-                      <span key={lang} className="px-2 py-0.5 bg-slate-200 dark:bg-navy rounded text-xs text-slate-700 dark:text-slate-300">
-                        {lang}
-                      </span>
-                    ))}
-                 </div>
-               </div>
-            </div>
-          </div>
-
-          <div className="mt-6 p-4 bg-white dark:bg-navy rounded-xl border">
-             <h4 className="font-semibold text-navy dark:text-white mb-2">{t.modal.about}</h4>
-             <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">{lawyer.bio}</p>
-          </div>
-        </div>
-
-        {/* Right Column: Booking */}
-        <div className="w-full md:w-7/12 p-6 md:p-8 flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b mb-6 pb-4">
-            <h3 className="text-xl font-semibold text-navy dark:text-white">{t.modal.bookTitle}</h3>
-            <div className="text-lg font-semibold text-navy dark:text-white">
-              {lawyer.hourlyRate}€<span className="text-sm font-normal text-slate-500">/h</span>
-            </div>
+            <h1 className="text-2xl font-bold text-navy dark:text-white mt-4">{lawyer.name}</h1>
+            <p className="text-md text-slate-500 dark:text-slate-400">{lawyer.firmName}</p>
+            {lawyer.rating && lawyer.reviewCount && (
+              <div className="flex items-center justify-center mt-2">
+                <Star className="w-4 h-4 text-yellow-400" />
+                <p className="ml-1 text-sm text-slate-600 dark:text-slate-300">
+                  {lawyer.rating} ({lawyer.reviewCount} {t.modal.reviewsTitle})
+                </p>
+              </div>
+            )}
           </div>
           
-          {/* Booking Content */}
-          {(
-            <>
-              {isSuccess ? (
-                 <div className="flex-grow flex flex-col items-center justify-center text-center p-8 animate-fade-in">
-                    <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
-                       <Check className="h-8 w-8" />
-                    </div>
-                    <h4 className="text-2xl font-bold text-navy dark:text-white mb-2">{t.modal.success}</h4>
-                    <p className="text-slate-500">Redirection vers le tableau de bord...</p>
-                 </div>
-              ) : (
-                 <div className="flex-col flex h-full">
-                   <div className="mb-6">
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t.modal.selectSlot}</label>
-                      <BookingCalendar 
-                        availableSlots={displaySlots} 
-                        selectedSlot={selectedSlot}
-                        onSelectSlot={setSelectedSlot}
-                      />
-                   </div>
+          <div className="mt-8 space-y-4">
+             <div className="flex items-start space-x-3">
+              <Briefcase className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-sm text-navy dark:text-white">{t.modal.specialties}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{translateSpecialty(lawyer.specialty)}</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Languages className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-sm text-navy dark:text-white">{t.modal.languages}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{lawyer.languages?.join(', ') || 'Non spécifié'}</p>
+              </div>
+            </div>
+             <div className="flex items-start space-x-3">
+              <Clock className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-sm text-navy dark:text-white">{t.modal.experience}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{lawyer.yearsExperience} {t.modal.years}</p>
+              </div>
+            </div>
+          </div>
 
-                   {selectedSlot && (
-                      <div className="space-y-4 animate-fade-in">
-                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t.modal.consultationType}</label>
-                            <div className="grid grid-cols-3 gap-2">
-                               {[
-                                 { id: 'VIDEO', label: t.modal.video }, 
-                                 { id: 'IN_PERSON', label: t.modal.inPerson }, 
-                                 { id: 'PHONE', label: t.modal.phone }
-                               ].map((type) => (
-                                  <button
-                                    key={type.id}
-                                    onClick={() => setConsultationType(type.id as any)}
-                                    className={`p-2 rounded-lg text-xs font-medium border transition-all ${consultationType === type.id ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-primary-300'}`}
-                                  >
-                                     {type.label}
-                                  </button>
-                               ))}
-                            </div>
-                         </div>
+          <div className="mt-auto pt-6">
+             <h3 className="text-lg font-semibold text-navy dark:text-white border-b-2 border-red-500 pb-2 mb-4 inline-block">Contacter</h3>
+             <div className="space-y-3">
+                <textarea 
+                  className="w-full p-2 text-sm border border-slate-300 dark:border-navy-light rounded-md bg-transparent focus:ring-2 focus:ring-red-500 outline-none"
+                  rows={3}
+                  placeholder="Votre message..."
+                />
+                <div className="flex justify-between items-center">
+                  <Button variant="outline" size="sm" className="flex items-center">
+                    <Paperclip className="w-4 h-4 mr-2" />
+                    Joindre un document
+                  </Button>
+                   <Button variant="solid" size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center">
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Envoyer
+                  </Button>
+                </div>
+             </div>
+           </div>
+        </div>
 
-                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t.modal.notes}</label>
-                            <textarea 
-                               rows={3}
-                               value={notes}
-                               onChange={(e) => setNotes(e.target.value)}
-                               className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                               placeholder="..."
-                            />
-                         </div>
-                      </div>
-                   )}
+        {/* Right Column: About & Booking */}
+        <div className="lg:col-span-2 p-8 flex flex-col overflow-y-auto">
+           <div className="flex items-start justify-between">
+             <h2 className="text-xl font-semibold text-navy dark:text-white border-b-2 border-red-500 pb-2 inline-block">{t.modal.about}</h2>
+             <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-navy-light transition-colors">
+              <X className="w-6 h-6 text-slate-500" />
+            </button>
+           </div>
+           <p className="mt-4 text-slate-600 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none flex-shrink-0">{lawyer.bio}</p>
+           
+           <div className="mt-8 flex-grow flex flex-col">
+              <h2 className="text-xl font-semibold text-navy dark:text-white mb-4">{t.modal.bookTitle}</h2>
+              
+              {/* Consultation Type Selection */}
+              <div className="mb-6 flex gap-4">
+                <button
+                  onClick={() => setConsultationType('VIDEO')}
+                  className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 transition-all ${
+                    consultationType === 'VIDEO' 
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
+                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <Video className="h-6 w-6" />
+                  <span className="font-medium text-sm">{t.modal.video}</span>
+                </button>
+                <button
+                  onClick={() => setConsultationType('IN_PERSON')}
+                  className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 transition-all ${
+                    consultationType === 'IN_PERSON' 
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
+                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <MapPin className="h-6 w-6" />
+                  <span className="font-medium text-sm">{t.modal.inPerson}</span>
+                </button>
+                <button
+                  onClick={() => setConsultationType('PHONE')}
+                  className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 transition-all ${
+                    consultationType === 'PHONE' 
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
+                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <Phone className="h-6 w-6" />
+                  <span className="font-medium text-sm">{t.modal.phone}</span>
+                </button>
+              </div>
 
-                   <div className="mt-auto pt-6">
-                      <Button 
-                         onClick={handleBook} 
-                         disabled={!selectedSlot} 
-                         className="w-full"
-                         size="lg"
-                      >
-                         {currentUser ? t.modal.confirm : t.modal.loginToBook}
-                      </Button>
-                   </div>
-                 </div>
-              )}
-            </>
-          )}
+              <div className="flex-grow">
+                <BookingCalendar 
+                  availableSlots={availableSlots}
+                  onSlotSelect={setSelectedSlot} 
+                />
+              </div>
+
+              {/* Optional Notes */}
+              <div className="mt-4">
+                <input 
+                    type="text" 
+                    placeholder={t.modal.notes}
+                    className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-red-500"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="mt-4 pt-2">
+                {currentUser ? (
+                  <Button 
+                    size="lg" 
+                    className="w-full bg-red-600 hover:bg-red-700 text-white" 
+                    onClick={handleBooking}
+                    disabled={!selectedSlot || isBooking}
+                  >
+                    {isBooking ? 'Réservation...' : t.modal.confirm}
+                  </Button>
+                ) : (
+                   <Button 
+                    size="lg" 
+                    className="w-full flex items-center justify-center"
+                    variant="outline"
+                    onClick={handleLoginRedirect}
+                  >
+                    <LogIn className="w-5 h-5 mr-2" />
+                    {t.modal.loginToBook}
+                  </Button>
+                )}
+              </div>
+           </div>
         </div>
       </div>
     </div>

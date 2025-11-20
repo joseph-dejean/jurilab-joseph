@@ -1,8 +1,11 @@
 import React from 'react';
 import { useApp } from '../store/store';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MessageSquare, FileText, Settings, Bell } from 'lucide-react';
+import { Calendar, MessageSquare, FileText, Settings, Bell, ExternalLink, Video } from 'lucide-react';
 import { Button } from '../components/Button';
+import { UserRole } from '../types';
+import { GoogleAuthProvider, linkWithPopup } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
 
 export const DashboardPage: React.FC = () => {
   const { currentUser, appointments, lawyers, logout, t } = useApp();
@@ -15,7 +18,29 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Filter appointments for this user
-  const myAppointments = appointments.filter(a => a.clientId === currentUser.id);
+  const myAppointments = appointments.filter(a => 
+    currentUser.role === UserRole.LAWYER 
+      ? a.lawyerId === currentUser.id 
+      : a.clientId === currentUser.id
+  );
+
+  const connectGoogleCalendar = async () => {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/calendar');
+      try {
+          if (auth.currentUser) {
+            await linkWithPopup(auth.currentUser, provider);
+            alert("Compte Google Calendar connecté avec succès !");
+          }
+      } catch (error: any) {
+          console.error(error);
+          if (error.code === 'auth/credential-already-in-use') {
+             alert("Ce compte Google est déjà lié à un autre utilisateur.");
+          } else {
+             alert("Erreur lors de la connexion à Google Calendar : " + error.message);
+          }
+      }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -47,6 +72,18 @@ export const DashboardPage: React.FC = () => {
               <Settings className="h-5 w-5 mr-3" /> {t.dashboard.settings}
             </a>
           </nav>
+          
+          {currentUser.role === UserRole.LAWYER && (
+               <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-brand" /> Google Calendar
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-3">Synchronisez vos rendez-vous automatiquement.</p>
+                  <Button variant="outline" size="sm" className="w-full text-xs" onClick={connectGoogleCalendar}>
+                      <ExternalLink className="h-3 w-3 mr-2" /> Connecter
+                  </Button>
+               </div>
+          )}
         </aside>
 
         {/* Main Content */}
@@ -80,7 +117,22 @@ export const DashboardPage: React.FC = () => {
               {myAppointments.length > 0 ? (
                 <div className="divide-y divide-slate-200 dark:divide-slate-800">
                   {myAppointments.map(appt => {
+                    const otherPartyId = currentUser.role === UserRole.LAWYER ? appt.clientId : appt.lawyerId;
+                    // In a real app we would fetch the other party's details. 
+                    // For now, if we are lawyer, we don't have client list loaded.
+                    // If we are client, we have lawyer list loaded.
+                    
+                    let otherPartyName = 'Unknown';
+                    let subtitle = appt.type;
+
+                    if (currentUser.role === UserRole.CLIENT) {
                     const lawyer = lawyers.find(l => l.id === appt.lawyerId);
+                        otherPartyName = lawyer?.name || 'Avocat';
+                        subtitle = `${lawyer?.specialty} • ${appt.type}`;
+                    } else {
+                        otherPartyName = "Client (ID: " + appt.clientId.substring(0, 5) + "...)";
+                    }
+
                     return (
                       <div key={appt.id} className="p-6 flex items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                          <div className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 p-3 rounded-lg text-center min-w-[60px]">
@@ -88,17 +140,26 @@ export const DashboardPage: React.FC = () => {
                             <span className="block text-xl font-bold">{new Date(appt.date).getDate()}</span>
                          </div>
                          <div className="flex-grow">
-                            <h4 className="font-bold text-slate-900 dark:text-slate-100">{lawyer?.name || 'Unknown Lawyer'}</h4>
-                            <p className="text-sm text-slate-500">{lawyer?.specialty} • {appt.type}</p>
+                            <h4 className="font-bold text-slate-900 dark:text-slate-100">{otherPartyName}</h4>
+                            <p className="text-sm text-slate-500">{subtitle}</p>
+                            <p className="text-xs text-slate-400 mt-1">{new Date(appt.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                          </div>
-                         <div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold
-                              ${appt.status === 'CONFIRMED' 
-                                ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900' 
-                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}
-                            `}>
-                              {appt.status}
-                            </span>
+                         <div className='flex items-center gap-2'>
+                           {appt.status === 'CONFIRMED' && (
+                               <Button variant="outline" size="sm" onClick={() => navigate('/video-call')}>
+                                   <Video className="h-4 w-4 mr-2" />
+                                   Rejoindre
+                               </Button>
+                           )}
+                           <div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold
+                                ${appt.status === 'CONFIRMED' 
+                                  ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900' 
+                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}
+                              `}>
+                                {appt.status}
+                              </span>
+                           </div>
                          </div>
                       </div>
                     );
@@ -108,7 +169,9 @@ export const DashboardPage: React.FC = () => {
                 <div className="p-8 text-center text-slate-500">
                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
                    <p>{t.dashboard.noAppts}</p>
+                   {currentUser.role === UserRole.CLIENT && (
                    <Button className="mt-4" onClick={() => navigate('/search')}>{t.dashboard.findLawyer}</Button>
+                   )}
                 </div>
               )}
            </div>
