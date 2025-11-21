@@ -18,15 +18,17 @@ import {
   XCircle,
 } from "lucide-react";
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { auth } from "../firebaseConfig";
 import { useApp } from "../store/store";
 import { Appointment, UserRole } from "../types";
 
 export const DashboardPage: React.FC = () => {
-  const { currentUser, appointments, lawyers, logout, t } = useApp();
+  const { currentUser, appointments, lawyers, logout, t, unreadMessagesCount } =
+    useApp();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Redirect to login if not authenticated
   React.useEffect(() => {
@@ -126,8 +128,7 @@ export const DashboardPage: React.FC = () => {
   };
 
   // Check if user is a lawyer
-  const isLawyer =
-    currentUser.role === UserRole.LAWYER || currentUser.role === "LAWYER";
+  const isLawyer = currentUser.role === UserRole.LAWYER;
 
   const connectGoogleCalendar = async () => {
     const provider = new GoogleAuthProvider();
@@ -180,10 +181,7 @@ export const DashboardPage: React.FC = () => {
               variant="outline"
               size="sm"
               className={`mt-${
-                currentUser.role === UserRole.LAWYER ||
-                currentUser.role === "LAWYER"
-                  ? "3"
-                  : "4"
+                currentUser.role === UserRole.LAWYER ? "3" : "4"
               } w-full`}
               onClick={logout}
             >
@@ -194,16 +192,29 @@ export const DashboardPage: React.FC = () => {
           <nav className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
             <button
               onClick={() => navigate("/my-appointments")}
-              className="w-full flex items-center px-6 py-4 text-primary-700 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary-700 dark:border-primary-500 font-medium hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+              className={`w-full flex items-center px-6 py-4 font-medium transition-colors text-left ${
+                location.pathname === "/my-appointments"
+                  ? "text-primary-700 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary-700 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/30"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+              }`}
             >
               <Calendar className="h-5 w-5 mr-3" /> {t.dashboard.appointments}
             </button>
-            <a
-              href="#"
-              className="flex items-center px-6 py-4 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            <button
+              onClick={() => navigate("/messages")}
+              className={`w-full flex items-center px-6 py-4 font-medium transition-colors text-left relative ${
+                location.pathname === "/messages"
+                  ? "text-navy dark:text-white bg-brand/10 dark:bg-brand/20 border-l-4 border-brand-dark dark:border-brand hover:bg-brand/20 dark:hover:bg-brand/30"
+                  : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              }`}
             >
               <MessageSquare className="h-5 w-5 mr-3" /> {t.dashboard.messages}
-            </a>
+              {unreadMessagesCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+                </span>
+              )}
+            </button>
             <a
               href="#"
               className="flex items-center px-6 py-4 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -304,7 +315,7 @@ export const DashboardPage: React.FC = () => {
                   // If we are client, we have lawyer list loaded.
 
                   let otherPartyName = "Unknown";
-                  let subtitle = appt.type;
+                  let subtitle: string = appt.type;
 
                   if (currentUser.role === UserRole.CLIENT) {
                     const lawyer = lawyers.find((l) => l.id === appt.lawyerId);

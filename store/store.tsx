@@ -309,6 +309,7 @@ interface AppState {
   // Chat State
   isChatOpen: boolean;
   toggleChat: () => void;
+  unreadMessagesCount: number;
 
   translateSpecialty: (s: LegalSpecialty) => string;
   setLanguage: (lang: Language) => void;
@@ -345,6 +346,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [language, setLanguage] = useState<Language>("fr");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isLoadingLawyers, setIsLoadingLawyers] = useState(true);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   // Auth listener
   useEffect(() => {
@@ -369,6 +371,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
               });
               setCurrentUser(userProfile);
 
+              // Initialize Stream Chat client (async, non-blocking)
+              (async () => {
+                try {
+                  const { initializeStreamClient, getUnreadMessageCount } =
+                    await import("../services/streamService");
+                  await initializeStreamClient(
+                    userProfile.id,
+                    userProfile.name,
+                    userProfile.role
+                  );
+                  console.log("✅ Stream client initialized");
+
+                  // Charger le nombre de messages non lus
+                  try {
+                    const unreadCount = await getUnreadMessageCount(
+                      userProfile.id
+                    );
+                    setUnreadMessagesCount(unreadCount);
+
+                    // Écouter les nouveaux messages pour mettre à jour le compteur
+                    const { getStreamClient } = await import(
+                      "../services/streamService"
+                    );
+                    const client = getStreamClient();
+                    if (client) {
+                      const updateUnreadCount = async () => {
+                        try {
+                          const count = await getUnreadMessageCount(
+                            userProfile.id
+                          );
+                          setUnreadMessagesCount(count);
+                        } catch (e) {
+                          // Ignorer les erreurs
+                        }
+                      };
+
+                      client.on("message.new", updateUnreadCount);
+                      client.on("message.read", updateUnreadCount);
+                      client.on("notification.message_new", updateUnreadCount);
+                    }
+                  } catch (unreadError) {
+                    console.error(
+                      "⚠️ Error loading unread count:",
+                      unreadError
+                    );
+                  }
+                } catch (streamError) {
+                  console.error(
+                    "⚠️ Error initializing Stream client (non-blocking):",
+                    streamError
+                  );
+                  // Ne pas bloquer la connexion si Stream échoue
+                }
+              })();
+
               // Load appointments (this is now handled by the real-time listener below)
               // const userAppointments = await getUserAppointments(userProfile.id, userProfile.role);
               // setAppointments(userAppointments);
@@ -391,6 +448,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         console.log("👋 User logged out");
         setCurrentUser(null);
         setAppointments([]);
+
+        // Disconnect Stream client (async, non-blocking)
+        (async () => {
+          try {
+            const { disconnectStreamClient } = await import(
+              "../services/streamService"
+            );
+            await disconnectStreamClient();
+            console.log("✅ Stream client disconnected");
+          } catch (streamError) {
+            console.error("⚠️ Error disconnecting Stream client:", streamError);
+          }
+        })();
       }
     });
 
@@ -479,6 +549,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const logout = async () => {
+    // Disconnect Stream client before logging out
+    try {
+      const { disconnectStreamClient } = await import(
+        "../services/streamService"
+      );
+      await disconnectStreamClient();
+    } catch (streamError) {
+      console.error("⚠️ Error disconnecting Stream client:", streamError);
+    }
+
     await logoutUser();
   };
 
@@ -550,6 +630,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     try {
       await createAppointment(newAppt);
       console.log("✅ Appointment created successfully (pending acceptance)");
+
+      // Créer automatiquement un channel GetStream pour la messagerie
+      try {
+        const {
+          initializeStreamClient,
+          createOrGetChatChannel,
+          getStreamClient,
+        } = await import("../services/streamService");
+
+        // Initialiser le client Stream si ce n'est pas déjà fait
+        const streamClient = getStreamClient();
+        if (!streamClient) {
+          await initializeStreamClient(
+            currentUser.id,
+            currentUser.name,
+            currentUser.role
+          );
+        }
+
+        // Créer ou récupérer le channel de chat
+        const channel = await createOrGetChatChannel(
+          lawyerId,
+          currentUser.id,
+          newAppt.id
+        );
+
+        // Stocker le channelId dans l'appointment
+        const { ref, update } = await import("firebase/database");
+        const { database } = await import("../firebaseConfig");
+        const apptRef = ref(database, `appointments/${newAppt.id}`);
+        await update(apptRef, { channelId: channel.id });
+
+        console.log("✅ Chat channel created:", channel.id);
+      } catch (streamError) {
+        console.error(
+          "⚠️ Error creating chat channel (non-blocking):",
+          streamError
+        );
+        // Ne pas bloquer la création de l'appointment si le channel échoue
+      }
+
       alert(
         "Votre demande de rendez-vous a été envoyée. L'avocat doit l'accepter pour confirmer."
       );
@@ -700,6 +821,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         isChatOpen,
         toggleChat,
         isLoadingLawyers,
+        unreadMessagesCount,
         login,
         loginGoogle,
         register,

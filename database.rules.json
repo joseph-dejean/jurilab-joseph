@@ -34,6 +34,16 @@
         ".write": "!data.exists() && auth != null && newData.child('clientId').val() === auth.uid || data.exists()",
         ".validate": "newData.hasChildren(['id', 'lawyerId', 'clientId', 'date', 'status', 'type'])"
       }
+    },
+    "chatPermissions": {
+      "$channelId": {
+        ".read": "auth != null && (data.child('lawyerId').val() === auth.uid || data.child('clientId').val() === auth.uid || !data.exists())",
+        ".write": "auth != null && (newData.child('lawyerId').val() === auth.uid || (data.exists() && data.child('lawyerId').val() === auth.uid))",
+        "clientCanMessage": {
+          ".read": "auth != null && (root.child('chatPermissions').child($channelId).child('lawyerId').val() === auth.uid || root.child('chatPermissions').child($channelId).child('clientId').val() === auth.uid || !root.child('chatPermissions').child($channelId).exists())",
+          ".write": "auth != null && root.child('chatPermissions').child($channelId).child('lawyerId').val() === auth.uid"
+        }
+      }
     }
   }
 }

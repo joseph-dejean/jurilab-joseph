@@ -18,6 +18,7 @@ import {
   XCircle,
   AlertCircle,
   FileText,
+  MessageSquare,
 } from 'lucide-react';
 import { MeetingSummary } from '../components/MeetingSummary';
 import { UserHistoryModal } from '../components/UserHistoryModal';
@@ -191,6 +192,63 @@ export const MyAppointmentsPage: React.FC = () => {
     }
   };
 
+  const handleSendMessage = async (appointment: Appointment) => {
+    if (!currentUser) return;
+
+    try {
+      let channelId = appointment.channelId;
+
+      // Si le channel n'existe pas encore, le créer
+      if (!channelId) {
+        const {
+          initializeStreamClient,
+          createOrGetChatChannel,
+          getStreamClient,
+        } = await import('../services/streamService');
+
+        // Initialiser le client Stream si nécessaire
+        let streamClient = getStreamClient();
+        if (!streamClient || !streamClient.userID) {
+          // Le client n'existe pas ou n'est pas connecté, le réinitialiser
+          await initializeStreamClient(
+            currentUser.id,
+            currentUser.name,
+            currentUser.role
+          );
+          streamClient = getStreamClient();
+          
+          // Vérifier que la connexion a réussi
+          if (!streamClient || !streamClient.userID) {
+            throw new Error('Failed to connect to Stream. Please try again.');
+          }
+        }
+
+        // Créer ou récupérer le channel
+        const channel = await createOrGetChatChannel(
+          appointment.lawyerId,
+          appointment.clientId,
+          appointment.id
+        );
+
+        channelId = channel.id;
+
+        // Stocker le channelId dans l'appointment
+        const { ref, update } = await import('firebase/database');
+        const { database } = await import('../firebaseConfig');
+        const apptRef = ref(database, `appointments/${appointment.id}`);
+        await update(apptRef, { channelId: channel.id });
+      }
+
+      // Rediriger vers la page messages avec le channel sélectionné
+      navigate(`/messages?channel=${channelId}`);
+    } catch (error: any) {
+      console.error('Error opening chat:', error);
+      const errorMessage = error?.message || error?.toString() || 'Erreur inconnue';
+      console.error('Détails de l\'erreur:', error);
+      alert(`Erreur lors de l'ouverture de la conversation: ${errorMessage}`);
+    }
+  };
+
   const otherParty = currentUser.role === UserRole.LAWYER ? 'Client' : 'Avocat';
 
   return (
@@ -355,6 +413,18 @@ export const MyAppointmentsPage: React.FC = () => {
                         >
                           <Video className="w-4 h-4" />
                           Rejoindre la visio
+                        </button>
+                      )}
+
+                      {/* Bouton Message */}
+                      {appointment.status !== 'CANCELLED' && (
+                        <button
+                          onClick={() => handleSendMessage(appointment)}
+                          className="flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-md text-sm transition-colors"
+                          title="Envoyer un message"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Message</span>
                         </button>
                       )}
 

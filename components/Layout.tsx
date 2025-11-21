@@ -3,11 +3,11 @@ import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { UserRole } from '../types';
 import { Button } from './Button';
-import { User, Moon, Sun, Menu, X, LogOut, Calendar } from 'lucide-react';
+import { User, Moon, Sun, Menu, X, LogOut, Calendar, MessageSquare } from 'lucide-react';
 import { LegalChatbot } from './LegalChatbot';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, logout, darkMode, toggleDarkMode, language, setLanguage, t } = useApp();
+  const { currentUser, logout, darkMode, toggleDarkMode, language, setLanguage, t, unreadMessagesCount } = useApp();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -37,12 +37,26 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               {t.nav.search}
             </Link>
             {currentUser && (
-               <Link 
-               to="/dashboard" 
-               className={`text-sm font-semibold transition-colors ${isActive('/dashboard') ? 'text-brand-dark dark:text-brand' : 'text-slate-600 dark:text-slate-300 hover:text-brand-dark dark:hover:text-brand'}`}
-             >
-               {t.nav.dashboard}
-             </Link>
+              <>
+                <Link 
+                  to="/dashboard" 
+                  className={`text-sm font-semibold transition-colors ${isActive('/dashboard') ? 'text-brand-dark dark:text-brand' : 'text-slate-600 dark:text-slate-300 hover:text-brand-dark dark:hover:text-brand'}`}
+                >
+                  {t.nav.dashboard}
+                </Link>
+                <Link 
+                  to="/messages" 
+                  className={`text-sm font-semibold transition-colors flex items-center gap-2 relative ${isActive('/messages') ? 'text-brand-dark dark:text-brand' : 'text-slate-600 dark:text-slate-300 hover:text-brand-dark dark:hover:text-brand'}`}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  {t.dashboard.messages}
+                  {unreadMessagesCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center absolute -top-1 -right-1">
+                      {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                    </span>
+                  )}
+                </Link>
+              </>
             )}
             {currentUser?.role === UserRole.ADMIN && (
                <Link 

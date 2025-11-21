@@ -90,6 +90,20 @@ export interface Appointment {
   summary?: string; // Résumé généré par Gemini
   summaryShared?: boolean; // Si l'avocat a partagé le résumé avec le client
   meetingEndedAt?: string; // Timestamp ISO de fin de réunion
+  // GetStream.io Chat
+  channelId?: string; // ID du channel GetStream pour la messagerie
+}
+
+/**
+ * Représente un channel de chat GetStream stocké dans Firebase
+ */
+export interface ChatChannel {
+  channelId: string; // ID du channel GetStream (format: "lawyer-{lawyerId}-client-{clientId}")
+  lawyerId: string;
+  clientId: string;
+  appointmentId?: string; // ID de l'appointment lié (optionnel)
+  createdAt: string; // ISO string
+  lastMessageAt?: string; // ISO string - timestamp du dernier message
 }
 
 export interface SearchFilters {

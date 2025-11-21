@@ -11,6 +11,7 @@ import { LawyerProfileEditor } from './pages/LawyerProfileEditor';
 import { MyAppointmentsPage } from './pages/MyAppointmentsPage';
 import VideoCallPage from './pages/VideoCallPage';
 import { AdminPage } from './pages/AdminPage';
+import { MessagesPage } from './pages/MessagesPage';
 
 const App: React.FC = () => {
   return (
@@ -25,6 +26,7 @@ const App: React.FC = () => {
             <Route path="/register-lawyer" element={<LawyerRegistrationPage />} />
             <Route path="/lawyer/profile-editor" element={<LawyerProfileEditor />} />
             <Route path="/my-appointments" element={<MyAppointmentsPage />} />
+            <Route path="/messages" element={<MessagesPage />} />
             <Route path="/video-call" element={<VideoCallPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
