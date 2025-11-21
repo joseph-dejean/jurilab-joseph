@@ -104,3 +104,69 @@ export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: 
     throw new Error("Failed to analyze the legal case with the AI.");
   }
 }
+
+/**
+ * Génère un résumé structuré d'une réunion de consultation juridique
+ * à partir du transcript de la visioconférence
+ */
+export async function generateMeetingSummary(
+  transcript: string,
+  lawyerName: string,
+  clientName: string,
+  date: string
+): Promise<string> {
+  if (!transcript || transcript.trim().length === 0) {
+    throw new Error("Transcript is empty or invalid");
+  }
+
+  const prompt = `
+Tu es un assistant juridique expert. Analyse le transcript suivant d'une consultation juridique entre un avocat et son client, puis génère un résumé professionnel et structuré.
+
+**Informations de la consultation :**
+- Avocat : ${lawyerName}
+- Client : ${clientName}
+- Date : ${date}
+
+**Transcript de la réunion :**
+${transcript}
+
+**Instructions :**
+Génère un résumé en français, structuré de la manière suivante :
+
+1. **Contexte** : Résume brièvement le contexte de la consultation et le problème du client (2-3 phrases)
+
+2. **Points clés discutés** : Liste les principaux sujets abordés pendant la consultation (3-5 points avec puces)
+
+3. **Décisions prises** : Indique les décisions ou accords pris pendant la consultation (si applicable)
+
+4. **Actions à suivre** : Liste les prochaines étapes à entreprendre, avec qui est responsable de chaque action (avocat ou client)
+
+5. **Recommandations** : Résume les recommandations de l'avocat (si applicable)
+
+**Format :**
+- Utilise des titres clairs pour chaque section
+- Sois concis mais complet
+- Utilise un langage professionnel et juridique approprié
+- Ne mentionne pas de détails personnels sensibles
+- Si certaines sections ne sont pas applicables, indique "Aucune information disponible"
+
+Génère uniquement le résumé, sans introduction ni conclusion supplémentaire.
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const summary = response.text();
+
+    if (!summary || summary.trim().length === 0) {
+      throw new Error("AI generated an empty summary");
+    }
+
+    console.log(`✅ Meeting summary generated successfully (${summary.length} characters)`);
+    
+    return summary.trim();
+  } catch (error) {
+    console.error("❌ Error generating meeting summary:", error);
+    throw new Error("Failed to generate meeting summary with Gemini AI.");
+  }
+}

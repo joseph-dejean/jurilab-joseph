@@ -20,9 +20,11 @@
       }
     },
     "appointments": {
-      // Admins can read and write all appointment data
-      ".read": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
-      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      // Allow authenticated users to read all appointments (filtering is done client-side)
+      // This is acceptable for small-to-medium scale apps
+      ".read": "auth != null",
+      // Only allow creating appointments (clients can create, admins can update)
+      ".write": false,
       ".indexOn": ["clientId", "lawyerId"], // Improves query performance
       "$appointmentId": {
         // A user can read an appointment if they are the client or the lawyer

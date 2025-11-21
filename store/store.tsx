@@ -1,33 +1,50 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Lawyer, Appointment, UserRole, LegalSpecialty, ChatMessage } from '../types';
-import { 
-  loadLawyersFromFirebase, 
-  loginUser, 
-  loginWithGoogle,
-  logoutUser, 
-  registerUser, 
-  getUserProfile, 
+import { onAuthStateChanged } from "firebase/auth";
+import { ref, update } from "firebase/database";
+import React, {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { auth, database } from "../firebaseConfig";
+import {
+  acceptAppointment as acceptAppointmentService,
+  cancelAppointment as cancelAppointmentService,
+  checkAppointmentConflict,
   createAppointment,
-  getUserAppointments,
-  subscribeToAppointments
-} from '../services/firebaseService';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+  getUserProfile,
+  loadLawyersFromFirebase,
+  loginUser,
+  loginWithGoogle,
+  logoutUser,
+  registerUser,
+  subscribeToAppointments,
+} from "../services/firebaseService";
+import { Appointment, Lawyer, LegalSpecialty, User, UserRole } from "../types";
 
-type Language = 'en' | 'fr';
+type Language = "en" | "fr";
 
 const TRANSLATIONS = {
   en: {
-    nav: { search: "Find a Lawyer", dashboard: "Dashboard", login: "Log in", signup: "Sign up", signout: "Sign Out" },
+    nav: {
+      search: "Find a Lawyer",
+      dashboard: "Dashboard",
+      login: "Log in",
+      signup: "Sign up",
+      signout: "Sign Out",
+    },
     hero: {
       title1: "The right ",
       title2: "lawyer",
       title3: ",\nat the right time.",
-      subtitle: "Find and book the best lawyers in your region. From specialized advice to full representation, Jurilab connects you instantly.",
+      subtitle:
+        "Find and book the best lawyers in your region. From specialized advice to full representation, Jurilab connects you instantly.",
       searchPlaceholder: "Describe your legal issue or search by name...",
       searchBtn: "Find Lawyers",
       new: "New",
-      aiHint: "AI-Powered Search: Type natural sentences like 'I was unfairly fired' to find specialists.",
+      aiHint:
+        "AI-Powered Search: Type natural sentences like 'I was unfairly fired' to find specialists.",
       verified: "Verified Professionals",
       pricing: "Transparent Pricing",
       booking: "Secure Booking",
@@ -36,10 +53,19 @@ const TRANSLATIONS = {
       browseSubtitle: "Find the right expert for your specific needs.",
       viewAll: "View All",
       features: {
-        vetted: { title: "Vetted Experts", desc: "Every lawyer on Jurilab undergoes a rigorous verification process." },
-        time: { title: "Real-Time Availability", desc: "See lawyer schedules and book appointments instantly online." },
-        rated: { title: "Top Rated", desc: "Read verified reviews from real clients to make informed decisions." }
-      }
+        vetted: {
+          title: "Vetted Experts",
+          desc: "Every lawyer on Jurilab undergoes a rigorous verification process.",
+        },
+        time: {
+          title: "Real-Time Availability",
+          desc: "See lawyer schedules and book appointments instantly online.",
+        },
+        rated: {
+          title: "Top Rated",
+          desc: "Read verified reviews from real clients to make informed decisions.",
+        },
+      },
     },
     search: {
       analyzing: "Analyzing...",
@@ -55,7 +81,7 @@ const TRANSLATIONS = {
       stars: "Stars",
       hr: "/hr",
       aiRecommended: "AI Recommended",
-      recommendedLawyers: "recommended lawyers"
+      recommendedLawyers: "recommended lawyers",
     },
     dashboard: {
       appointments: "Appointments",
@@ -69,7 +95,7 @@ const TRANSLATIONS = {
       myAppointments: "My Appointments",
       viewAll: "View All",
       noAppts: "You have no upcoming appointments.",
-      findLawyer: "Find a Lawyer"
+      findLawyer: "Find a Lawyer",
     },
     auth: {
       welcome: "Welcome Back",
@@ -84,7 +110,7 @@ const TRANSLATIONS = {
       signIn: "Sign In",
       haveAccount: "Already have an account?",
       dontHaveAccount: "Don't have an account?",
-      google: "Continue with Google"
+      google: "Continue with Google",
     },
     modal: {
       about: "About",
@@ -103,14 +129,16 @@ const TRANSLATIONS = {
       confirm: "Confirm Booking",
       loginToBook: "Log in to Book",
       success: "Appointment Confirmed!",
-      close: "Close"
+      close: "Close",
     },
     chatbot: {
       title: "Juribot Assistant",
       placeholder: "Ask about a law, contract, or case law...",
-      disclaimer: "⚠️ IMPORTANT: Juribot is an AI assistant, not a lawyer. It can make errors. Information provided is for educational purposes only. Always consult a professional.",
-      welcome: "Hello! I am Juribot. I can help you research French law (Légifrance, Dalloz) or explain complex terms. How can I help you today?",
-      sources: "Sources found:"
+      disclaimer:
+        "⚠️ IMPORTANT: Juribot is an AI assistant, not a lawyer. It can make errors. Information provided is for educational purposes only. Always consult a professional.",
+      welcome:
+        "Hello! I am Juribot. I can help you research French law (Légifrance, Dalloz) or explain complex terms. How can I help you today?",
+      sources: "Sources found:",
     },
     booking: {
       youSelected: "You have selected",
@@ -119,20 +147,28 @@ const TRANSLATIONS = {
       noSlots: "No slots available.",
       confirmMessage: "Appointment confirmed with",
       confirmOn: "on",
-      selectSlotFirst: "Please select a time slot first."
-    }
+      selectSlotFirst: "Please select a time slot first.",
+    },
   },
   fr: {
-    nav: { search: "Trouver un Avocat", dashboard: "Tableau de Bord", login: "Connexion", signup: "Inscription", signout: "Déconnexion" },
+    nav: {
+      search: "Trouver un Avocat",
+      dashboard: "Tableau de Bord",
+      login: "Connexion",
+      signup: "Inscription",
+      signout: "Déconnexion",
+    },
     hero: {
       title1: "Le bon ",
       title2: "avocat",
       title3: ",\nau bon moment.",
-      subtitle: "Trouvez et réservez les meilleurs avocats de votre région. Du conseil spécialisé à la représentation complète, Jurilab vous connecte instantanément.",
+      subtitle:
+        "Trouvez et réservez les meilleurs avocats de votre région. Du conseil spécialisé à la représentation complète, Jurilab vous connecte instantanément.",
       searchPlaceholder: "Décrivez votre problème ou cherchez par nom...",
       searchBtn: "Rechercher",
       new: "Nouveau",
-      aiHint: "Recherche IA : Écrivez naturellement, ex: 'J'ai été licencié abusivement'.",
+      aiHint:
+        "Recherche IA : Écrivez naturellement, ex: 'J'ai été licencié abusivement'.",
       verified: "Professionnels Vérifiés",
       pricing: "Tarifs Transparents",
       booking: "Réservation Sécurisée",
@@ -141,10 +177,19 @@ const TRANSLATIONS = {
       browseSubtitle: "Trouvez l'expert adapté à vos besoins spécifiques.",
       viewAll: "Voir Tout",
       features: {
-        vetted: { title: "Experts Vérifiés", desc: "Chaque avocat sur Jurilab subit un processus de vérification rigoureux." },
-        time: { title: "Disponibilité Temps Réel", desc: "Consultez les agendas et prenez rendez-vous en ligne instantanément." },
-        rated: { title: "Les Mieux Notés", desc: "Lisez des avis vérifiés de clients réels pour prendre des décisions éclairées." }
-      }
+        vetted: {
+          title: "Experts Vérifiés",
+          desc: "Chaque avocat sur Jurilab subit un processus de vérification rigoureux.",
+        },
+        time: {
+          title: "Disponibilité Temps Réel",
+          desc: "Consultez les agendas et prenez rendez-vous en ligne instantanément.",
+        },
+        rated: {
+          title: "Les Mieux Notés",
+          desc: "Lisez des avis vérifiés de clients réels pour prendre des décisions éclairées.",
+        },
+      },
     },
     search: {
       analyzing: "Analyse...",
@@ -160,7 +205,7 @@ const TRANSLATIONS = {
       stars: "Étoiles",
       hr: "/h",
       aiRecommended: "IA Recommandé",
-      recommendedLawyers: "avocats recommandés"
+      recommendedLawyers: "avocats recommandés",
     },
     dashboard: {
       appointments: "Rendez-vous",
@@ -174,7 +219,7 @@ const TRANSLATIONS = {
       myAppointments: "Mes Rendez-vous",
       viewAll: "Voir Tout",
       noAppts: "Vous n'avez aucun rendez-vous à venir.",
-      findLawyer: "Trouver un Avocat"
+      findLawyer: "Trouver un Avocat",
     },
     auth: {
       welcome: "Bon retour",
@@ -189,7 +234,7 @@ const TRANSLATIONS = {
       signIn: "Se Connecter",
       haveAccount: "Déjà un compte ?",
       dontHaveAccount: "Pas encore de compte ?",
-      google: "Continuer avec Google"
+      google: "Continuer avec Google",
     },
     modal: {
       about: "À Propos",
@@ -208,14 +253,16 @@ const TRANSLATIONS = {
       confirm: "Confirmer le Rendez-vous",
       loginToBook: "Connexion requise",
       success: "Rendez-vous Confirmé !",
-      close: "Fermer"
+      close: "Fermer",
     },
     chatbot: {
       title: "Assistant Juribot",
       placeholder: "Posez une question sur une loi, un contrat...",
-      disclaimer: "⚠️ IMPORTANT : Juribot est une IA, pas un avocat. Elle peut faire des erreurs. Les infos sont à titre documentaire. Consultez toujours un professionnel.",
-      welcome: "Bonjour ! Je suis Juribot. Je peux vous aider à rechercher des textes de loi (Légifrance, Dalloz) ou vulgariser des termes. Comment puis-je vous aider ?",
-      sources: "Sources trouvées :"
+      disclaimer:
+        "⚠️ IMPORTANT : Juribot est une IA, pas un avocat. Elle peut faire des erreurs. Les infos sont à titre documentaire. Consultez toujours un professionnel.",
+      welcome:
+        "Bonjour ! Je suis Juribot. Je peux vous aider à rechercher des textes de loi (Légifrance, Dalloz) ou vulgariser des termes. Comment puis-je vous aider ?",
+      sources: "Sources trouvées :",
     },
     booking: {
       youSelected: "Vous avez sélectionné le",
@@ -224,20 +271,29 @@ const TRANSLATIONS = {
       noSlots: "Aucun créneau disponible.",
       confirmMessage: "Rendez-vous confirmé avec",
       confirmOn: "le",
-      selectSlotFirst: "Veuillez d'abord sélectionner un créneau horaire."
-    }
-  }
+      selectSlotFirst: "Veuillez d'abord sélectionner un créneau horaire.",
+    },
+  },
 };
 
 // Helper to translate specialties
-const SPECIALTY_TRANSLATIONS: Record<LegalSpecialty, { en: string, fr: string }> = {
+const SPECIALTY_TRANSLATIONS: Record<
+  LegalSpecialty,
+  { en: string; fr: string }
+> = {
   [LegalSpecialty.CRIMINAL]: { en: "Criminal Law", fr: "Droit Pénal" },
   [LegalSpecialty.FAMILY]: { en: "Family Law", fr: "Droit de la Famille" },
   [LegalSpecialty.CORPORATE]: { en: "Corporate Law", fr: "Droit des Affaires" },
   [LegalSpecialty.REAL_ESTATE]: { en: "Real Estate", fr: "Droit Immobilier" },
   [LegalSpecialty.LABOR]: { en: "Labor Law", fr: "Droit du Travail" },
-  [LegalSpecialty.IP]: { en: "Intellectual Property", fr: "Propriété Intellectuelle" },
-  [LegalSpecialty.IMMIGRATION]: { en: "Immigration", fr: "Droit des Étrangers" },
+  [LegalSpecialty.IP]: {
+    en: "Intellectual Property",
+    fr: "Propriété Intellectuelle",
+  },
+  [LegalSpecialty.IMMIGRATION]: {
+    en: "Immigration",
+    fr: "Droit des Étrangers",
+  },
   [LegalSpecialty.TAX]: { en: "Tax Law", fr: "Droit Fiscal" },
   [LegalSpecialty.GENERAL]: { en: "General Practice", fr: "Droit Général" },
 };
@@ -249,55 +305,90 @@ interface AppState {
   darkMode: boolean;
   language: Language;
   isLoadingLawyers: boolean;
-  t: typeof TRANSLATIONS['en'];
+  t: (typeof TRANSLATIONS)["en"];
   // Chat State
   isChatOpen: boolean;
   toggleChat: () => void;
-  
+
   translateSpecialty: (s: LegalSpecialty) => string;
   setLanguage: (lang: Language) => void;
   login: (email: string, password: string) => Promise<void>;
   loginGoogle: (role?: UserRole) => Promise<void>;
-  register: (email: string, password: string, role: UserRole, name: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    role: UserRole,
+    name: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
   toggleDarkMode: () => void;
-  bookAppointment: (lawyerId: string, date: string, type: Appointment['type'], notes: string) => Promise<void>;
+  bookAppointment: (
+    lawyerId: string,
+    date: string,
+    type: Appointment["type"],
+    notes: string,
+    duration?: number
+  ) => Promise<void>;
+  acceptAppointment: (appointmentId: string) => Promise<void>;
+  cancelAppointment: (appointmentId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AppProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [lawyers, setLawyers] = useState<Lawyer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState<Language>('fr');
+  const [language, setLanguage] = useState<Language>("fr");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isLoadingLawyers, setIsLoadingLawyers] = useState(true);
 
   // Auth listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        console.log('👤 User logged in:', firebaseUser.email);
-        try {
+        console.log(
+          "👤 User logged in:",
+          firebaseUser.email,
+          "UID:",
+          firebaseUser.uid
+        );
+        // Charger le profil de manière asynchrone pour ne pas bloquer
+        (async () => {
+          try {
             const userProfile = await getUserProfile(firebaseUser.uid);
             if (userProfile) {
-                setCurrentUser(userProfile);
-                
-                // Load appointments (this is now handled by the real-time listener below)
-                // const userAppointments = await getUserAppointments(userProfile.id, userProfile.role);
-                // setAppointments(userAppointments);
+              console.log("✅ User profile loaded:", {
+                id: userProfile.id,
+                name: userProfile.name,
+                email: userProfile.email,
+                role: userProfile.role,
+              });
+              setCurrentUser(userProfile);
+
+              // Load appointments (this is now handled by the real-time listener below)
+              // const userAppointments = await getUserAppointments(userProfile.id, userProfile.role);
+              // setAppointments(userAppointments);
             } else {
-                // Fallback if profile creation is delayed
-                console.warn('User profile not found in DB immediately.');
-                // Retry logic could go here, but for now relying on create logic to have finished
+              // Fallback if profile creation is delayed
+              console.warn(
+                "⚠️ User profile not found in DB immediately. UID:",
+                firebaseUser.uid
+              );
+              console.warn(
+                "⚠️ This might happen if the user was created manually in Firebase Auth but not in Realtime Database."
+              );
+              // Retry logic could go here, but for now relying on create logic to have finished
             }
-        } catch (e) {
-            console.error('Error fetching user profile', e);
-        }
+          } catch (e) {
+            console.error("❌ Error fetching user profile:", e);
+          }
+        })();
       } else {
-        console.log('👋 User logged out');
+        console.log("👋 User logged out");
         setCurrentUser(null);
         setAppointments([]);
       }
@@ -313,9 +404,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return;
     }
 
-    const unsubscribe = subscribeToAppointments(currentUser.id, currentUser.role, (newAppointments) => {
-      setAppointments(newAppointments);
-    });
+    const unsubscribe = subscribeToAppointments(
+      currentUser.id,
+      currentUser.role,
+      (newAppointments) => {
+        setAppointments(newAppointments);
+      }
+    );
 
     return () => unsubscribe();
   }, [currentUser]);
@@ -325,31 +420,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const loadLawyers = async () => {
       try {
         setIsLoadingLawyers(true);
-        console.log('🔥 Loading lawyers from Firebase...');
+        console.log("🔥 Loading lawyers from Firebase...");
         const lawyersData = await loadLawyersFromFirebase();
-        
+
         if (lawyersData.length === 0) {
-          console.warn('⚠️ No lawyers in Firebase yet. You need to upload the CSV first.');
+          console.warn(
+            "⚠️ No lawyers in Firebase yet. You need to upload the CSV first."
+          );
         } else {
           setLawyers(lawyersData);
           console.log(`✅ Loaded ${lawyersData.length} lawyers from Firebase`);
         }
       } catch (error) {
-        console.error('❌ Failed to load lawyers from Firebase:', error);
-        console.error('Please check:');
-        console.error('1. Firebase config is correct');
-        console.error('2. Database rules allow read access');
-        console.error('3. Data has been uploaded to Firebase');
+        console.error("❌ Failed to load lawyers from Firebase:", error);
       } finally {
         setIsLoadingLawyers(false);
       }
     };
+
     loadLawyers();
   }, []);
 
   // Check system preference on mount
   useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    if (
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    ) {
       setDarkMode(true);
     }
   }, []);
@@ -358,9 +455,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const html = document.documentElement;
     if (darkMode) {
-      html.classList.add('dark');
+      html.classList.add("dark");
     } else {
-      html.classList.remove('dark');
+      html.classList.remove("dark");
     }
   }, [darkMode]);
 
@@ -372,49 +469,247 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await loginWithGoogle(role);
   };
 
-  const register = async (email: string, password: string, role: UserRole, name: string) => {
+  const register = async (
+    email: string,
+    password: string,
+    role: UserRole,
+    name: string
+  ) => {
     await registerUser(email, password, role, name);
   };
 
   const logout = async () => {
-      await logoutUser();
+    await logoutUser();
   };
 
-  const toggleDarkMode = () => setDarkMode(prev => !prev);
-  const toggleChat = () => setIsChatOpen(prev => !prev);
+  const toggleDarkMode = () => setDarkMode((prev) => !prev);
+  const toggleChat = () => setIsChatOpen((prev) => !prev);
 
-  const bookAppointment = async (lawyerId: string, date: string, type: Appointment['type'], notes: string) => {
+  const bookAppointment = async (
+    lawyerId: string,
+    date: string,
+    type: Appointment["type"],
+    notes: string,
+    duration?: number
+  ) => {
     if (!currentUser) return;
+
+    // Vérifier les conflits de créneaux avant de créer le RDV
+    try {
+      const conflictCheck = await checkAppointmentConflict(
+        lawyerId,
+        currentUser.id,
+        date,
+        duration || 60
+      );
+
+      if (conflictCheck.hasConflict) {
+        alert(
+          conflictCheck.conflictReason || "Ce créneau n'est plus disponible"
+        );
+        throw new Error(conflictCheck.conflictReason || "Time slot conflict");
+      }
+    } catch (error: any) {
+      if (
+        error.message?.includes("conflict") ||
+        error.message?.includes("créneau")
+      ) {
+        throw error; // Re-throw les erreurs de conflit
+      }
+      console.error("Error checking conflicts:", error);
+      // Continuer même si la vérification échoue (pour ne pas bloquer)
+    }
+
+    // Ne pas créer la salle Daily.co maintenant - on la créera quand l'avocat acceptera
+    // Cela évite de créer des salles pour des RDV qui ne seront peut-être pas acceptés
+
+    // Récupérer les noms pour les stocker dans l'appointment
+    // Si lawyers n'est pas encore chargé, utiliser getLawyerById
+    let lawyer = lawyers.find((l) => l.id === lawyerId);
+    if (!lawyer) {
+      const { getLawyerById } = await import("../services/firebaseService");
+      lawyer = await getLawyerById(lawyerId);
+    }
+    const lawyerName = lawyer?.name || "Avocat";
+    const clientName = currentUser.name || "Client";
+
     const newAppt: Appointment = {
-      id: 'appt_' + Date.now(),
+      id: "appt_" + Date.now(),
       lawyerId,
       clientId: currentUser.id,
+      lawyerName, // Stocker le nom de l'avocat
+      clientName, // Stocker le nom du client
       date,
-      status: 'CONFIRMED',
+      status: "PENDING", // Statut initial : en attente d'acceptation
       type,
-      notes
+      notes,
+      duration: duration || 60,
+      // Ne pas créer la salle Daily.co maintenant
     };
-    
+
     try {
-        await createAppointment(newAppt);
-        // TODO: Notify lawyer or update availability
+      await createAppointment(newAppt);
+      console.log("✅ Appointment created successfully (pending acceptance)");
+      alert(
+        "Votre demande de rendez-vous a été envoyée. L'avocat doit l'accepter pour confirmer."
+      );
     } catch (e) {
-        console.error("Error booking appointment:", e);
-        alert("Erreur lors de la réservation.");
+      console.error("Error booking appointment:", e);
+      alert("Erreur lors de la réservation.");
+      throw e;
+    }
+  };
+
+  const acceptAppointment = async (appointmentId: string) => {
+    if (!currentUser || currentUser.role !== UserRole.LAWYER) {
+      throw new Error("Seuls les avocats peuvent accepter des rendez-vous");
+    }
+
+    try {
+      // Récupérer l'appointment pour vérifier qu'il est bien pour cet avocat
+      const { getAllAppointments } = await import(
+        "../services/firebaseService"
+      );
+      const allAppointments = await getAllAppointments();
+      const appointment = allAppointments.find((a) => a.id === appointmentId);
+
+      if (!appointment) {
+        throw new Error("Appointment not found");
+      }
+
+      if (appointment.lawyerId !== currentUser.id) {
+        throw new Error("Vous ne pouvez accepter que vos propres rendez-vous");
+      }
+
+      // Vérifier les conflits avant d'accepter (exclure l'appointment qu'on est en train d'accepter)
+      const conflictCheck = await checkAppointmentConflict(
+        appointment.lawyerId,
+        appointment.clientId,
+        appointment.date,
+        appointment.duration || 60,
+        appointmentId // Exclure cet appointment de la vérification
+      );
+
+      if (conflictCheck.hasConflict) {
+        alert(
+          conflictCheck.conflictReason || "Ce créneau n'est plus disponible"
+        );
+        throw new Error(conflictCheck.conflictReason || "Time slot conflict");
+      }
+
+      // Si c'est une visioconférence, créer la salle Daily.co maintenant
+      let dailyRoomUrl: string | undefined;
+      let dailyRoomId: string | undefined;
+
+      if (appointment.type === "VIDEO") {
+        try {
+          const { createRoom } = await import("../services/dailyService");
+          const room = await createRoom(
+            appointmentId,
+            appointment.lawyerName || "Avocat",
+            appointment.clientName || "Client",
+            appointment.duration || 60
+          );
+
+          dailyRoomUrl = room.roomUrl;
+          dailyRoomId = room.roomId;
+
+          console.log(`✅ Daily.co room created: ${dailyRoomId}`);
+        } catch (error) {
+          console.error("❌ Error creating Daily.co room:", error);
+          // Continuer quand même - on peut créer la salle plus tard
+        }
+      }
+
+      // Accepter le rendez-vous et mettre à jour avec la salle si créée
+      await acceptAppointmentService(appointmentId);
+
+      if (dailyRoomUrl && dailyRoomId) {
+        const apptRef = ref(database, `appointments/${appointmentId}`);
+        await update(apptRef, { dailyRoomUrl, dailyRoomId });
+      }
+
+      console.log("✅ Appointment accepted successfully");
+    } catch (error: any) {
+      console.error("Error accepting appointment:", error);
+      alert(error.message || "Erreur lors de l'acceptation du rendez-vous");
+      throw error;
+    }
+  };
+
+  const cancelAppointment = async (appointmentId: string) => {
+    if (!currentUser) {
+      throw new Error("Vous devez être connecté pour annuler un rendez-vous");
+    }
+
+    try {
+      // Vérifier que l'utilisateur peut annuler ce RDV
+      const { getAllAppointments } = await import(
+        "../services/firebaseService"
+      );
+      const allAppointments = await getAllAppointments();
+      const appointment = allAppointments.find((a) => a.id === appointmentId);
+
+      if (!appointment) {
+        throw new Error("Appointment not found");
+      }
+
+      if (
+        appointment.clientId !== currentUser.id &&
+        appointment.lawyerId !== currentUser.id
+      ) {
+        throw new Error("Vous ne pouvez annuler que vos propres rendez-vous");
+      }
+
+      // Vérifier qu'on est à plus de 24h avant le RDV
+      const aptDate = new Date(appointment.date);
+      const now = new Date();
+      const hoursUntilAppointment =
+        (aptDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      if (hoursUntilAppointment < 24) {
+        throw new Error(
+          "Impossible d'annuler un rendez-vous moins de 24 heures avant l'heure prévue"
+        );
+      }
+
+      await cancelAppointmentService(appointmentId);
+      console.log("✅ Appointment cancelled successfully");
+    } catch (error: any) {
+      console.error("Error cancelling appointment:", error);
+      alert(error.message || "Erreur lors de l'annulation du rendez-vous");
+      throw error;
     }
   };
 
   const translateSpecialty = (s: LegalSpecialty) => {
     return SPECIALTY_TRANSLATIONS[s][language];
-  }
+  };
 
   return (
-    <AppContext.Provider value={{ 
-      currentUser, lawyers, appointments, darkMode, 
-      language, setLanguage, t: TRANSLATIONS[language], translateSpecialty,
-      isChatOpen, toggleChat, isLoadingLawyers,
-      login, loginGoogle, register, logout, toggleDarkMode, bookAppointment 
-    }}>
+    <AppContext.Provider
+      value={{
+        currentUser,
+        lawyers,
+        appointments,
+        darkMode,
+        language,
+        setLanguage,
+        t: TRANSLATIONS[language],
+        translateSpecialty,
+        isChatOpen,
+        toggleChat,
+        isLoadingLawyers,
+        login,
+        loginGoogle,
+        register,
+        logout,
+        toggleDarkMode,
+        bookAppointment,
+        acceptAppointment,
+        cancelAppointment,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
@@ -422,6 +717,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within AppProvider');
+  if (!context) throw new Error("useApp must be used within AppProvider");
   return context;
 };

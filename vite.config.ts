@@ -5,7 +5,11 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   // Load env file from parent directory (outside jurilabb folder)
   const parentDir = path.resolve(__dirname, '..');
-  const env = loadEnv(mode, parentDir, '');
+  const env = loadEnv(mode, parentDir, 'VITE_');
+  
+  console.log('🔧 Vite Config - Loading env from:', parentDir);
+  console.log('🔧 Vite Config - DAILY_API_KEY exists:', !!env.VITE_DAILY_API_KEY);
+  console.log('🔧 Vite Config - GEMINI_API_KEY exists:', !!env.VITE_GEMINI_API_KEY);
   
   return {
     server: {
@@ -13,8 +17,11 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
     },
     plugins: [react()],
+    envPrefix: 'VITE_',
+    envDir: parentDir, // Tell Vite to look for .env in parent directory
     define: {
-      'process.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
+      'import.meta.env.VITE_DAILY_API_KEY': JSON.stringify(env.VITE_DAILY_API_KEY || ''),
     },
     resolve: {
       alias: {

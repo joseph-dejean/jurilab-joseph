@@ -13,6 +13,7 @@ export const SearchPage: React.FC = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialQuery = searchParams.get('q') || '';
+  
 
   const [query, setQuery] = useState(initialQuery);
   const [filteredLawyers, setFilteredLawyers] = useState<Lawyer[]>(lawyers);

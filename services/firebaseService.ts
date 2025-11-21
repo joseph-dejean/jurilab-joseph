@@ -90,6 +90,38 @@ export const getLawyerById = async (lawyerId: string): Promise<Lawyer | null> =>
 };
 
 /**
+ * Get a single client by ID
+ */
+export const getClientById = async (clientId: string): Promise<Client | User | null> => {
+  try {
+    console.log(`🔍 getClientById called for: ${clientId}`);
+    // Utiliser getUserProfile qui gère déjà tous les cas
+    const userProfile = await getUserProfile(clientId);
+    console.log(`📊 getUserProfile returned for ${clientId}:`, userProfile ? { id: userProfile.id, name: userProfile.name, role: userProfile.role } : null);
+    
+    if (userProfile) {
+      // Vérifier le rôle (peut être string ou enum)
+      const isClient = userProfile.role === UserRole.CLIENT || 
+                       userProfile.role === 'CLIENT' ||
+                       (userProfile as any).role === 'CLIENT';
+      
+      if (isClient) {
+        console.log(`✅ Client found: ${userProfile.name} (${clientId})`);
+        return userProfile as Client;
+      } else {
+        console.warn(`⚠️ User ${clientId} is not a client, role: ${userProfile.role}`);
+      }
+    } else {
+      console.warn(`⚠️ User profile not found for client ID: ${clientId}`);
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Error getting client:', error);
+    return null;
+  }
+};
+
+/**
  * Add a new lawyer to Firebase Database
  */
 export const addLawyerToFirebase = async (lawyer: Lawyer): Promise<void> => {
@@ -280,24 +312,120 @@ export const logoutUser = async () => {
     return await signOut(auth);
 };
 
+/**
+ * Create a default client profile if user exists in Auth but not in DB
+ */
+const createDefaultClientProfile = async (uid: string, email: string | null): Promise<Client> => {
+    console.log(`📝 Creating default client profile for UID: ${uid}`);
+    const defaultClient: Client = {
+        id: uid,
+        name: email ? email.split('@')[0] : 'Client',
+        email: email || '',
+        role: UserRole.CLIENT,
+        avatarUrl: `https://ui-avatars.com/api/?name=${email ? email.split('@')[0] : 'Client'}`,
+        favorites: []
+    };
+    
+    const userRef = ref(database, `users/${uid}`);
+    await set(userRef, defaultClient);
+    console.log(`✅ Default client profile created`);
+    return defaultClient;
+};
+
 export const getUserProfile = async (uid: string): Promise<User | Lawyer | null> => {
-    // First check 'users' path
-    let userRef = ref(database, `users/${uid}`);
-    let snapshot = await get(userRef);
-    
-    if (snapshot.exists()) {
-        const userData = snapshot.val();
-        // If it's a lawyer, we might want the full lawyer profile from 'lawyers' node
-        if (userData.role === UserRole.LAWYER) {
-            const lawyerProfile = await getLawyerById(uid);
-            return lawyerProfile || userData;
+    try {
+        console.log(`🔍 Getting user profile for UID: ${uid}`);
+        
+        // First check 'users' path
+        let userRef = ref(database, `users/${uid}`);
+        let snapshot;
+        
+        try {
+            snapshot = await get(userRef);
+            console.log(`📊 Snapshot exists: ${snapshot.exists()}`);
+        } catch (error) {
+            console.error(`❌ Error reading from Firebase for UID ${uid}:`, error);
+            throw error;
         }
-        return userData;
+        
+        if (snapshot.exists()) {
+            const userData = snapshot.val();
+            console.log(`✅ Found user in 'users' node:`, { 
+                email: userData.email, 
+                role: userData.role,
+                name: userData.name 
+            });
+            
+            // Normalize role (handle both string and enum)
+            const userRole = userData.role === 'LAWYER' || userData.role === UserRole.LAWYER ? UserRole.LAWYER : 
+                             userData.role === 'CLIENT' || userData.role === UserRole.CLIENT ? UserRole.CLIENT : 
+                             UserRole.CLIENT; // Default to CLIENT if role is unclear
+            
+            console.log(`📝 Normalized role: ${userRole}`);
+            
+            // If it's a lawyer, we might want the full lawyer profile from 'lawyers' node
+            if (userRole === UserRole.LAWYER) {
+                console.log(`🔍 Checking for full lawyer profile...`);
+                const lawyerProfile = await getLawyerById(uid);
+                if (lawyerProfile) {
+                    console.log(`✅ Found full lawyer profile in 'lawyers' node`);
+                    return lawyerProfile;
+                }
+                console.log(`⚠️ Lawyer profile not found in 'lawyers' node, using basic user data`);
+                return { ...userData, role: userRole };
+            }
+            
+            // Ensure role is properly set for clients
+            const finalUser = { ...userData, role: userRole };
+            console.log(`✅ Returning user profile:`, { id: finalUser.id, email: finalUser.email, role: finalUser.role });
+            return finalUser;
+        }
+        
+        console.log(`⚠️ User not found in 'users' node, checking 'lawyers' node...`);
+        
+        // Fallback: check 'lawyers' path directly if not found in users
+        const lawyerProfile = await getLawyerById(uid);
+        if (lawyerProfile) {
+            console.log(`✅ Found lawyer in 'lawyers' node`);
+            return lawyerProfile;
+        }
+        
+        // Last fallback: check 'clients' node (legacy support)
+        console.log(`⚠️ User not found in 'lawyers' node, checking 'clients' node (legacy)...`);
+        const clientsRef = ref(database, `clients/${uid}`);
+        const clientSnapshot = await get(clientsRef);
+        
+        if (clientSnapshot.exists()) {
+            const clientData = clientSnapshot.val();
+            console.log(`✅ Found client in 'clients' node (legacy)`);
+            // Migrate to users node for consistency
+            const userRef = ref(database, `users/${uid}`);
+            await set(userRef, { ...clientData, role: UserRole.CLIENT });
+            return { ...clientData, role: UserRole.CLIENT };
+        }
+        
+        // If user exists in Auth but not in DB, try to get email from Auth and create default profile
+        console.log(`⚠️ User profile not found anywhere for UID: ${uid}`);
+        console.log(`⚠️ Attempting to get user email from Auth to create default profile...`);
+        
+        // Import auth to get current user
+        const { auth } = await import('../firebaseConfig');
+        const firebaseUser = auth.currentUser;
+        
+        if (firebaseUser && firebaseUser.uid === uid) {
+            console.log(`✅ Found user in Auth (${firebaseUser.email}), creating default client profile`);
+            const defaultClient = await createDefaultClientProfile(uid, firebaseUser.email);
+            return defaultClient;
+        } else {
+            console.error(`❌ User not found in Auth either. Current user:`, firebaseUser?.uid);
+        }
+        
+        console.error(`❌ Could not retrieve or create user profile for UID: ${uid}`);
+        return null;
+    } catch (error) {
+        console.error(`❌ Error in getUserProfile for UID ${uid}:`, error);
+        return null;
     }
-    
-    // Fallback: check 'lawyers' path directly if not found in users
-    const lawyerProfile = await getLawyerById(uid);
-    return lawyerProfile;
 };
 
 // --- APPOINTMENTS ---
@@ -327,9 +455,178 @@ export const getUserAppointments = async (userId: string, role: UserRole): Promi
     }
 };
 
+/**
+ * Met à jour le transcript et le résumé d'un rendez-vous
+ */
+export const updateAppointmentTranscript = async (
+  appointmentId: string,
+  transcript: string,
+  summary: string,
+  meetingEndedAt: string
+): Promise<void> => {
+  try {
+    const apptRef = ref(database, `appointments/${appointmentId}`);
+    
+    await update(apptRef, {
+      transcript,
+      summary,
+      meetingEndedAt,
+      status: 'COMPLETED' as Appointment['status'], // Marquer comme terminé
+    });
+
+    console.log(`✅ Appointment transcript and summary updated: ${appointmentId}`);
+  } catch (error) {
+    console.error('❌ Error updating appointment transcript:', error);
+    throw error;
+  }
+};
+
+/**
+ * Partage le résumé d'un rendez-vous avec le client
+ */
+export const shareSummaryWithClient = async (appointmentId: string): Promise<void> => {
+  try {
+    const apptRef = ref(database, `appointments/${appointmentId}`);
+    
+    await update(apptRef, {
+      summaryShared: true,
+    });
+
+    console.log(`✅ Summary shared with client: ${appointmentId}`);
+  } catch (error) {
+    console.error('❌ Error sharing summary:', error);
+    throw error;
+  }
+};
+
 export const updateAppointmentStatus = async (apptId: string, status: Appointment['status']): Promise<void> => {
     const apptRef = ref(database, `appointments/${apptId}`);
     await update(apptRef, { status });
+    console.log(`✅ Appointment ${apptId} status updated to ${status}`);
+};
+
+/**
+ * Accepte un rendez-vous (change le statut de PENDING à CONFIRMED)
+ * Seulement l'avocat peut accepter
+ */
+export const acceptAppointment = async (appointmentId: string): Promise<void> => {
+  try {
+    const apptRef = ref(database, `appointments/${appointmentId}`);
+    const snapshot = await get(apptRef);
+    
+    if (!snapshot.exists()) {
+      throw new Error('Appointment not found');
+    }
+    
+    const appointment = snapshot.val() as Appointment;
+    
+    if (appointment.status !== 'PENDING') {
+      throw new Error(`Cannot accept appointment with status ${appointment.status}`);
+    }
+    
+    await update(apptRef, { status: 'CONFIRMED' });
+    console.log(`✅ Appointment ${appointmentId} accepted by lawyer`);
+  } catch (error) {
+    console.error('❌ Error accepting appointment:', error);
+    throw error;
+  }
+};
+
+/**
+ * Annule un rendez-vous (change le statut à CANCELLED)
+ * Le client ou l'avocat peuvent annuler
+ */
+export const cancelAppointment = async (appointmentId: string): Promise<void> => {
+  try {
+    const apptRef = ref(database, `appointments/${appointmentId}`);
+    const snapshot = await get(apptRef);
+    
+    if (!snapshot.exists()) {
+      throw new Error('Appointment not found');
+    }
+    
+    const appointment = snapshot.val() as Appointment;
+    
+    if (appointment.status === 'CANCELLED') {
+      throw new Error('Appointment is already cancelled');
+    }
+    
+    if (appointment.status === 'COMPLETED') {
+      throw new Error('Cannot cancel a completed appointment');
+    }
+    
+    await update(apptRef, { status: 'CANCELLED' });
+    console.log(`✅ Appointment ${appointmentId} cancelled`);
+  } catch (error) {
+    console.error('❌ Error cancelling appointment:', error);
+    throw error;
+  }
+};
+
+/**
+ * Vérifie s'il y a un conflit de créneaux pour un avocat ou un client
+ * Retourne true s'il y a un conflit (un autre RDV confirmé ou en attente au même moment)
+ * @param excludeAppointmentId - ID de l'appointment à exclure de la vérification (utile lors de l'acceptation d'un RDV)
+ */
+export const checkAppointmentConflict = async (
+  lawyerId: string,
+  clientId: string,
+  date: string,
+  duration: number,
+  excludeAppointmentId?: string
+): Promise<{ hasConflict: boolean; conflictReason?: string }> => {
+  try {
+    const allAppointments = await getAllAppointments();
+    const appointmentDate = new Date(date);
+    const appointmentEnd = new Date(appointmentDate.getTime() + duration * 60 * 1000);
+    
+    // Vérifier les conflits pour l'avocat
+    const lawyerConflicts = allAppointments.filter(apt => {
+      // Exclure l'appointment qu'on est en train de vérifier (utile lors de l'acceptation)
+      if (excludeAppointmentId && apt.id === excludeAppointmentId) return false;
+      if (apt.lawyerId !== lawyerId) return false;
+      if (apt.status === 'CANCELLED' || apt.status === 'COMPLETED') return false;
+      
+      const aptDate = new Date(apt.date);
+      const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
+      
+      // Vérifier si les créneaux se chevauchent
+      return (appointmentDate < aptEnd && appointmentEnd > aptDate);
+    });
+    
+    if (lawyerConflicts.length > 0) {
+      return {
+        hasConflict: true,
+        conflictReason: `L'avocat a déjà un rendez-vous à ce moment-là`
+      };
+    }
+    
+    // Vérifier les conflits pour le client
+    const clientConflicts = allAppointments.filter(apt => {
+      // Exclure l'appointment qu'on est en train de vérifier
+      if (excludeAppointmentId && apt.id === excludeAppointmentId) return false;
+      if (apt.clientId !== clientId) return false;
+      if (apt.status === 'CANCELLED' || apt.status === 'COMPLETED') return false;
+      
+      const aptDate = new Date(apt.date);
+      const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
+      
+      // Vérifier si les créneaux se chevauchent
+      return (appointmentDate < aptEnd && appointmentEnd > aptDate);
+    });
+    
+    if (clientConflicts.length > 0) {
+      return {
+        hasConflict: true,
+        conflictReason: `Vous avez déjà un rendez-vous à ce moment-là`
+      };
+    }
+    
+    return { hasConflict: false };
+  } catch (error) {
+    console.error('❌ Error checking appointment conflict:', error);
+    throw error;
+  }
 };
 
 /**

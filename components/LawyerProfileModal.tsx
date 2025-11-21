@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { BookingCalendar } from './BookingCalendar';
 import { ProfileViewer } from './profile-builder/ProfileViewer';
 import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, Video, MapPin, Phone } from 'lucide-react';
-import { format, addDays, setHours, setMinutes, setSeconds, isPast } from 'date-fns';
+import { format, addDays, setHours, setMinutes, setSeconds, isPast, startOfDay, isSameDay, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,41 +15,133 @@ interface LawyerProfileModalProps {
 }
 
 export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, onClose }) => {
-  const { t, translateSpecialty, currentUser, bookAppointment } = useApp();
+  const { t, translateSpecialty, currentUser, bookAppointment, appointments } = useApp();
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [consultationType, setConsultationType] = useState<Appointment['type']>('VIDEO');
   const [notes, setNotes] = useState('');
+  const [duration, setDuration] = useState<number>(60); // Durée par défaut 60 minutes
   const [isBooking, setIsBooking] = useState(false);
   const navigate = useNavigate();
 
   // Generate mock slots if the lawyer has none, for demonstration purposes
+  // Créneaux toutes les 15 minutes de 8h à 19h
   const availableSlots = useMemo(() => {
     if (lawyer.availableSlots && lawyer.availableSlots.length > 0) {
       return lawyer.availableSlots;
     }
     const mockSlots: string[] = [];
     const now = new Date();
-    const hours = [9, 10, 11, 14, 15, 16];
-    for (let i = 1; i < 8; i++) {
-      for (const hour of hours) {
-        const slotDate = setSeconds(setMinutes(setHours(addDays(now, i), hour), 0), 0);
+    
+    // Calculer le premier créneau disponible (minimum 15 minutes)
+    const getNextAvailableSlot = (baseDate: Date): Date => {
+      const minutesToAdd = 15 - (baseDate.getMinutes() % 15);
+      const nextSlot = new Date(baseDate);
+      nextSlot.setMinutes(baseDate.getMinutes() + minutesToAdd, 0, 0);
+      
+      // Si le créneau est dans moins de 15 minutes, passer au suivant
+      const minTime = new Date(now.getTime() + 15 * 60 * 1000); // Maintenant + 15 minutes
+      if (nextSlot < minTime) {
+        nextSlot.setMinutes(nextSlot.getMinutes() + 15, 0, 0);
+      }
+      
+      return nextSlot;
+    };
+    
+    // Générer les créneaux à partir d'aujourd'hui
+    for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
+      const targetDay = addDays(startOfDay(now), dayOffset);
+      const isToday = dayOffset === 0;
+      
+      // Générer des créneaux toutes les 15 minutes de 8h à 19h (19h exclu)
+      // 8h = 8*60 = 480 minutes, 19h = 19*60 = 1140 minutes
+      // Créneaux : 8:00, 8:15, 8:30, 8:45, 9:00, ..., 18:45
+      for (let minutesFromMidnight = 8 * 60; minutesFromMidnight < 19 * 60; minutesFromMidnight += 15) {
+        const slotDate = new Date(targetDay);
+        slotDate.setMinutes(minutesFromMidnight, 0, 0);
+        
+        // Pour aujourd'hui, vérifier que le créneau n'est pas passé et respecte le minimum de 15 minutes
+        if (isToday) {
+          const minTime = new Date(now.getTime() + 15 * 60 * 1000);
+          if (slotDate < minTime || isPast(slotDate)) {
+            continue; // Passer ce créneau
+          }
+        }
+        
+        // Vérifier que le créneau n'est pas dans le passé
         if (!isPast(slotDate)) {
           mockSlots.push(slotDate.toISOString());
         }
       }
     }
-    return mockSlots;
-  }, [lawyer.availableSlots]);
+    
+    // Trier et dédupliquer les créneaux
+    const uniqueSlots = Array.from(new Set(mockSlots))
+      .map(slot => parseISO(slot))
+      .filter(slot => slot >= new Date(now.getTime() + 15 * 60 * 1000))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    // Filtrer les créneaux déjà réservés pour cet avocat
+    const bookedSlots = appointments
+      .filter(apt => 
+        apt.lawyerId === lawyer.id && 
+        (apt.status === 'CONFIRMED' || apt.status === 'PENDING') &&
+        apt.status !== 'CANCELLED'
+      )
+      .map(apt => {
+        const aptDate = parseISO(apt.date);
+        const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
+        return { start: aptDate, end: aptEnd };
+      });
+
+    // Filtrer aussi les créneaux réservés par le client actuel (si connecté)
+    const clientBookedSlots = currentUser 
+      ? appointments
+          .filter(apt => 
+            apt.clientId === currentUser.id && 
+            (apt.status === 'CONFIRMED' || apt.status === 'PENDING') &&
+            apt.status !== 'CANCELLED'
+          )
+          .map(apt => {
+            const aptDate = parseISO(apt.date);
+            const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
+            return { start: aptDate, end: aptEnd };
+          })
+      : [];
+
+    // Filtrer les créneaux qui se chevauchent avec des RDV existants
+    const availableSlotsFiltered = uniqueSlots.filter(slot => {
+      const slotDate = slot;
+      const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
+      
+      // Vérifier les conflits avec les RDV de l'avocat
+      const hasLawyerConflict = bookedSlots.some(booked => 
+        slotDate < booked.end && slotEnd > booked.start
+      );
+      
+      // Vérifier les conflits avec les RDV du client
+      const hasClientConflict = clientBookedSlots.some(booked => 
+        slotDate < booked.end && slotEnd > booked.start
+      );
+      
+      return !hasLawyerConflict && !hasClientConflict;
+    });
+    
+    return availableSlotsFiltered.map(slot => slot.toISOString());
+  }, [lawyer.availableSlots, appointments, lawyer.id, currentUser?.id, duration]);
 
   const handleBooking = async () => {
     if (selectedSlot && currentUser) {
       setIsBooking(true);
       try {
-        await bookAppointment(lawyer.id, selectedSlot.toISOString(), consultationType, notes);
-        alert(`${t.booking.confirmMessage} ${lawyer.name} ${t.booking.confirmOn} ${format(selectedSlot, 'PPPP p', { locale: fr })}`);
+        await bookAppointment(lawyer.id, selectedSlot.toISOString(), consultationType, notes, duration);
+        // Le message est déjà affiché dans bookAppointment
         onClose();
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
+        // L'erreur est déjà affichée dans bookAppointment (conflit, etc.)
+        if (!error.message?.includes('conflict') && !error.message?.includes('créneau')) {
+          alert('Erreur lors de la réservation. Veuillez réessayer.');
+        }
       } finally {
         setIsBooking(false);
       }
@@ -212,6 +304,23 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
                   availableSlots={availableSlots}
                   onSlotSelect={setSelectedSlot} 
                 />
+              </div>
+
+              {/* Duration Selection */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Durée de la consultation
+                </label>
+                <select
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-navy dark:text-white"
+                >
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>1 heure</option>
+                  <option value={90}>1h30</option>
+                  <option value={120}>2 heures</option>
+                </select>
               </div>
 
               {/* Optional Notes */}

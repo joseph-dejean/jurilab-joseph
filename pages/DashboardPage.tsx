@@ -1,27 +1,41 @@
+import { format, isFuture, isToday, parseISO } from "date-fns";
+import { fr } from "date-fns/locale";
 import { GoogleAuthProvider, linkWithPopup } from "firebase/auth";
 import {
+  AlertCircle,
   Calendar,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
   Edit,
   ExternalLink,
   FileText,
+  MapPin,
   MessageSquare,
+  Phone,
   Settings,
   Video,
+  XCircle,
 } from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { auth } from "../firebaseConfig";
 import { useApp } from "../store/store";
-import { UserRole } from "../types";
+import { Appointment, UserRole } from "../types";
 
 export const DashboardPage: React.FC = () => {
   const { currentUser, appointments, lawyers, logout, t } = useApp();
   const navigate = useNavigate();
 
+  // Redirect to login if not authenticated
+  React.useEffect(() => {
+    if (!currentUser) {
+      navigate("/login");
+    }
+  }, [currentUser, navigate]);
+
   if (!currentUser) {
-    // Simple redirect protection
-    setTimeout(() => navigate("/login"), 0);
     return null;
   }
 
@@ -31,6 +45,85 @@ export const DashboardPage: React.FC = () => {
       ? a.lawyerId === currentUser.id
       : a.clientId === currentUser.id
   );
+
+  // Trier les rendez-vous (à venir en premier)
+  const sortedAppointments = [...myAppointments].sort((a, b) => {
+    const dateA = parseISO(a.date).getTime();
+    const dateB = parseISO(b.date).getTime();
+    return dateA - dateB;
+  });
+
+  // Obtenir le badge de statut
+  const getStatusBadge = (status: Appointment["status"]) => {
+    switch (status) {
+      case "CONFIRMED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+            <CheckCircle2 className="w-3 h-3" />
+            Confirmé
+          </span>
+        );
+      case "PENDING":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+            <AlertCircle className="w-3 h-3" />
+            En attente
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+            <XCircle className="w-3 h-3" />
+            Annulé
+          </span>
+        );
+      case "COMPLETED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+            <CheckCircle2 className="w-3 h-3" />
+            Terminé
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Obtenir l'icône du type
+  const getTypeIcon = (type: Appointment["type"]) => {
+    switch (type) {
+      case "VIDEO":
+        return <Video className="w-4 h-4" />;
+      case "PHONE":
+        return <Phone className="w-4 h-4" />;
+      case "IN_PERSON":
+        return <MapPin className="w-4 h-4" />;
+    }
+  };
+
+  // Vérifier si on peut rejoindre la visio
+  const canJoinVideo = (appointment: Appointment) => {
+    if (appointment.type !== "VIDEO") return false;
+    if (appointment.status === "CANCELLED") return false;
+    const aptDate = parseISO(appointment.date);
+    const now = new Date();
+    // Peut rejoindre 5 minutes avant et jusqu'à 1h après
+    const canJoinBefore = new Date(aptDate.getTime() - 5 * 60 * 1000);
+    const canJoinAfter = new Date(aptDate.getTime() + 60 * 60 * 1000);
+    return now >= canJoinBefore && now <= canJoinAfter;
+  };
+
+  const handleJoinVideo = (appointment: Appointment) => {
+    if (appointment.dailyRoomUrl) {
+      navigate(
+        `/video-call?roomUrl=${encodeURIComponent(
+          appointment.dailyRoomUrl
+        )}&appointmentId=${appointment.id}`
+      );
+    } else {
+      alert("URL de la salle de visioconférence non disponible");
+    }
+  };
 
   // Check if user is a lawyer
   const isLawyer =
@@ -99,12 +192,12 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <nav className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <a
-              href="#"
-              className="flex items-center px-6 py-4 text-primary-700 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary-700 dark:border-primary-500 font-medium"
+            <button
+              onClick={() => navigate("/my-appointments")}
+              className="w-full flex items-center px-6 py-4 text-primary-700 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary-700 dark:border-primary-500 font-medium hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
             >
               <Calendar className="h-5 w-5 mr-3" /> {t.dashboard.appointments}
-            </a>
+            </button>
             <a
               href="#"
               className="flex items-center px-6 py-4 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -190,14 +283,18 @@ export const DashboardPage: React.FC = () => {
               <h3 className="font-bold text-lg">
                 {t.dashboard.myAppointments}
               </h3>
-              <Button variant="ghost" size="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/my-appointments")}
+              >
                 {t.dashboard.viewAll}
               </Button>
             </div>
 
-            {myAppointments.length > 0 ? (
+            {sortedAppointments.length > 0 ? (
               <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                {myAppointments.map((appt) => {
+                {sortedAppointments.map((appt) => {
                   const otherPartyId =
                     currentUser.role === UserRole.LAWYER
                       ? appt.clientId
@@ -218,57 +315,74 @@ export const DashboardPage: React.FC = () => {
                       "Client (ID: " + appt.clientId.substring(0, 5) + "...)";
                   }
 
+                  const aptDate = parseISO(appt.date);
+                  const isUpcoming = isFuture(aptDate) || isToday(aptDate);
+
                   return (
                     <div
                       key={appt.id}
-                      className="p-6 flex items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      className="p-6 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                     >
                       <div className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 p-3 rounded-lg text-center min-w-[60px]">
                         <span className="block text-xs uppercase font-bold">
-                          {new Date(appt.date).toLocaleString("default", {
-                            month: "short",
-                          })}
+                          {format(aptDate, "MMM", { locale: fr })}
                         </span>
                         <span className="block text-xl font-bold">
-                          {new Date(appt.date).getDate()}
+                          {format(aptDate, "d")}
                         </span>
                       </div>
                       <div className="flex-grow">
-                        <h4 className="font-bold text-slate-900 dark:text-slate-100">
-                          {otherPartyName}
-                        </h4>
-                        <p className="text-sm text-slate-500">{subtitle}</p>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {new Date(appt.date).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {appt.status === "CONFIRMED" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate("/video-call")}
-                          >
-                            <Video className="h-4 w-4 mr-2" />
-                            Rejoindre
-                          </Button>
-                        )}
-                        <div>
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-bold
-                                ${
-                                  appt.status === "CONFIRMED"
-                                    ? "bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900"
-                                    : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-                                }
-                              `}
-                          >
-                            {appt.status}
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-bold text-slate-900 dark:text-slate-100">
+                            {otherPartyName}
+                          </h4>
+                          {getStatusBadge(appt.status)}
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 mb-1">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {format(aptDate, "HH:mm", { locale: fr })}
+                          </span>
+                          {appt.duration && (
+                            <span className="flex items-center gap-1">
+                              • {appt.duration} min
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            {getTypeIcon(appt.type)}
+                            {appt.type === "VIDEO"
+                              ? "Visio"
+                              : appt.type === "PHONE"
+                              ? "Téléphone"
+                              : "Présentiel"}
                           </span>
                         </div>
+                        {subtitle && (
+                          <p className="text-xs text-slate-400 mt-1">
+                            {subtitle}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {canJoinVideo(appt) && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleJoinVideo(appt)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                          >
+                            <Video className="h-4 w-4 mr-2" />
+                            Rejoindre la visio
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate("/my-appointments")}
+                        >
+                          Voir détails
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
                       </div>
                     </div>
                   );

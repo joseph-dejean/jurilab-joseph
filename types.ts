@@ -75,10 +75,21 @@ export interface Appointment {
   id: string;
   lawyerId: string;
   clientId: string;
+  lawyerName?: string; // Nom de l'avocat (stocké pour affichage rapide)
+  clientName?: string; // Nom du client (stocké pour affichage rapide)
   date: string; // ISO string
   status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'COMPLETED';
   notes?: string;
   type: 'VIDEO' | 'IN_PERSON' | 'PHONE';
+  // Daily.co visioconférence
+  dailyRoomUrl?: string; // URL de la salle Daily.co
+  dailyRoomId?: string; // ID de la salle
+  duration?: number; // Durée en minutes (30, 60, etc.)
+  // Transcript et résumé
+  transcript?: string; // Transcript de la réunion (stocké après la fin)
+  summary?: string; // Résumé généré par Gemini
+  summaryShared?: boolean; // Si l'avocat a partagé le résumé avec le client
+  meetingEndedAt?: string; // Timestamp ISO de fin de réunion
 }
 
 export interface SearchFilters {

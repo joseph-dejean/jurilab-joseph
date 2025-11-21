@@ -1,148 +1,321 @@
 import React, { useState, useEffect, useRef } from 'react';
-import AgoraRTC, { IAgoraRTCClient, ILocalVideoTrack, ILocalAudioTrack, IRemoteUser } from 'agora-rtc-sdk-ng';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useApp } from '../store/store';
+import { generateToken } from '../services/dailyService';
+import { processCompletedMeeting } from '../services/meetingProcessor';
+import { getLawyerById } from '../services/firebaseService';
+import { X, Video, VideoOff, Mic, MicOff, Monitor, LogOut } from 'lucide-react';
 
 const VideoCallPage: React.FC = () => {
-    const [client, setClient] = useState<IAgoraRTCClient | null>(null);
-    const [localVideoTrack, setLocalVideoTrack] = useState<ILocalVideoTrack | null>(null);
-    const [localAudioTrack, setLocalAudioTrack] = useState<ILocalAudioTrack | null>(null);
-    const [remoteUsers, setRemoteUsers] = useState<IRemoteUser[]>([]);
-    const [isJoined, setIsJoined] = useState(false);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { currentUser } = useApp();
+  
+  const roomUrl = searchParams.get('roomUrl');
+  const appointmentId = searchParams.get('appointmentId');
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [meetingEnded, setMeetingEnded] = useState(false);
+  
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-    const localVideoRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!roomUrl || !currentUser) {
+      setError('URL de la salle ou utilisateur manquant');
+      setIsLoading(false);
+      return;
+    }
 
-    const appId = "e2e2e1bcc90347eb83be44e9c4dabb0a";
-    const token = "007eJxTYPggNvXnnYzZJ/mXcWcs0A4+tPe9qbiDrsXb2dbq7ywPfP2uwJBqBISGScnJlgbGJuapSRbGSakmJqmWySYpiUlJBon6hXKZDYGMDJfkmpkYGSAQxGdnyCotysxJTGJgAAAS3CG2";
-    const channel = "test-channel";
-    const uid = 0; // The user ID, 0 means Agora will generate one.
+    const initializeMeeting = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Extraire le roomId depuis l'URL Daily.co
+        // Format: https://domain.daily.co/room-name
+        const roomId = roomUrl.split('/').pop()?.split('?')[0];
+        
+        if (!roomId) {
+          throw new Error('Impossible d\'extraire l\'ID de la salle');
+        }
 
-    useEffect(() => {
-        const agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-        setClient(agoraClient);
+        // Générer un token pour l'utilisateur
+        const userToken = await generateToken(
+          roomId,
+          currentUser.id,
+          currentUser.name || 'Utilisateur',
+          false // isOwner (pourrait être déterminé selon le rôle)
+        );
 
-        return () => {
-            if (isJoined) {
-                leaveChannel();
-            }
-        };
-    }, []);
+        setToken(userToken);
+        setIsLoading(false);
+      } catch (err: any) {
+        console.error('❌ Error initializing meeting:', err);
+        setError(err.message || 'Erreur lors de l\'initialisation de la réunion');
+        setIsLoading(false);
+      }
+    };
 
-    useEffect(() => {
-        if (!client) return;
+    initializeMeeting();
+  }, [roomUrl, currentUser]);
 
-        const handleUserPublished = async (user: IRemoteUser, mediaType: 'video' | 'audio') => {
-            await client.subscribe(user, mediaType);
-            console.log("subscribe success");
+  // Écouter les messages de l'iframe Daily.co
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Vérifier l'origine pour la sécurité
+      if (!event.origin.includes('daily.co')) {
+        return;
+      }
 
-            if (mediaType === "video") {
-                setRemoteUsers(Array.from(client.remoteUsers));
-            }
+      const data = event.data;
+      
+      // Gérer les événements Daily.co
+      if (data.type === 'participant-left' && data.participant?.local) {
+        // L'utilisateur local a quitté
+        handleMeetingEnd();
+      }
+      
+      if (data.type === 'meeting-ended') {
+        handleMeetingEnd();
+      }
+    };
 
-            if (mediaType === "audio") {
-                user.audioTrack?.play();
-            }
-        };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
-        const handleUserUnpublished = (user: IRemoteUser) => {
-            setRemoteUsers(Array.from(client.remoteUsers));
-        };
-
-        client.on("user-published", handleUserPublished);
-        client.on("user-unpublished", handleUserUnpublished);
-
-        return () => {
-            client.off("user-published", handleUserPublished);
-            client.off("user-unpublished", handleUserUnpublished);
-        };
-    }, [client]);
+  const handleMeetingEnd = async () => {
+    if (meetingEnded) return; // Éviter les appels multiples
     
-    const joinChannel = async () => {
-        if (!client) return;
-        try {
-            await client.join(appId, channel, token, uid);
-
-            const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-            const videoTrack = await AgoraRTC.createCameraVideoTrack();
-            
-            setLocalAudioTrack(audioTrack);
-            setLocalVideoTrack(videoTrack);
-
-            if (localVideoRef.current) {
-                videoTrack.play(localVideoRef.current);
-            }
-
-            await client.publish([audioTrack, videoTrack]);
-            setIsJoined(true);
-            console.log("Publish success!");
-        } catch (error) {
-            console.error("Failed to join channel", error);
-        }
-    };
-
-    const leaveChannel = async () => {
-        if (!client) return;
-        localAudioTrack?.close();
-        localVideoTrack?.close();
+    setMeetingEnded(true);
+    
+    // Traiter le transcript et générer le résumé si appointmentId est présent
+    if (appointmentId && currentUser) {
+      try {
+        // Récupérer l'appointment depuis Firebase
+        const { getAllAppointments } = await import('../services/firebaseService');
+        const appointments = await getAllAppointments();
+        const appointment = appointments.find(a => a.id === appointmentId);
         
-        setLocalAudioTrack(null);
-        setLocalVideoTrack(null);
-        
-        await client.leave();
-        setIsJoined(false);
-        setRemoteUsers([]);
-        console.log("Left channel");
-    };
-
-    return (
-        <div className="p-4">
-            <h2 className="text-2xl font-bold mb-4">Video Call</h2>
-            <div className="mb-4">
-                {!isJoined ? (
-                    <button onClick={joinChannel} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                        Join
-                    </button>
-                ) : (
-                    <button onClick={leaveChannel} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                        Leave
-                    </button>
-                )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div id="local-player-container">
-                    <h3 className="text-lg font-semibold">Local User</h3>
-                    <div ref={localVideoRef} style={{ width: '640px', height: '480px', border: '1px solid black' }}></div>
-                </div>
-                {remoteUsers.map(user => (
-                    <RemoteUser key={user.uid} user={user} />
-                ))}
-            </div>
-        </div>
-    );
-};
-
-const RemoteUser: React.FC<{ user: IRemoteUser }> = ({ user }) => {
-    const videoRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (user.videoTrack && videoRef.current) {
-            user.videoTrack.play(videoRef.current);
+        if (appointment && appointment.dailyRoomId) {
+          // Récupérer les noms de l'avocat et du client
+          const lawyer = await getLawyerById(appointment.lawyerId);
+          const lawyerName = lawyer?.name || 'Avocat';
+          
+          // Pour le client, on utilise currentUser si c'est le client, sinon on récupère depuis Firebase
+          let clientName = 'Client';
+          if (currentUser.id === appointment.clientId) {
+            clientName = currentUser.name || 'Client';
+          } else {
+            // TODO: Récupérer le nom du client depuis Firebase si nécessaire
+            clientName = 'Client';
+          }
+          
+          // Lancer le traitement en arrière-plan (ne pas bloquer la redirection)
+          // Passer les IDs pour vérifier la présence des deux participants
+          processCompletedMeeting(
+            appointment, 
+            lawyerName, 
+            clientName,
+            appointment.lawyerId,
+            appointment.clientId
+          )
+            .then(() => {
+              console.log('✅ Meeting processed successfully');
+            })
+            .catch((error) => {
+              console.error('❌ Error processing meeting:', error);
+              // Ne pas bloquer l'utilisateur, le traitement pourra être relancé plus tard
+            });
         }
-        return () => {
-            user.videoTrack?.stop();
-        };
-    }, [user.videoTrack]);
+      } catch (error) {
+        console.error('❌ Error initiating meeting processing:', error);
+        // Ne pas bloquer l'utilisateur
+      }
+    }
+    
+    // Rediriger vers la page des rendez-vous après un court délai
+    setTimeout(() => {
+      navigate('/my-appointments');
+    }, 2000);
+  };
 
-    useEffect(() => {
-        if (user.audioTrack) {
-            user.audioTrack.play();
-        }
-    }, [user.audioTrack])
+  const handleLeave = () => {
+    if (iframeRef.current) {
+      // Envoyer un message à l'iframe pour quitter
+      iframeRef.current.contentWindow?.postMessage(
+        { type: 'leave-meeting' },
+        '*'
+      );
+    }
+    handleMeetingEnd();
+  };
 
+  const toggleMute = () => {
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow?.postMessage(
+        { type: isMuted ? 'unmute-audio' : 'mute-audio' },
+        '*'
+      );
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow?.postMessage(
+        { type: isVideoOff ? 'start-video' : 'stop-video' },
+        '*'
+      );
+      setIsVideoOff(!isVideoOff);
+    }
+  };
+
+  const toggleScreenShare = () => {
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow?.postMessage(
+        { type: isScreenSharing ? 'stop-screenshare' : 'start-screenshare' },
+        '*'
+      );
+      setIsScreenSharing(!isScreenSharing);
+    }
+  };
+
+  if (isLoading) {
     return (
-        <div>
-            <h3 className="text-lg font-semibold">Remote User {user.uid}</h3>
-            <div ref={videoRef} style={{ width: '640px', height: '480px', border: '1px solid black' }}></div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-brand-DEFAULT border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-lg">Chargement de la réunion...</p>
         </div>
+      </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-8 max-w-md text-center">
+          <X className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-navy dark:text-white mb-2">
+            Erreur
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">{error}</p>
+          <button
+            onClick={() => navigate('/my-appointments')}
+            className="px-6 py-2 bg-brand-DEFAULT hover:bg-brand-dark text-white rounded-lg font-medium"
+          >
+            Retour aux rendez-vous
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (meetingEnded) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-8 max-w-md text-center">
+          <Video className="w-16 h-16 text-brand-DEFAULT mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-navy dark:text-white mb-2">
+            Réunion terminée
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+            Redirection vers vos rendez-vous...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Construire l'URL Daily.co avec le token
+  const dailyIframeUrl = token 
+    ? `${roomUrl}?t=${token}&enableTranscription=true&enableRecording=true`
+    : roomUrl;
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex flex-col">
+      {/* Header */}
+      <div className="bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Video className="w-6 h-6 text-brand-DEFAULT" />
+          <h1 className="text-xl font-semibold text-white">
+            Consultation en visioconférence
+          </h1>
+        </div>
+        <button
+          onClick={handleLeave}
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Quitter
+        </button>
+      </div>
+
+      {/* Video Container */}
+      <div className="flex-1 relative">
+        <iframe
+          ref={iframeRef}
+          src={dailyIframeUrl}
+          allow="camera; microphone; display-capture"
+          className="w-full h-full border-0"
+          style={{ minHeight: 'calc(100vh - 200px)' }}
+        />
+      </div>
+
+      {/* Controls Bar */}
+      <div className="bg-slate-800 border-t border-slate-700 px-6 py-4">
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={toggleMute}
+            className={`p-3 rounded-full transition-colors ${
+              isMuted
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-slate-700 hover:bg-slate-600 text-white'
+            }`}
+            title={isMuted ? 'Activer le micro' : 'Désactiver le micro'}
+          >
+            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
+
+          <button
+            onClick={toggleVideo}
+            className={`p-3 rounded-full transition-colors ${
+              isVideoOff
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-slate-700 hover:bg-slate-600 text-white'
+            }`}
+            title={isVideoOff ? 'Activer la caméra' : 'Désactiver la caméra'}
+          >
+            {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+          </button>
+
+          <button
+            onClick={toggleScreenShare}
+            className={`p-3 rounded-full transition-colors ${
+              isScreenSharing
+                ? 'bg-brand-DEFAULT hover:bg-brand-dark text-white'
+                : 'bg-slate-700 hover:bg-slate-600 text-white'
+            }`}
+            title={isScreenSharing ? 'Arrêter le partage d\'écran' : 'Partager l\'écran'}
+          >
+            <Monitor className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={handleLeave}
+            className="p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
+            title="Quitter la réunion"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default VideoCallPage;
