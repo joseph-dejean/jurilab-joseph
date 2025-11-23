@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Lawyer, Appointment } from '../types';
 import { useApp } from '../store/store';
 import { Button } from './Button';
@@ -8,6 +8,8 @@ import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, 
 import { format, addDays, setHours, setMinutes, setSeconds, isPast, startOfDay, isSameDay, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { getGoogleCalendarCredentials } from '../services/firebaseService';
+import { getAvailableSlots, refreshGoogleAccessToken, isSlotInAvailabilityHours } from '../services/googleCalendarService';
 
 interface LawyerProfileModalProps {
   lawyer: Lawyer;
@@ -21,13 +23,143 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
   const [notes, setNotes] = useState('');
   const [duration, setDuration] = useState<number>(60); // Durée par défaut 60 minutes
   const [isBooking, setIsBooking] = useState(false);
+  const [isLoadingGoogleCalendar, setIsLoadingGoogleCalendar] = useState(false);
+  const [googleCalendarSlots, setGoogleCalendarSlots] = useState<string[] | null>(null);
   const navigate = useNavigate();
 
+  // Charger les disponibilités Google Calendar si le calendrier est connecté
+  useEffect(() => {
+    const loadGoogleCalendarSlots = async () => {
+      if (!lawyer.googleCalendarConnected) {
+        setGoogleCalendarSlots(null);
+        return;
+      }
+
+      try {
+        setIsLoadingGoogleCalendar(true);
+        const credentials = await getGoogleCalendarCredentials(lawyer.id);
+        
+        if (!credentials || !credentials.googleCalendarAccessToken) {
+          setGoogleCalendarSlots(null);
+          return;
+        }
+
+        // Calculer la plage de dates (aujourd'hui + 8 jours)
+        const now = new Date();
+        const startDate = now.toISOString();
+        const endDate = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
+
+        // Récupérer les créneaux disponibles depuis Google Calendar
+        let accessToken = credentials.googleCalendarAccessToken;
+        try {
+          const slots = await getAvailableSlots(
+            accessToken, 
+            startDate, 
+            endDate, 
+            duration, 
+            15,
+            lawyer.availabilityHours // Passer les heures de disponibilité
+          );
+          setGoogleCalendarSlots(slots);
+        } catch (error: any) {
+          // Si le token a expiré (401), on ne peut pas le rafraîchir sans refresh token
+          // On utilise les créneaux fixes en fallback
+          if (error.message?.includes('401') || error.message?.includes('Unauthorized') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
+            console.warn('⚠️ Google Calendar token expired. Please reconnect your calendar.');
+            // Ne pas bloquer, utiliser les créneaux fixes
+            setGoogleCalendarSlots(null);
+          } else {
+            console.error('❌ Error loading Google Calendar slots:', error);
+            setGoogleCalendarSlots(null); // Fallback sur les créneaux fixes
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error loading Google Calendar slots:', error);
+        setGoogleCalendarSlots(null); // Fallback sur les créneaux fixes
+      } finally {
+        setIsLoadingGoogleCalendar(false);
+      }
+    };
+
+    loadGoogleCalendarSlots();
+  }, [lawyer.id, lawyer.googleCalendarConnected, duration]);
+
   // Generate mock slots if the lawyer has none, for demonstration purposes
-  // Créneaux toutes les 15 minutes de 8h à 19h
+  // Si Google Calendar est connecté, utiliser les créneaux Google Calendar, sinon utiliser les créneaux fixes
   const availableSlots = useMemo(() => {
+    // Filtrer les créneaux déjà réservés pour cet avocat (dans l'app)
+    const bookedSlots = appointments
+      .filter(apt => 
+        apt.lawyerId === lawyer.id && 
+        (apt.status === 'CONFIRMED' || apt.status === 'PENDING') &&
+        apt.status !== 'CANCELLED'
+      )
+      .map(apt => {
+        const aptDate = parseISO(apt.date);
+        const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
+        return { start: aptDate, end: aptEnd };
+      });
+
+    // Filtrer aussi les créneaux réservés par le client actuel (si connecté)
+    const clientBookedSlots = currentUser 
+      ? appointments
+          .filter(apt => 
+            apt.clientId === currentUser.id && 
+            (apt.status === 'CONFIRMED' || apt.status === 'PENDING') &&
+            apt.status !== 'CANCELLED'
+          )
+          .map(apt => {
+            const aptDate = parseISO(apt.date);
+            const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
+            return { start: aptDate, end: aptEnd };
+          })
+      : [];
+
+    // Si Google Calendar est connecté et qu'on a des créneaux, les utiliser et filtrer
+    if (lawyer.googleCalendarConnected && googleCalendarSlots && googleCalendarSlots.length > 0) {
+      const filteredGoogleSlots = googleCalendarSlots.filter(slotStr => {
+        const slotDate = parseISO(slotStr);
+        const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
+        
+        // Vérifier les conflits avec les RDV de l'avocat
+        const hasLawyerConflict = bookedSlots.some(booked => 
+          slotDate < booked.end && slotEnd > booked.start
+        );
+        
+        // Vérifier les conflits avec les RDV du client
+        const hasClientConflict = clientBookedSlots.some(booked => 
+          slotDate < booked.end && slotEnd > booked.start
+        );
+        
+        return !hasLawyerConflict && !hasClientConflict;
+      });
+      
+      return filteredGoogleSlots;
+    }
+    
+    // Si l'avocat a des créneaux fixes, les filtrer selon les heures de disponibilité
     if (lawyer.availableSlots && lawyer.availableSlots.length > 0) {
-      return lawyer.availableSlots;
+      const filteredSlots = lawyer.availableSlots.filter(slotStr => {
+        const slotDate = parseISO(slotStr);
+        const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
+        
+        // Vérifier si le créneau est dans les heures de disponibilité
+        const isInAvailability = isSlotInAvailabilityHours(slotDate, lawyer.availabilityHours);
+        
+        // Vérifier les conflits avec les RDV de l'avocat
+        const hasLawyerConflict = bookedSlots.some(booked => 
+          slotDate < booked.end && slotEnd > booked.start
+        );
+        
+        // Vérifier les conflits avec les RDV du client
+        const hasClientConflict = clientBookedSlots.some(booked => 
+          slotDate < booked.end && slotEnd > booked.start
+        );
+        
+        return isInAvailability && !hasLawyerConflict && !hasClientConflict;
+      });
+      
+      return filteredSlots;
     }
     const mockSlots: string[] = [];
     const now = new Date();
@@ -74,60 +206,32 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
       }
     }
     
-    // Trier et dédupliquer les créneaux
+    // Trier et dédupliquer les créneaux, puis filtrer selon les heures de disponibilité
     const uniqueSlots = Array.from(new Set(mockSlots))
       .map(slot => parseISO(slot))
       .filter(slot => slot >= new Date(now.getTime() + 15 * 60 * 1000))
+      .filter(slot => {
+        // Vérifier si le créneau est dans les heures de disponibilité
+        return isSlotInAvailabilityHours(slot, lawyer.availabilityHours);
+      })
+      .filter(slot => {
+        // Vérifier les conflits avec les RDV de l'avocat
+        const slotEnd = new Date(slot.getTime() + (duration || 60) * 60 * 1000);
+        const hasLawyerConflict = bookedSlots.some(booked => 
+          slot < booked.end && slotEnd > booked.start
+        );
+        
+        // Vérifier les conflits avec les RDV du client
+        const hasClientConflict = clientBookedSlots.some(booked => 
+          slot < booked.end && slotEnd > booked.start
+        );
+        
+        return !hasLawyerConflict && !hasClientConflict;
+      })
       .sort((a, b) => a.getTime() - b.getTime());
-
-    // Filtrer les créneaux déjà réservés pour cet avocat
-    const bookedSlots = appointments
-      .filter(apt => 
-        apt.lawyerId === lawyer.id && 
-        (apt.status === 'CONFIRMED' || apt.status === 'PENDING') &&
-        apt.status !== 'CANCELLED'
-      )
-      .map(apt => {
-        const aptDate = parseISO(apt.date);
-        const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
-        return { start: aptDate, end: aptEnd };
-      });
-
-    // Filtrer aussi les créneaux réservés par le client actuel (si connecté)
-    const clientBookedSlots = currentUser 
-      ? appointments
-          .filter(apt => 
-            apt.clientId === currentUser.id && 
-            (apt.status === 'CONFIRMED' || apt.status === 'PENDING') &&
-            apt.status !== 'CANCELLED'
-          )
-          .map(apt => {
-            const aptDate = parseISO(apt.date);
-            const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
-            return { start: aptDate, end: aptEnd };
-          })
-      : [];
-
-    // Filtrer les créneaux qui se chevauchent avec des RDV existants
-    const availableSlotsFiltered = uniqueSlots.filter(slot => {
-      const slotDate = slot;
-      const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
-      
-      // Vérifier les conflits avec les RDV de l'avocat
-      const hasLawyerConflict = bookedSlots.some(booked => 
-        slotDate < booked.end && slotEnd > booked.start
-      );
-      
-      // Vérifier les conflits avec les RDV du client
-      const hasClientConflict = clientBookedSlots.some(booked => 
-        slotDate < booked.end && slotEnd > booked.start
-      );
-      
-      return !hasLawyerConflict && !hasClientConflict;
-    });
     
-    return availableSlotsFiltered.map(slot => slot.toISOString());
-  }, [lawyer.availableSlots, appointments, lawyer.id, currentUser?.id, duration]);
+    return uniqueSlots.map(slot => slot.toISOString());
+  }, [lawyer.availableSlots, lawyer.googleCalendarConnected, googleCalendarSlots, appointments, lawyer.id, currentUser?.id, duration, lawyer.availabilityHours]);
 
   const handleBooking = async () => {
     if (selectedSlot && currentUser) {

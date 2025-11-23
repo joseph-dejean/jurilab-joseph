@@ -750,6 +750,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         await update(apptRef, { dailyRoomUrl, dailyRoomId });
       }
 
+      // Récupérer l'appointment mis à jour (avec le statut CONFIRMED)
+      const updatedAppointment = {
+        ...appointment,
+        status: "CONFIRMED" as Appointment["status"],
+      };
+
+      // Synchroniser avec Google Calendar (non-bloquant)
+      console.log(
+        "📍📍📍 SYNC GOOGLE CALENDAR START - Appointment ID:",
+        updatedAppointment.id
+      );
+      console.log("📍📍📍 Appointment details:", {
+        id: updatedAppointment.id,
+        lawyerId: updatedAppointment.lawyerId,
+        date: updatedAppointment.date,
+        status: updatedAppointment.status,
+      });
+      try {
+        const { syncAppointmentToGoogleCalendar } = await import(
+          "../services/firebaseService"
+        );
+        console.log("✅ syncAppointmentToGoogleCalendar imported successfully");
+        const eventId = await syncAppointmentToGoogleCalendar(
+          updatedAppointment
+        );
+        if (eventId) {
+          console.log(
+            "✅ Appointment synced to Google Calendar, event ID:",
+            eventId
+          );
+        } else {
+          console.log(
+            "⚠️ Google Calendar sync returned null (calendar not connected?)"
+          );
+        }
+      } catch (calError) {
+        console.error(
+          "⚠️ Error syncing to Google Calendar (non-blocking):",
+          calError
+        );
+      }
+
       console.log("✅ Appointment accepted successfully");
     } catch (error: any) {
       console.error("Error accepting appointment:", error);
@@ -795,6 +837,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       await cancelAppointmentService(appointmentId);
+
+      // Synchroniser avec Google Calendar (non-bloquant)
+      try {
+        const { deleteGoogleCalendarEvent } = await import(
+          "../services/firebaseService"
+        );
+        await deleteGoogleCalendarEvent(appointment);
+        console.log("✅ Google Calendar event deleted");
+      } catch (calError) {
+        console.error(
+          "⚠️ Error deleting Google Calendar event (non-blocking):",
+          calError
+        );
+      }
+
       console.log("✅ Appointment cancelled successfully");
     } catch (error: any) {
       console.error("Error cancelling appointment:", error);

@@ -1,7 +1,8 @@
 import { ref, get, set, onValue, push, update, remove } from 'firebase/database';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
 import { database, auth, googleProvider } from '../firebaseConfig';
-import { Lawyer, Client, UserRole, Appointment, User, ProfileBlock } from '../types';
+import { Lawyer, Client, UserRole, Appointment, User, ProfileBlock, GoogleCalendarCredentials, AvailabilityHours } from '../types';
+import { encryptToken, decryptToken } from './googleCalendarService';
 
 /**
  * Load all lawyers from Firebase Realtime Database
@@ -743,4 +744,396 @@ export const getAuthErrorMessage = (error: any): string => {
       default:
         return error.message || 'Une erreur est survenue lors de l\'authentification.';
     }
+};
+
+// --- GOOGLE CALENDAR INTEGRATION ---
+
+/**
+ * Sauvegarde les credentials Google Calendar pour un avocat
+ */
+export const saveGoogleCalendarCredentials = async (
+  lawyerId: string,
+  credentials: {
+    accessToken: string;
+    refreshToken?: string;
+  }
+): Promise<void> => {
+  try {
+    console.log(`💾 Saving Google Calendar credentials for lawyer: ${lawyerId}`);
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    
+    // Chiffrer les tokens avant de les stocker
+    const encryptedAccessToken = encryptToken(credentials.accessToken);
+    
+    // Préparer l'objet de mise à jour (sans undefined)
+    const updateData: any = {
+      googleCalendarConnected: true,
+      googleCalendarAccessToken: encryptedAccessToken,
+      googleCalendarLastSyncAt: new Date().toISOString(),
+    };
+    
+    // Ajouter le refresh token seulement s'il existe
+    if (credentials.refreshToken) {
+      updateData.googleCalendarRefreshToken = encryptToken(credentials.refreshToken);
+    }
+    
+    await update(lawyerRef, updateData);
+    
+    console.log(`✅ Google Calendar credentials saved successfully`);
+  } catch (error) {
+    console.error('❌ Error saving Google Calendar credentials:', error);
+    throw error;
+  }
+};
+
+/**
+ * Récupère les credentials Google Calendar d'un avocat
+ */
+export const getGoogleCalendarCredentials = async (
+  lawyerId: string
+): Promise<GoogleCalendarCredentials | null> => {
+  try {
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    const snapshot = await get(lawyerRef);
+    
+    if (!snapshot.exists()) {
+      return null;
+    }
+    
+    const lawyer = snapshot.val() as Lawyer;
+    
+    if (!lawyer.googleCalendarConnected || !lawyer.googleCalendarAccessToken) {
+      return null;
+    }
+    
+    // Déchiffrer les tokens
+    const accessToken = decryptToken(lawyer.googleCalendarAccessToken);
+    const refreshToken = lawyer.googleCalendarRefreshToken 
+      ? decryptToken(lawyer.googleCalendarRefreshToken)
+      : undefined;
+    
+    return {
+      googleCalendarConnected: lawyer.googleCalendarConnected || false,
+      googleCalendarAccessToken: accessToken,
+      googleCalendarRefreshToken: refreshToken,
+      googleCalendarLastSyncAt: lawyer.googleCalendarLastSyncAt,
+    };
+  } catch (error) {
+    console.error('❌ Error getting Google Calendar credentials:', error);
+    return null;
+  }
+};
+
+/**
+ * Déconnecte le calendrier Google d'un avocat
+ */
+export const disconnectGoogleCalendar = async (lawyerId: string): Promise<void> => {
+  try {
+    console.log(`🔌 Disconnecting Google Calendar for lawyer: ${lawyerId}`);
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    
+    await update(lawyerRef, {
+      googleCalendarConnected: false,
+      googleCalendarAccessToken: null,
+      googleCalendarRefreshToken: null,
+      googleCalendarLastSyncAt: null,
+    });
+    
+    console.log(`✅ Google Calendar disconnected successfully`);
+  } catch (error) {
+    console.error('❌ Error disconnecting Google Calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Met à jour le token d'accès Google Calendar (après rafraîchissement)
+ */
+export const updateGoogleCalendarAccessToken = async (
+  lawyerId: string,
+  accessToken: string
+): Promise<void> => {
+  try {
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    const encryptedToken = encryptToken(accessToken);
+    
+    await update(lawyerRef, {
+      googleCalendarAccessToken: encryptedToken,
+      googleCalendarLastSyncAt: new Date().toISOString(),
+    });
+    
+    console.log(`✅ Google Calendar access token updated`);
+  } catch (error) {
+    console.error('❌ Error updating Google Calendar access token:', error);
+    throw error;
+  }
+};
+
+/**
+ * Synchronise un rendez-vous avec Google Calendar
+ * Crée un événement dans Google Calendar quand un RDV est accepté
+ */
+export const syncAppointmentToGoogleCalendar = async (
+  appointment: Appointment
+): Promise<string | null> => {
+  try {
+    console.log('🔄 Starting Google Calendar sync for appointment:', appointment.id);
+    
+    // Récupérer les credentials Google Calendar de l'avocat
+    const credentials = await getGoogleCalendarCredentials(appointment.lawyerId);
+    
+    if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
+      console.log('⚠️ Google Calendar not connected for lawyer, skipping sync');
+      return null;
+    }
+
+    console.log('✅ Google Calendar credentials found for lawyer:', appointment.lawyerId);
+
+    const {
+      createGoogleCalendarEvent,
+      refreshGoogleAccessToken,
+    } = await import('./googleCalendarService');
+
+    let accessToken = credentials.googleCalendarAccessToken;
+    
+    try {
+      // Calculer les heures de début et fin
+      const startTime = new Date(appointment.date);
+      const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
+      
+      // Créer le titre et la description de l'événement
+      const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
+      const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
+      const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
+                       appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+      
+      console.log('📅 Creating event:', { summary, startTime: startTime.toISOString(), endTime: endTime.toISOString() });
+      
+      // Créer l'événement dans Google Calendar
+      const googleEvent = await createGoogleCalendarEvent(
+        accessToken,
+        summary,
+        startTime.toISOString(),
+        endTime.toISOString(),
+        description,
+        location
+      );
+      
+      // Stocker l'ID de l'événement Google Calendar dans l'appointment
+      const apptRef = ref(database, `appointments/${appointment.id}`);
+      await update(apptRef, { googleCalendarEventId: googleEvent.id });
+      
+      console.log(`✅ Appointment synced to Google Calendar: ${googleEvent.id}`);
+      return googleEvent.id;
+    } catch (error: any) {
+      // Si le token a expiré, essayer de le rafraîchir
+      if (error.message?.includes('401') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
+        if (credentials.googleCalendarRefreshToken) {
+          const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
+          accessToken = newAccessToken;
+          await updateGoogleCalendarAccessToken(appointment.lawyerId, accessToken);
+          
+          // Réessayer avec le nouveau token
+          const startTime = new Date(appointment.date);
+          const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
+          const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
+          const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
+          const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
+                           appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+          
+          const googleEvent = await createGoogleCalendarEvent(
+            accessToken,
+            summary,
+            startTime.toISOString(),
+            endTime.toISOString(),
+            description,
+            location
+          );
+          
+          const apptRef = ref(database, `appointments/${appointment.id}`);
+          await update(apptRef, { googleCalendarEventId: googleEvent.id });
+          
+          console.log(`✅ Appointment synced to Google Calendar (after token refresh): ${googleEvent.id}`);
+          return googleEvent.id;
+        }
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('❌ Error syncing appointment to Google Calendar:', error);
+    // Ne pas bloquer si la synchronisation échoue
+    return null;
+  }
+};
+
+/**
+ * Met à jour un événement Google Calendar
+ */
+export const updateGoogleCalendarEvent = async (
+  appointment: Appointment
+): Promise<void> => {
+  try {
+    if (!appointment.googleCalendarEventId) {
+      console.log('⚠️ No Google Calendar event ID, skipping update');
+      return;
+    }
+
+    const credentials = await getGoogleCalendarCredentials(appointment.lawyerId);
+    
+    if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
+      console.log('⚠️ Google Calendar not connected, skipping update');
+      return;
+    }
+
+    const {
+      updateGoogleCalendarEvent: updateEvent,
+      refreshGoogleAccessToken,
+    } = await import('./googleCalendarService');
+
+    let accessToken = credentials.googleCalendarAccessToken;
+    
+    try {
+      const startTime = new Date(appointment.date);
+      const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
+      const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
+      const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
+      const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
+                       appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+      
+      await updateEvent(accessToken, appointment.googleCalendarEventId, {
+        summary,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        description,
+        location,
+      });
+      
+      console.log(`✅ Google Calendar event updated: ${appointment.googleCalendarEventId}`);
+    } catch (error: any) {
+      if (error.message?.includes('401') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
+        if (credentials.googleCalendarRefreshToken) {
+          const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
+          accessToken = newAccessToken;
+          await updateGoogleCalendarAccessToken(appointment.lawyerId, accessToken);
+          
+          const startTime = new Date(appointment.date);
+          const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
+          const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
+          const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
+          const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
+                           appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+          
+          await updateEvent(accessToken, appointment.googleCalendarEventId, {
+            summary,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            description,
+            location,
+          });
+          
+          console.log(`✅ Google Calendar event updated (after token refresh): ${appointment.googleCalendarEventId}`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error updating Google Calendar event:', error);
+    // Ne pas bloquer si la mise à jour échoue
+  }
+};
+
+/**
+ * Supprime un événement Google Calendar
+ */
+export const deleteGoogleCalendarEvent = async (
+  appointment: Appointment
+): Promise<void> => {
+  try {
+    if (!appointment.googleCalendarEventId) {
+      console.log('⚠️ No Google Calendar event ID, skipping delete');
+      return;
+    }
+
+    const credentials = await getGoogleCalendarCredentials(appointment.lawyerId);
+    
+    if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
+      console.log('⚠️ Google Calendar not connected, skipping delete');
+      return;
+    }
+
+    const {
+      deleteGoogleCalendarEvent: deleteEvent,
+      refreshGoogleAccessToken,
+    } = await import('./googleCalendarService');
+
+    let accessToken = credentials.googleCalendarAccessToken;
+    
+    try {
+      await deleteEvent(accessToken, appointment.googleCalendarEventId);
+      console.log(`✅ Google Calendar event deleted: ${appointment.googleCalendarEventId}`);
+    } catch (error: any) {
+      if (error.message?.includes('401') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
+        if (credentials.googleCalendarRefreshToken) {
+          const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
+          accessToken = newAccessToken;
+          await updateGoogleCalendarAccessToken(appointment.lawyerId, accessToken);
+          
+          await deleteEvent(accessToken, appointment.googleCalendarEventId);
+          console.log(`✅ Google Calendar event deleted (after token refresh): ${appointment.googleCalendarEventId}`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error deleting Google Calendar event:', error);
+    // Ne pas bloquer si la suppression échoue
+  }
+};
+
+// --- AVAILABILITY HOURS ---
+
+/**
+ * Sauvegarde les heures de disponibilité d'un avocat
+ */
+export const saveAvailabilityHours = async (
+  lawyerId: string,
+  availabilityHours: AvailabilityHours
+): Promise<void> => {
+  try {
+    console.log(`💾 Saving availability hours for lawyer: ${lawyerId}`);
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    
+    await update(lawyerRef, {
+      availabilityHours,
+    });
+    
+    console.log(`✅ Availability hours saved successfully`);
+  } catch (error) {
+    console.error('❌ Error saving availability hours:', error);
+    throw error;
+  }
+};
+
+/**
+ * Récupère les heures de disponibilité d'un avocat
+ */
+export const getAvailabilityHours = async (
+  lawyerId: string
+): Promise<AvailabilityHours | null> => {
+  try {
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    const snapshot = await get(lawyerRef);
+    
+    if (!snapshot.exists()) {
+      return null;
+    }
+    
+    const lawyerData = snapshot.val();
+    return lawyerData.availabilityHours || null;
+  } catch (error) {
+    console.error('❌ Error getting availability hours:', error);
+    throw error;
+  }
 };

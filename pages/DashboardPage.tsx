@@ -1,6 +1,5 @@
 import { format, isFuture, isToday, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { GoogleAuthProvider, linkWithPopup } from "firebase/auth";
 import {
   AlertCircle,
   Calendar,
@@ -8,7 +7,6 @@ import {
   ChevronRight,
   Clock,
   Edit,
-  ExternalLink,
   FileText,
   MapPin,
   MessageSquare,
@@ -20,7 +18,8 @@ import {
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
-import { auth } from "../firebaseConfig";
+import { GoogleCalendarConnection } from "../components/GoogleCalendarConnection";
+import { AvailabilitySettings } from "../components/AvailabilitySettings";
 import { useApp } from "../store/store";
 import { Appointment, UserRole } from "../types";
 
@@ -130,26 +129,6 @@ export const DashboardPage: React.FC = () => {
   // Check if user is a lawyer
   const isLawyer = currentUser.role === UserRole.LAWYER;
 
-  const connectGoogleCalendar = async () => {
-    const provider = new GoogleAuthProvider();
-    provider.addScope("https://www.googleapis.com/auth/calendar");
-    try {
-      if (auth.currentUser) {
-        await linkWithPopup(auth.currentUser, provider);
-        alert("Compte Google Calendar connecté avec succès !");
-      }
-    } catch (error: any) {
-      console.error(error);
-      if (error.code === "auth/credential-already-in-use") {
-        alert("Ce compte Google est déjà lié à un autre utilisateur.");
-      } else {
-        alert(
-          "Erreur lors de la connexion à Google Calendar : " + error.message
-        );
-      }
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row gap-8">
@@ -230,22 +209,15 @@ export const DashboardPage: React.FC = () => {
           </nav>
 
           {currentUser.role === UserRole.LAWYER && (
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
-              <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-brand" /> Google Calendar
-              </h3>
-              <p className="text-xs text-slate-500 mb-3">
-                Synchronisez vos rendez-vous automatiquement.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-xs"
-                onClick={connectGoogleCalendar}
-              >
-                <ExternalLink className="h-3 w-3 mr-2" /> Connecter
-              </Button>
-            </div>
+            <>
+              <AvailabilitySettings lawyerId={currentUser.id} />
+              <GoogleCalendarConnection
+                lawyerId={currentUser.id}
+                onConnectionChange={(connected) => {
+                  console.log("📅 Google Calendar connection changed:", connected);
+                }}
+              />
+            </>
           )}
         </aside>
 
