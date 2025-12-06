@@ -64,10 +64,20 @@ export const MapComponent: React.FC<MapComponentProps> = ({ lawyers, selectedLaw
     const bounds = window.L.latLngBounds([]);
     let selectedCoords: [number, number] | null = null;
     
-    lawyers.forEach(lawyer => {
+    // Filter lawyers with valid coordinates (must be valid numbers, not NaN)
+    const lawyersWithCoords = lawyers.filter(l => 
+      l.coordinates?.lat && 
+      l.coordinates?.lng && 
+      !isNaN(l.coordinates.lat) && 
+      !isNaN(l.coordinates.lng) &&
+      typeof l.coordinates.lat === 'number' &&
+      typeof l.coordinates.lng === 'number'
+    );
+    
+    lawyersWithCoords.forEach(lawyer => {
       const isSelected = lawyer.id === selectedLawyerId;
       
-      if (isSelected) {
+      if (isSelected && !isNaN(lawyer.coordinates.lat) && !isNaN(lawyer.coordinates.lng)) {
         selectedCoords = [lawyer.coordinates.lat, lawyer.coordinates.lng];
       }
       
@@ -92,11 +102,13 @@ export const MapComponent: React.FC<MapComponentProps> = ({ lawyers, selectedLaw
         .addTo(map)
         .on('click', () => {
           onSelectLawyer(lawyer.id);
-          // Immediate smooth zoom on click
-          map.flyTo([lawyer.coordinates.lat, lawyer.coordinates.lng], 15, {
-            animate: true,
-            duration: 1.5
-          });
+          // Immediate smooth zoom on click - only if coordinates are valid
+          if (!isNaN(lawyer.coordinates.lat) && !isNaN(lawyer.coordinates.lng)) {
+            map.flyTo([lawyer.coordinates.lat, lawyer.coordinates.lng], 15, {
+              animate: true,
+              duration: 1.5
+            });
+          }
         });
 
       markersRef.current[lawyer.id] = marker;
@@ -104,7 +116,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({ lawyers, selectedLaw
     });
 
     // Handle View State
-    if (selectedCoords) {
+    if (selectedCoords && !isNaN(selectedCoords[0]) && !isNaN(selectedCoords[1])) {
       // If a lawyer is selected (from list or map), zoom to them
       map.flyTo(selectedCoords, 15, {
         animate: true,
@@ -112,7 +124,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({ lawyers, selectedLaw
       });
     } else {
       // If no lawyer selected, fit all markers
-      if (lawyers.length > 0) {
+      if (lawyersWithCoords.length > 0) {
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
       } else {
          // Default to France

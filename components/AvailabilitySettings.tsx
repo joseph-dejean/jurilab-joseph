@@ -40,7 +40,17 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ lawy
         setIsLoading(true);
         const saved = await getAvailabilityHours(lawyerId);
         if (saved) {
-          setAvailability(saved);
+          // Merge saved data with defaults to ensure all days have proper structure
+          const mergedAvailability: AvailabilityHours = { ...DEFAULT_AVAILABILITY };
+          for (const day of Object.keys(DEFAULT_AVAILABILITY) as (keyof AvailabilityHours)[]) {
+            if (saved[day]) {
+              mergedAvailability[day] = {
+                enabled: saved[day].enabled ?? DEFAULT_AVAILABILITY[day].enabled,
+                timeSlots: Array.isArray(saved[day].timeSlots) ? saved[day].timeSlots : DEFAULT_AVAILABILITY[day].timeSlots,
+              };
+            }
+          }
+          setAvailability(mergedAvailability);
         }
       } catch (error) {
         console.error('❌ Error loading availability:', error);
@@ -152,7 +162,8 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ lawy
 
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
             {DAYS.map(({ key, label }) => {
-              const dayAvailability = availability[key];
+              const dayAvailability = availability[key] || { enabled: false, timeSlots: [] };
+              const timeSlots = Array.isArray(dayAvailability.timeSlots) ? dayAvailability.timeSlots : [];
               return (
                 <div
                   key={key}
@@ -174,7 +185,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ lawy
 
                   {dayAvailability.enabled && (
                     <div className="space-y-2 ml-6">
-                      {dayAvailability.timeSlots.map((slot, index) => (
+                      {timeSlots.map((slot, index) => (
                         <div
                           key={index}
                           className="flex items-center gap-2 p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700"
@@ -199,7 +210,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ lawy
                           <button
                             onClick={() => handleRemoveTimeSlot(key, index)}
                             className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                            disabled={dayAvailability.timeSlots.length === 1}
+                            disabled={timeSlots.length === 1}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -215,7 +226,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ lawy
                     </div>
                   )}
 
-                  {dayAvailability.enabled && dayAvailability.timeSlots.length === 0 && (
+                  {dayAvailability.enabled && timeSlots.length === 0 && (
                     <div className="ml-6">
                       <button
                         onClick={() => handleAddTimeSlot(key)}

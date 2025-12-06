@@ -861,6 +861,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const translateSpecialty = (s: LegalSpecialty) => {
+    if (!s || !SPECIALTY_TRANSLATIONS[s]) {
+      return s || 'Non spécifié';
+    }
     return SPECIALTY_TRANSLATIONS[s][language];
   };
 

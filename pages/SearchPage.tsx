@@ -37,7 +37,10 @@ export const SearchPage: React.FC = () => {
   // Extract all unique cities - OPTIMIZED with useMemo
   const allCities = useMemo(() => {
     if (lawyers.length === 0) return [];
-    return Array.from(new Set(lawyers.map(l => l.location.split(',')[0]?.trim() || l.location)))
+    return Array.from(new Set(lawyers.map(l => {
+      if (!l.location) return '';
+      return l.location.split(',')[0]?.trim() || l.location;
+    })))
       .filter(c => c && c !== '')
       .sort();
   }, [lawyers]);
@@ -112,14 +115,14 @@ export const SearchPage: React.FC = () => {
     }
 
     if (selectedRegion) {
-      results = results.filter(l => l.location.includes(selectedRegion));
+      results = results.filter(l => l.location?.includes(selectedRegion));
     }
 
     if (!isAiSearchActive && query) {
       const lowerQ = query.toLowerCase();
       results = results.filter(l => 
-        l.name.toLowerCase().includes(lowerQ) || 
-        l.location.toLowerCase().includes(lowerQ) ||
+        l.name?.toLowerCase().includes(lowerQ) || 
+        l.location?.toLowerCase().includes(lowerQ) ||
         l.firmName?.toLowerCase().includes(lowerQ)
       );
     }
