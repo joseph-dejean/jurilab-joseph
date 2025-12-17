@@ -18,6 +18,8 @@ const firebaseConfig = {
   measurementId: "G-RWGMWP6H0X"
 };
 
+import { getStorage } from "firebase/storage";
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
@@ -25,4 +27,5 @@ const analytics = getAnalytics(app);
 // Initialize Realtime Database and get a reference to the service
 export const database = getDatabase(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();

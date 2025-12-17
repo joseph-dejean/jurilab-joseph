@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { LegalSpecialty, UserRole, Lawyer } from '../types';
 import { Button } from '../components/Button';
 import { registerLawyer, getAuthErrorMessage } from '../services/firebaseService';
-import { 
-  User, Briefcase, MapPin, DollarSign, Languages, 
-  FileText, Upload, Check, ChevronRight, ChevronLeft 
+import {
+  User, Briefcase, MapPin, DollarSign, Languages,
+  FileText, Upload, Check, ChevronRight, ChevronLeft,
+  Scale, Eye, EyeOff, AlertCircle, Phone, Mail, Lock,
+  Building, Award, GraduationCap, Globe
 } from 'lucide-react';
 
 interface LawyerFormData {
@@ -17,23 +19,23 @@ interface LawyerFormData {
   password: string;
   confirmPassword: string;
   phone: string;
-  
+
   // Étape 2: Informations professionnelles
   barNumber: string; // Numéro d'inscription au barreau
   specialty: LegalSpecialty;
   firmName: string;
   yearsExperience: number;
-  
+
   // Étape 3: Pratique & Localisation
   bio: string;
   city: string;
   address: string;
   postalCode: string;
-  
+
   // Étape 4: Tarifs & Langues
   hourlyRate: number;
   languages: string[];
-  
+
   // Étape 5: Documents
   profilePhoto?: File;
   barCertificate?: File;
@@ -60,21 +62,72 @@ const INITIAL_FORM_DATA: LawyerFormData = {
 };
 
 const AVAILABLE_LANGUAGES = [
-  'Français', 'Anglais', 'Espagnol', 'Allemand', 'Italien', 
+  'Français', 'Anglais', 'Espagnol', 'Allemand', 'Italien',
   'Arabe', 'Chinois', 'Portugais', 'Russe'
 ];
 
+const STEPS = [
+  { number: 1, title: 'Identité', icon: User },
+  { number: 2, title: 'Profession', icon: Briefcase },
+  { number: 3, title: 'Localisation', icon: MapPin },
+  { number: 4, title: 'Tarifs', icon: DollarSign },
+  { number: 5, title: 'Documents', icon: FileText },
+];
+
+const InputField = ({
+  label,
+  name,
+  type = 'text',
+  placeholder,
+  icon: Icon,
+  value,
+  onChange,
+  error,
+  hint,
+  required = true
+}: any) => (
+  <div>
+    <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+      {label} {required && <span className="text-red-500">*</span>}
+      {hint && <span className="font-normal text-deep-400 dark:text-surface-500 ml-1">({hint})</span>}
+    </label>
+    <div className="relative">
+      {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />}
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        className={`w-full ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${error
+            ? 'border-red-300 dark:border-red-800'
+            : 'border-surface-200 dark:border-deep-700 focus:border-accent-500 dark:focus:border-accent-400'
+          } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+        placeholder={placeholder}
+        style={{ fontSize: '16px' }}
+      />
+    </div>
+    {error && (
+      <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+        <AlertCircle className="w-4 h-4" />
+        {error}
+      </p>
+    )}
+  </div>
+);
+
+
 export const LawyerRegistrationPage: React.FC = () => {
-  const { t, translateSpecialty } = useApp();
+  const { translateSpecialty } = useApp();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<LawyerFormData>(INITIAL_FORM_DATA);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const updateField = (field: keyof LawyerFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error for this field
     if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -134,6 +187,10 @@ export const LawyerRegistrationPage: React.FC = () => {
         if (formData.hourlyRate < 50) newErrors.hourlyRate = 'Tarif minimum: 50€';
         if (formData.languages.length === 0) newErrors.languages = 'Au moins une langue requise';
         break;
+
+      case 5:
+        if (!acceptedTerms) newErrors.terms = 'Vous devez accepter les conditions';
+        break;
     }
 
     setErrors(newErrors);
@@ -150,7 +207,6 @@ export const LawyerRegistrationPage: React.FC = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  // Helper function to get coordinates for common cities
   const getCityCoordinates = (city: string): { lat: number; lng: number } => {
     const cityCoords: Record<string, { lat: number; lng: number }> = {
       'PARIS': { lat: 48.8566, lng: 2.3522 },
@@ -174,9 +230,9 @@ export const LawyerRegistrationPage: React.FC = () => {
       'NÎMES': { lat: 43.8367, lng: 4.3601 },
       'VILLEURBANNE': { lat: 45.7660, lng: 4.8795 }
     };
-    
+
     const normalizedCity = city.toUpperCase().trim();
-    return cityCoords[normalizedCity] || { lat: 46.2276, lng: 2.2137 }; // Default: center of France
+    return cityCoords[normalizedCity] || { lat: 46.2276, lng: 2.2137 };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -184,20 +240,18 @@ export const LawyerRegistrationPage: React.FC = () => {
     if (!validateStep(currentStep)) return;
 
     setIsSubmitting(true);
-    
+
     try {
-      // Get coordinates for the city (basic implementation)
       const coordinates = getCityCoordinates(formData.city);
-      
-      // Prepare lawyer data (excluding id and email which are handled by auth)
+
       const lawyerData = {
         name: `${formData.firstName} ${formData.lastName}`,
         specialty: formData.specialty,
         location: `${formData.city}, France`,
         hourlyRate: formData.hourlyRate,
-        experience: formData.yearsExperience,
+        yearsExperience: formData.yearsExperience,
         languages: formData.languages,
-        availableSlots: [], // Empty initially
+        availableSlots: [],
         bio: formData.bio,
         education: [],
         certifications: [],
@@ -209,22 +263,21 @@ export const LawyerRegistrationPage: React.FC = () => {
         phone: formData.phone,
         address: formData.address,
         coordinates,
-        verified: false, // Will be verified by admin
+        verified: false,
         firmName: formData.firmName,
         barNumber: formData.barNumber,
         responseTime: '24h',
         role: UserRole.LAWYER,
-        avatarUrl: `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}`
+        avatarUrl: `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=7c3aed&color=fff`
       };
-      
-      // Register via Firebase Auth and save profile
+
       await registerLawyer(formData.email, formData.password, lawyerData);
-      
+
       alert('✅ Inscription réussie! Votre compte sera activé après vérification de vos documents (24-48h).');
       navigate('/');
     } catch (error: any) {
       console.error('❌ Error during registration:', error);
-      alert('❌ Erreur lors de l\'inscription: ' + getAuthErrorMessage(error));
+      setErrors({ form: getAuthErrorMessage(error) });
     } finally {
       setIsSubmitting(false);
     }
@@ -232,441 +285,587 @@ export const LawyerRegistrationPage: React.FC = () => {
 
   const renderProgressBar = () => (
     <div className="mb-8">
-      <div className="flex justify-between items-center mb-2">
-        {[1, 2, 3, 4, 5].map((step) => (
-          <div key={step} className="flex items-center">
-            <div 
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors
-                ${currentStep > step ? 'bg-green-500 text-white' : 
-                  currentStep === step ? 'bg-primary-600 text-white' : 
-                  'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}
-            >
-              {currentStep > step ? <Check className="h-5 w-5" /> : step}
+      {/* Desktop Progress */}
+      <div className="hidden md:flex justify-between items-center mb-4">
+        {STEPS.map((step, index) => (
+          <React.Fragment key={step.number}>
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-300
+                  ${currentStep > step.number
+                    ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
+                    : currentStep === step.number
+                      ? 'bg-accent-600 text-white shadow-lg shadow-accent-500/30'
+                      : 'bg-surface-100 dark:bg-deep-800 text-deep-400 dark:text-surface-500'}`}
+              >
+                {currentStep > step.number ? <Check className="h-5 w-5" /> : <step.icon className="h-5 w-5" />}
+              </div>
+              <span className={`text-xs mt-2 font-medium transition-colors
+                ${currentStep >= step.number
+                  ? 'text-deep-900 dark:text-surface-100'
+                  : 'text-deep-400 dark:text-surface-500'}`}>
+                {step.title}
+              </span>
             </div>
-            {step < 5 && (
-              <div className={`h-1 w-12 md:w-20 mx-2 transition-colors
-                ${currentStep > step ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-700'}`}
+            {index < STEPS.length - 1 && (
+              <div className={`flex-1 h-1 mx-3 rounded-full transition-all duration-500
+                ${currentStep > step.number
+                  ? 'bg-green-500'
+                  : 'bg-surface-200 dark:bg-deep-700'}`}
               />
             )}
-          </div>
+          </React.Fragment>
         ))}
       </div>
-      <div className="flex justify-between text-xs text-slate-500 mt-2">
-        <span>Personnel</span>
-        <span>Professionnel</span>
-        <span>Localisation</span>
-        <span>Tarifs</span>
-        <span>Documents</span>
+
+      {/* Mobile Progress */}
+      <div className="md:hidden">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-deep-900 dark:text-surface-100">
+            Étape {currentStep} sur 5
+          </span>
+          <span className="text-sm text-deep-500 dark:text-surface-400">
+            {STEPS[currentStep - 1].title}
+          </span>
+        </div>
+        <div className="w-full h-2 bg-surface-200 dark:bg-deep-700 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-accent-600 rounded-full transition-all duration-300"
+            style={{ width: `${(currentStep / 5) * 100}%` }}
+          />
+        </div>
       </div>
     </div>
   );
 
+
+
   const renderStep1 = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4 pb-4 border-b dark:border-slate-700">
-        <User className="h-5 w-5 text-primary-600" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-          Informations Personnelles
-        </h2>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-surface-200 dark:border-deep-700">
+        <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+          <User className="h-5 w-5 text-accent-600 dark:text-accent-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-deep-900 dark:text-surface-100">
+            Informations Personnelles
+          </h2>
+          <p className="text-sm text-deep-500 dark:text-surface-400">
+            Commençons par vos informations de base
+          </p>
+        </div>
       </div>
+
+      {errors.form && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <p className="text-sm text-red-700 dark:text-red-300">{errors.form}</p>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Prénom *
-          </label>
-          <input 
-            type="text"
-            value={formData.firstName}
-            onChange={(e) => updateField('firstName', e.target.value)}
-            className={`w-full px-4 py-2 rounded-lg border ${errors.firstName ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-            placeholder="Jean"
+        <InputField
+          label="Prénom"
+          name="firstName"
+          icon={User}
+          placeholder="Jean"
+          value={formData.firstName}
+          onChange={(e: any) => updateField('firstName', e.target.value)}
+          error={errors.firstName}
+        />
+        <InputField
+          label="Nom"
+          name="lastName"
+          icon={User}
+          placeholder="Dupont"
+          value={formData.lastName}
+          onChange={(e: any) => updateField('lastName', e.target.value)}
+          error={errors.lastName}
+        />
+      </div>
+
+      <InputField
+        label="Email Professionnel"
+        name="email"
+        type="email"
+        icon={Mail}
+        placeholder="jean.dupont@avocats.fr"
+        value={formData.email}
+        onChange={(e: any) => updateField('email', e.target.value)}
+        error={errors.email}
+      />
+
+      <InputField
+        label="Téléphone"
+        name="phone"
+        type="tel"
+        icon={Phone}
+        placeholder="+33 6 12 34 56 78"
+        value={formData.phone}
+        onChange={(e: any) => updateField('phone', e.target.value)}
+        error={errors.phone}
+      />
+
+      {/* Password */}
+      <div>
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          Mot de passe <span className="text-red-500">*</span>
+          <span className="font-normal text-deep-400 dark:text-surface-500 ml-1">(min. 8 caractères)</span>
+        </label>
+        <div className="relative">
+          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={(e) => updateField('password', e.target.value)}
+            className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.password
+                ? 'border-red-300 dark:border-red-800'
+                : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+            placeholder="••••••••"
+            style={{ fontSize: '16px' }}
           />
-          {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-deep-400 dark:text-surface-500 hover:text-deep-600 transition-colors"
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
         </div>
+        {errors.password && (
+          <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.password}
+          </p>
+        )}
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Nom *
-          </label>
-          <input 
-            type="text"
-            value={formData.lastName}
-            onChange={(e) => updateField('lastName', e.target.value)}
-            className={`w-full px-4 py-2 rounded-lg border ${errors.lastName ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-            placeholder="Dupont"
+      {/* Confirm Password */}
+      <div>
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          Confirmer le mot de passe <span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
+          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+          <input
+            type={showConfirmPassword ? 'text' : 'password'}
+            value={formData.confirmPassword}
+            onChange={(e) => updateField('confirmPassword', e.target.value)}
+            className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.confirmPassword
+                ? 'border-red-300 dark:border-red-800'
+                : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+            placeholder="••••••••"
+            style={{ fontSize: '16px' }}
           />
-          {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-deep-400 dark:text-surface-500 hover:text-deep-600 transition-colors"
+          >
+            {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Email Professionnel *
-        </label>
-        <input 
-          type="email"
-          value={formData.email}
-          onChange={(e) => updateField('email', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.email ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="jean.dupont@avocats.fr"
-        />
-        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Téléphone *
-        </label>
-        <input 
-          type="tel"
-          value={formData.phone}
-          onChange={(e) => updateField('phone', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.phone ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="+33 6 12 34 56 78"
-        />
-        {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Mot de passe * (min. 8 caractères)
-        </label>
-        <input 
-          type="password"
-          value={formData.password}
-          onChange={(e) => updateField('password', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.password ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="••••••••"
-        />
-        {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Confirmer le mot de passe *
-        </label>
-        <input 
-          type="password"
-          value={formData.confirmPassword}
-          onChange={(e) => updateField('confirmPassword', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.confirmPassword ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="••••••••"
-        />
-        {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
+        {errors.confirmPassword && (
+          <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.confirmPassword}
+          </p>
+        )}
       </div>
     </div>
   );
 
   const renderStep2 = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4 pb-4 border-b dark:border-slate-700">
-        <Briefcase className="h-5 w-5 text-primary-600" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-          Informations Professionnelles
-        </h2>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-surface-200 dark:border-deep-700">
+        <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+          <Briefcase className="h-5 w-5 text-accent-600 dark:text-accent-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-deep-900 dark:text-surface-100">
+            Informations Professionnelles
+          </h2>
+          <p className="text-sm text-deep-500 dark:text-surface-400">
+            Détails de votre pratique juridique
+          </p>
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Numéro d'inscription au Barreau *
-        </label>
-        <input 
-          type="text"
-          value={formData.barNumber}
-          onChange={(e) => updateField('barNumber', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.barNumber ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="P1234567890"
-        />
-        {errors.barNumber && <p className="text-red-500 text-xs mt-1">{errors.barNumber}</p>}
-        <p className="text-xs text-slate-500 mt-1">Votre numéro sera vérifié auprès du barreau</p>
-      </div>
+      <InputField
+        label="Numéro d'inscription au Barreau"
+        name="barNumber"
+        icon={Award}
+        placeholder="P1234567890"
+        value={formData.barNumber}
+        onChange={(e: any) => updateField('barNumber', e.target.value)}
+        error={errors.barNumber}
+        hint="sera vérifié"
+      />
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Spécialité Juridique *
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          Spécialité Juridique <span className="text-red-500">*</span>
         </label>
-        <select
-          value={formData.specialty}
-          onChange={(e) => updateField('specialty', e.target.value as LegalSpecialty)}
-          className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none"
-        >
-          {Object.values(LegalSpecialty).map(s => (
-            <option key={s} value={s}>{translateSpecialty(s)}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+          <select
+            value={formData.specialty}
+            onChange={(e) => updateField('specialty', e.target.value as LegalSpecialty)}
+            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 border-surface-200 dark:border-deep-700 focus:border-accent-500 outline-none text-deep-900 dark:text-surface-100 transition-colors appearance-none cursor-pointer"
+            style={{ fontSize: '16px' }}
+          >
+            {Object.values(LegalSpecialty).map(s => (
+              <option key={s} value={s}>{translateSpecialty(s)}</option>
+            ))}
+          </select>
+          <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 rotate-90" />
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Nom du Cabinet *
-        </label>
-        <input 
-          type="text"
-          value={formData.firmName}
-          onChange={(e) => updateField('firmName', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.firmName ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="Cabinet Dupont & Associés"
-        />
-        {errors.firmName && <p className="text-red-500 text-xs mt-1">{errors.firmName}</p>}
-      </div>
+      <InputField
+        label="Nom du Cabinet"
+        name="firmName"
+        icon={Building}
+        placeholder="Cabinet Dupont & Associés"
+        value={formData.firmName}
+        onChange={(e: any) => updateField('firmName', e.target.value)}
+        error={errors.firmName}
+      />
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Années d'Expérience *
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          Années d'Expérience <span className="text-red-500">*</span>
         </label>
-        <input 
+        <input
           type="number"
           min="0"
           value={formData.yearsExperience}
-          onChange={(e) => updateField('yearsExperience', parseInt(e.target.value))}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.yearsExperience ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
+          onChange={(e) => updateField('yearsExperience', parseInt(e.target.value) || 0)}
+          className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.yearsExperience
+              ? 'border-red-300 dark:border-red-800'
+              : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+            } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+          style={{ fontSize: '16px' }}
         />
-        {errors.yearsExperience && <p className="text-red-500 text-xs mt-1">{errors.yearsExperience}</p>}
+        {errors.yearsExperience && (
+          <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.yearsExperience}
+          </p>
+        )}
       </div>
     </div>
   );
 
   const renderStep3 = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4 pb-4 border-b dark:border-slate-700">
-        <MapPin className="h-5 w-5 text-primary-600" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-          Pratique & Localisation
-        </h2>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-surface-200 dark:border-deep-700">
+        <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+          <MapPin className="h-5 w-5 text-accent-600 dark:text-accent-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-deep-900 dark:text-surface-100">
+            Pratique & Localisation
+          </h2>
+          <p className="text-sm text-deep-500 dark:text-surface-400">
+            Où et comment vous exercez
+          </p>
+        </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Biographie Professionnelle * (min. 50 caractères)
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          Biographie Professionnelle <span className="text-red-500">*</span>
+          <span className="font-normal text-deep-400 dark:text-surface-500 ml-1">(min. 50 caractères)</span>
         </label>
         <textarea
           rows={5}
           value={formData.bio}
           onChange={(e) => updateField('bio', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.bio ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none resize-none`}
+          className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.bio
+              ? 'border-red-300 dark:border-red-800'
+              : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+            } outline-none text-deep-900 dark:text-surface-100 resize-none transition-colors`}
           placeholder="Décrivez votre parcours, vos expertises et votre approche..."
+          style={{ fontSize: '16px' }}
         />
-        <div className="flex justify-between items-center mt-1">
-          {errors.bio && <p className="text-red-500 text-xs">{errors.bio}</p>}
-          <p className="text-xs text-slate-500 ml-auto">{formData.bio.length} / 500</p>
+        <div className="flex justify-between items-center mt-1.5">
+          {errors.bio && (
+            <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {errors.bio}
+            </p>
+          )}
+          <p className={`text-xs ml-auto ${formData.bio.length >= 50 ? 'text-green-600' : 'text-deep-500'}`}>
+            {formData.bio.length} / 50 min.
+          </p>
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Ville *
-        </label>
-        <input 
-          type="text"
-          value={formData.city}
-          onChange={(e) => updateField('city', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.city ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="Paris"
-        />
-        {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-      </div>
+      <InputField
+        label="Ville"
+        name="city"
+        icon={MapPin}
+        placeholder="Paris"
+        value={formData.city}
+        onChange={(e: any) => updateField('city', e.target.value)}
+        error={errors.city}
+      />
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Adresse du Cabinet *
-        </label>
-        <input 
-          type="text"
-          value={formData.address}
-          onChange={(e) => updateField('address', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.address ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="123 Rue de la Paix"
-        />
-        {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
-      </div>
+      <InputField
+        label="Adresse du Cabinet"
+        name="address"
+        icon={Building}
+        placeholder="123 Rue de la Paix"
+        value={formData.address}
+        onChange={(e: any) => updateField('address', e.target.value)}
+        error={errors.address}
+      />
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Code Postal *
-        </label>
-        <input 
-          type="text"
-          value={formData.postalCode}
-          onChange={(e) => updateField('postalCode', e.target.value)}
-          className={`w-full px-4 py-2 rounded-lg border ${errors.postalCode ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
-          placeholder="75001"
-        />
-        {errors.postalCode && <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>}
-      </div>
+      <InputField
+        label="Code Postal"
+        name="postalCode"
+        placeholder="75001"
+        value={formData.postalCode}
+        onChange={(e: any) => updateField('postalCode', e.target.value)}
+        error={errors.postalCode}
+      />
     </div>
   );
 
   const renderStep4 = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4 pb-4 border-b dark:border-slate-700">
-        <DollarSign className="h-5 w-5 text-primary-600" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-          Tarifs & Langues
-        </h2>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-surface-200 dark:border-deep-700">
+        <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+          <DollarSign className="h-5 w-5 text-accent-600 dark:text-accent-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-deep-900 dark:text-surface-100">
+            Tarifs & Langues
+          </h2>
+          <p className="text-sm text-deep-500 dark:text-surface-400">
+            Vos conditions de consultation
+          </p>
+        </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Tarif Horaire (€) *
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          Tarif Horaire <span className="text-red-500">*</span>
         </label>
         <div className="relative">
-          <input 
+          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+          <input
             type="number"
             min="50"
             step="10"
             value={formData.hourlyRate}
-            onChange={(e) => updateField('hourlyRate', parseInt(e.target.value))}
-            className={`w-full px-4 py-2 rounded-lg border ${errors.hourlyRate ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'} bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none`}
+            onChange={(e) => updateField('hourlyRate', parseInt(e.target.value) || 0)}
+            className={`w-full pl-12 pr-20 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.hourlyRate
+                ? 'border-red-300 dark:border-red-800'
+                : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+            style={{ fontSize: '16px' }}
           />
-          <span className="absolute right-4 top-2 text-slate-500">€ / heure</span>
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-deep-500 dark:text-surface-400 font-medium">
+            € / heure
+          </span>
         </div>
-        {errors.hourlyRate && <p className="text-red-500 text-xs mt-1">{errors.hourlyRate}</p>}
-        <p className="text-xs text-slate-500 mt-1">Ce tarif sera visible par les clients</p>
+        {errors.hourlyRate && (
+          <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.hourlyRate}
+          </p>
+        )}
+        <p className="text-xs text-deep-500 dark:text-surface-400 mt-1.5">
+          Ce tarif sera visible par les clients
+        </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Langues Parlées * <Languages className="inline h-4 w-4" />
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-3 flex items-center gap-2">
+          <Globe className="w-4 h-4" />
+          Langues Parlées <span className="text-red-500">*</span>
         </label>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {AVAILABLE_LANGUAGES.map(lang => (
             <button
               key={lang}
               type="button"
               onClick={() => toggleLanguage(lang)}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                formData.languages.includes(lang)
-                  ? 'bg-primary-50 border-primary-500 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-primary-300'
-              }`}
+              className={`px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${formData.languages.includes(lang)
+                  ? 'bg-accent-50 dark:bg-accent-900/30 border-accent-500 text-accent-700 dark:text-accent-300'
+                  : 'border-surface-200 dark:border-deep-700 text-deep-600 dark:text-surface-400 hover:border-accent-300 dark:hover:border-accent-700'
+                }`}
             >
               {lang}
             </button>
           ))}
         </div>
-        {errors.languages && <p className="text-red-500 text-xs mt-1">{errors.languages}</p>}
+        {errors.languages && (
+          <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.languages}
+          </p>
+        )}
       </div>
     </div>
   );
 
   const renderStep5 = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4 pb-4 border-b dark:border-slate-700">
-        <FileText className="h-5 w-5 text-primary-600" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-          Documents de Vérification
-        </h2>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-surface-200 dark:border-deep-700">
+        <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+          <FileText className="h-5 w-5 text-accent-600 dark:text-accent-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-deep-900 dark:text-surface-100">
+            Documents & Finalisation
+          </h2>
+          <p className="text-sm text-deep-500 dark:text-surface-400">
+            Dernière étape avant validation
+          </p>
+        </div>
       </div>
 
-      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800">
         <p className="text-sm text-amber-800 dark:text-amber-200">
           <strong>Important:</strong> Vos documents seront vérifiés par notre équipe avant l'activation de votre compte.
           Ce processus prend généralement 24-48 heures.
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Photo de Profil (Recommandé)
-        </label>
-        <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center hover:border-primary-500 transition-colors cursor-pointer">
-          <Upload className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-            Cliquez pour télécharger ou glissez-déposez
-          </p>
-          <p className="text-xs text-slate-500">JPG, PNG (max. 5MB)</p>
-          <input 
-            type="file" 
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => updateField('profilePhoto', e.target.files?.[0])}
-          />
+      {/* File Uploads */}
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+            Photo de Profil <span className="text-deep-400">(Recommandé)</span>
+          </label>
+          <div className="border-2 border-dashed border-surface-300 dark:border-deep-600 rounded-xl p-6 text-center hover:border-accent-400 dark:hover:border-accent-500 transition-colors cursor-pointer bg-surface-50 dark:bg-deep-900/50">
+            <Upload className="h-8 w-8 mx-auto mb-2 text-deep-400 dark:text-surface-500" />
+            <p className="text-sm text-deep-600 dark:text-surface-400 mb-1">
+              Cliquez pour télécharger
+            </p>
+            <p className="text-xs text-deep-400 dark:text-surface-500">JPG, PNG (max. 5MB)</p>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => updateField('profilePhoto', e.target.files?.[0])}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+            Certificat d'Inscription au Barreau <span className="text-red-500">*</span>
+          </label>
+          <div className="border-2 border-dashed border-surface-300 dark:border-deep-600 rounded-xl p-6 text-center hover:border-accent-400 dark:hover:border-accent-500 transition-colors cursor-pointer bg-surface-50 dark:bg-deep-900/50">
+            <Upload className="h-8 w-8 mx-auto mb-2 text-deep-400 dark:text-surface-500" />
+            <p className="text-sm text-deep-600 dark:text-surface-400 mb-1">
+              Téléchargez votre certificat
+            </p>
+            <p className="text-xs text-deep-400 dark:text-surface-500">PDF (max. 10MB)</p>
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={(e) => updateField('barCertificate', e.target.files?.[0])}
+            />
+          </div>
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Certificat d'Inscription au Barreau * (Obligatoire)
-        </label>
-        <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center hover:border-primary-500 transition-colors cursor-pointer">
-          <Upload className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-            Téléchargez votre certificat
-          </p>
-          <p className="text-xs text-slate-500">PDF (max. 10MB)</p>
-          <input 
-            type="file" 
-            accept=".pdf"
-            className="hidden"
-            onChange={(e) => updateField('barCertificate', e.target.files?.[0])}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Diplôme de Droit (Optionnel)
-        </label>
-        <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center hover:border-primary-500 transition-colors cursor-pointer">
-          <Upload className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-            Téléchargez votre diplôme
-          </p>
-          <p className="text-xs text-slate-500">PDF (max. 10MB)</p>
-          <input 
-            type="file" 
-            accept=".pdf"
-            className="hidden"
-            onChange={(e) => updateField('diploma', e.target.files?.[0])}
-          />
-        </div>
-      </div>
-
-      <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-        <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 mb-2">
+      {/* Summary */}
+      <div className="bg-surface-100 dark:bg-deep-800 p-5 rounded-xl">
+        <h3 className="font-bold text-deep-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+          <Check className="w-5 h-5 text-green-500" />
           Récapitulatif de votre inscription
         </h3>
-        <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
-          <p><strong>Nom:</strong> {formData.firstName} {formData.lastName}</p>
-          <p><strong>Email:</strong> {formData.email}</p>
-          <p><strong>Spécialité:</strong> {translateSpecialty(formData.specialty)}</p>
-          <p><strong>Cabinet:</strong> {formData.firmName}</p>
-          <p><strong>Localisation:</strong> {formData.city}</p>
-          <p><strong>Tarif:</strong> {formData.hourlyRate}€/h</p>
+        <div className="grid gap-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-deep-500 dark:text-surface-400">Nom</span>
+            <span className="font-medium text-deep-900 dark:text-surface-100">{formData.firstName} {formData.lastName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-deep-500 dark:text-surface-400">Email</span>
+            <span className="font-medium text-deep-900 dark:text-surface-100">{formData.email}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-deep-500 dark:text-surface-400">Spécialité</span>
+            <span className="font-medium text-deep-900 dark:text-surface-100">{translateSpecialty(formData.specialty)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-deep-500 dark:text-surface-400">Cabinet</span>
+            <span className="font-medium text-deep-900 dark:text-surface-100">{formData.firmName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-deep-500 dark:text-surface-400">Localisation</span>
+            <span className="font-medium text-deep-900 dark:text-surface-100">{formData.city}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-deep-500 dark:text-surface-400">Tarif</span>
+            <span className="font-medium text-accent-600 dark:text-accent-400">{formData.hourlyRate}€/h</span>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-        <input 
-          type="checkbox" 
+      {/* Terms */}
+      <div className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-colors ${acceptedTerms
+          ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800'
+          : errors.terms
+            ? 'bg-red-50 dark:bg-red-950/20 border-red-300 dark:border-red-800'
+            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+        }`}>
+        <input
+          type="checkbox"
           id="terms"
-          required
-          className="mt-1"
+          checked={acceptedTerms}
+          onChange={(e) => {
+            setAcceptedTerms(e.target.checked);
+            if (errors.terms) setErrors({ ...errors, terms: '' });
+          }}
+          className="mt-1 w-5 h-5 rounded border-2 accent-accent-600"
         />
-        <label htmlFor="terms" className="text-sm text-blue-900 dark:text-blue-200">
-          J'accepte les <a href="#" className="underline font-medium">conditions d'utilisation</a> et la 
-          <a href="#" className="underline font-medium"> politique de confidentialité</a> de Jurilab.
+        <label htmlFor="terms" className="text-sm text-deep-700 dark:text-surface-200">
+          J'accepte les <a href="#" className="underline font-semibold text-accent-600 dark:text-accent-400">conditions d'utilisation</a> et la
+          <a href="#" className="underline font-semibold text-accent-600 dark:text-accent-400 ml-1">politique de confidentialité</a> de Jurilab.
         </label>
       </div>
+      {errors.terms && (
+        <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+          <AlertCircle className="w-4 h-4" />
+          {errors.terms}
+        </p>
+      )}
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-surface-50 via-surface-100 to-accent-50 dark:from-deep-950 dark:via-deep-900 dark:to-accent-950/20 py-8 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-slate-100 mb-2">
+          <Link to="/" className="inline-flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center shadow-lg shadow-accent-500/30">
+              <Scale className="w-6 h-6 text-white" />
+            </div>
+            <span className="font-serif text-2xl font-bold text-deep-900 dark:text-surface-100">
+              Jurilab
+            </span>
+          </Link>
+          <h1 className="text-3xl sm:text-4xl font-serif font-bold text-deep-900 dark:text-surface-100 mb-2">
             Inscription Avocat
           </h1>
-          <p className="text-slate-600 dark:text-slate-400">
+          <p className="text-deep-600 dark:text-surface-400">
             Rejoignez Jurilab et développez votre clientèle
           </p>
         </div>
 
         {/* Main Form Card */}
-        <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
+        <div className="bg-white dark:bg-deep-900 p-6 md:p-8 rounded-2xl shadow-xl border border-surface-200 dark:border-deep-800">
           {renderProgressBar()}
 
           <form onSubmit={currentStep === 5 ? handleSubmit : (e) => e.preventDefault()}>
@@ -677,8 +876,8 @@ export const LawyerRegistrationPage: React.FC = () => {
             {currentStep === 5 && renderStep5()}
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between mt-8 pt-6 border-t dark:border-slate-700">
-              {currentStep > 1 && (
+            <div className="flex justify-between mt-8 pt-6 border-t border-surface-200 dark:border-deep-700">
+              {currentStep > 1 ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -688,13 +887,23 @@ export const LawyerRegistrationPage: React.FC = () => {
                   <ChevronLeft className="h-4 w-4" />
                   Précédent
                 </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/login?register=true')}
+                  className="flex items-center gap-2"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Retour
+                </Button>
               )}
-              
+
               {currentStep < 5 ? (
                 <Button
                   type="button"
                   onClick={handleNext}
-                  className="flex items-center gap-2 ml-auto"
+                  className="flex items-center gap-2"
                 >
                   Suivant
                   <ChevronRight className="h-4 w-4" />
@@ -702,14 +911,11 @@ export const LawyerRegistrationPage: React.FC = () => {
               ) : (
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="flex items-center gap-2 ml-auto bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  isLoading={isSubmitting}
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
                 >
                   {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                      Inscription en cours...
-                    </>
+                    'Inscription en cours...'
                   ) : (
                     <>
                       <Check className="h-4 w-4" />
@@ -723,11 +929,11 @@ export const LawyerRegistrationPage: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-6 text-sm text-slate-500">
-          Vous avez déjà un compte?{' '}
-          <button 
+        <div className="text-center mt-6 text-sm text-deep-500 dark:text-surface-400">
+          Vous avez déjà un compte ?{' '}
+          <button
             onClick={() => navigate('/login')}
-            className="text-primary-600 font-medium hover:underline"
+            className="text-accent-600 dark:text-accent-400 font-semibold hover:underline"
           >
             Se connecter
           </button>

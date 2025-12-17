@@ -2,47 +2,63 @@
   "rules": {
     "lawyers": {
       ".read": true,
-      // Admins can write to any lawyer profile
-      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
       "$uid": {
-        // A user can write to their own lawyer profile if authenticated
-        ".write": "auth != null && auth.uid === $uid"
+        ".read": true,
+        ".write": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".validate": "newData.child('id').val() === $uid"
+      }
+    },
+    "tasks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid && root.child('users').child(auth.uid).child('disabled').val() !== true",
+        ".write": "auth != null && auth.uid === $uid && root.child('users').child(auth.uid).child('disabled').val() !== true"
       }
     },
     "users": {
-      // Admins can read and write all user data
-      ".read": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
-      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".read": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
       "$uid": {
-        // A user can read or write to their own user profile
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && ( (root.child('users').child(auth.uid).child('disabled').val() !== true && root.child('users').child(auth.uid).child('role').val() === 'ADMIN') || (auth.uid === $uid && root.child('users').child(auth.uid).child('disabled').val() !== true) )",
+        ".validate": "newData.hasChildren(['id','name','email','role']) && newData.child('id').val() === $uid && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (auth.uid === $uid && ( (!data.exists() && (newData.child('role').val() === 'CLIENT' || newData.child('role').val() === 'LAWYER')) || (data.exists() && newData.child('role').val() === data.child('role').val()) ) && ( (!data.exists() && newData.child('disabled').val() !== true) || (data.exists() && newData.child('disabled').val() === data.child('disabled').val()) ) ))"
       }
     },
     "appointments": {
-      // Allow authenticated users to read all appointments (filtering is done client-side)
-      // This is acceptable for small-to-medium scale apps
-      ".read": "auth != null",
-      // Only allow creating appointments (clients can create, admins can update)
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('disabled').val() !== true || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
       ".write": false,
-      ".indexOn": ["clientId", "lawyerId"], // Improves query performance
+      ".indexOn": [
+        "clientId",
+        "lawyerId"
+      ],
       "$appointmentId": {
-        // A user can read an appointment if they are the client or the lawyer
-        ".read": "auth != null && (data.child('clientId').val() === auth.uid || data.child('lawyerId').val() === auth.uid)",
-        // A user can create an appointment if they are authenticated and are the client for that appointment
-        // Allow client to create, and anyone to update (admins)
-        ".write": "!data.exists() && auth != null && newData.child('clientId').val() === auth.uid || data.exists()",
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || data.child('clientId').val() === auth.uid || data.child('lawyerId').val() === auth.uid)",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('clientId').val() === auth.uid) || (data.exists() && (data.child('clientId').val() === auth.uid || data.child('lawyerId').val() === auth.uid)))",
         ".validate": "newData.hasChildren(['id', 'lawyerId', 'clientId', 'date', 'status', 'type'])"
       }
     },
     "chatPermissions": {
       "$channelId": {
-        ".read": "auth != null && (data.child('lawyerId').val() === auth.uid || data.child('clientId').val() === auth.uid || !data.exists())",
-        ".write": "auth != null && (newData.child('lawyerId').val() === auth.uid || (data.exists() && data.child('lawyerId').val() === auth.uid))",
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || data.child('lawyerId').val() === auth.uid || data.child('clientId').val() === auth.uid || !data.exists())",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('lawyerId').val() === auth.uid || (data.exists() && data.child('lawyerId').val() === auth.uid))",
         "clientCanMessage": {
-          ".read": "auth != null && (root.child('chatPermissions').child($channelId).child('lawyerId').val() === auth.uid || root.child('chatPermissions').child($channelId).child('clientId').val() === auth.uid || !root.child('chatPermissions').child($channelId).exists())",
-          ".write": "auth != null && root.child('chatPermissions').child($channelId).child('lawyerId').val() === auth.uid"
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || root.child('chatPermissions').child($channelId).child('lawyerId').val() === auth.uid || root.child('chatPermissions').child($channelId).child('clientId').val() === auth.uid || !root.child('chatPermissions').child($channelId).exists())",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || root.child('chatPermissions').child($channelId).child('lawyerId').val() === auth.uid)"
         }
+      }
+    },
+    "documents": {
+      ".read": "auth != null",
+      ".write": false,
+      ".indexOn": [
+        "lawyerId",
+        "clientId",
+        "uploadedBy"
+      ],
+      "$documentId": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || data.child('lawyerId').val() === auth.uid || (data.child('clientId').val() === auth.uid && data.child('sharedWithClient').val() === true))",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('disabled').val() !== true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() || data.child('lawyerId').val() === auth.uid || data.child('uploadedBy').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['id', 'name', 'fileName', 'fileUrl', 'fileType', 'lawyerId', 'clientId', 'uploadedBy'])"
       }
     }
   }

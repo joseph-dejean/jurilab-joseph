@@ -23,10 +23,21 @@ export const MapComponent: React.FC<MapComponentProps> = ({ lawyers, selectedLaw
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    // Initialize map centered on France
+    // France bounding box (with some padding for border regions)
+    const franceBounds = window.L.latLngBounds(
+      [41.2, -5.5],  // Southwest corner (includes Corsica margin)
+      [51.2, 10.0]   // Northeast corner
+    );
+
+    // Initialize map centered on France with strict bounds
     const map = window.L.map(mapContainerRef.current, {
       zoomControl: false,
-      attributionControl: false
+      attributionControl: false,
+      maxBounds: franceBounds,
+      maxBoundsViscosity: 1.0, // Prevents dragging outside bounds completely
+      minZoom: 5,              // Can't zoom out past France level
+      maxZoom: 18,             // Reasonable max zoom for street level
+      bounceAtZoomLimits: false
     }).setView([46.603354, 1.888334], 6); 
 
     // Add Zoom Control to bottom right
@@ -34,11 +45,15 @@ export const MapComponent: React.FC<MapComponentProps> = ({ lawyers, selectedLaw
       position: 'bottomright'
     }).addTo(map);
 
-    // Use CartoDB Voyager (Light) for a clean, professional look
+    // Use CartoDB Voyager (Light) with performance optimizations
     window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
-      maxZoom: 20
+      maxZoom: 18,
+      bounds: franceBounds,    // Only load tiles within France bounds
+      updateWhenIdle: true,    // Only load tiles after panning stops (faster)
+      updateWhenZooming: false, // Don't load during zoom animation
+      keepBuffer: 2            // Keep fewer tiles in memory (faster initial load)
     }).addTo(map);
 
     mapRef.current = map;

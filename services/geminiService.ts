@@ -65,21 +65,36 @@ export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: 
     'Labor Law', 'Intellectual Property', 'Immigration', 'Tax Law', 'General Practice'
   ];
 
+  const specialtyDescriptions: Record<string, string> = {
+    'Criminal Law': 'droit pénal (infractions, délits, crimes)',
+    'Family Law': 'droit de la famille (divorce, garde d\'enfants, succession)',
+    'Corporate Law': 'droit des affaires et des sociétés',
+    'Real Estate': 'droit immobilier (achat, vente, litiges de propriété)',
+    'Labor Law': 'droit du travail (licenciement, contrat de travail, harcèlement)',
+    'Intellectual Property': 'propriété intellectuelle (brevets, marques, droits d\'auteur)',
+    'Immigration': 'droit de l\'immigration (visa, naturalisation, régularisation)',
+    'Tax Law': 'droit fiscal (impôts, contrôle fiscal, optimisation)',
+    'General Practice': 'droit général'
+  };
+
   const prompt = `
-    Analyze the following user query and determine the most relevant legal specialty.
-    The user is looking for a lawyer.
-    Query: "${userQuery}"
+    Tu es un assistant juridique expert. Analyse la requête suivante d'un utilisateur cherchant un avocat.
+    
+    Requête de l'utilisateur : "${userQuery}"
 
-    Available specialties are: ${specialties.join(', ')}.
+    Spécialités disponibles : ${specialties.join(', ')}.
 
-    Your task:
-    1.  Provide a brief, one-sentence summary in French explaining your choice. Start with "Votre cas semble concerner...".
-    2.  On a new line, state ONLY the chosen specialty from the provided list that best matches the query. Do not add any extra text or punctuation.
+    Instructions :
+    1. Détermine la spécialité juridique la plus pertinente pour cette requête.
+    2. Rédige une phrase d'analyse en français qui :
+       - Commence par "Votre cas semble concerner"
+       - Décrit spécifiquement le problème juridique mentionné par l'utilisateur
+       - Mentionne le domaine du droit concerné de façon naturelle
+       - Soit empathique et professionnelle
+       - Fasse entre 15 et 30 mots
+    3. Sur une nouvelle ligne, écris UNIQUEMENT la spécialité choisie (en anglais, exactement comme dans la liste).
 
-    Example:
-    Votre cas semble concerner un problème avec votre employeur.
-    Labor Law
-  `;
+  `; 
 
   try {
     const result = await model.generateContent(prompt);

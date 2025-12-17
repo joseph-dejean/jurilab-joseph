@@ -12,6 +12,7 @@ import { MyAppointmentsPage } from './pages/MyAppointmentsPage';
 import VideoCallPage from './pages/VideoCallPage';
 import { AdminPage } from './pages/AdminPage';
 import { MessagesPage } from './pages/MessagesPage';
+import { DocumentsPage } from './pages/DocumentsPage';
 
 const App: React.FC = () => {
   return (
@@ -28,6 +29,7 @@ const App: React.FC = () => {
             <Route path="/my-appointments" element={<MyAppointmentsPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/video-call" element={<VideoCallPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

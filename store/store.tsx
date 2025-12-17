@@ -300,6 +300,7 @@ const SPECIALTY_TRANSLATIONS: Record<
 
 interface AppState {
   currentUser: User | null;
+  isAuthLoading: boolean;
   lawyers: Lawyer[];
   appointments: Appointment[];
   darkMode: boolean;
@@ -340,6 +341,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [lawyers, setLawyers] = useState<Lawyer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [darkMode, setDarkMode] = useState(false);
@@ -363,6 +365,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           try {
             const userProfile = await getUserProfile(firebaseUser.uid);
             if (userProfile) {
+              // Block disabled accounts (app-level). They can still sign-in to Firebase Auth,
+              // but we immediately sign them out and deny access to the UI.
+              if ((userProfile as any).disabled === true) {
+                alert("Ce compte a été désactivé. Contactez le support si besoin.");
+                try {
+                  await logoutUser();
+                } finally {
+                  setCurrentUser(null);
+                  setAppointments([]);
+                  setIsAuthLoading(false);
+                }
+                return;
+              }
               console.log("✅ User profile loaded:", {
                 id: userProfile.id,
                 name: userProfile.name,
@@ -442,12 +457,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             }
           } catch (e) {
             console.error("❌ Error fetching user profile:", e);
+          } finally {
+            setIsAuthLoading(false);
           }
         })();
       } else {
         console.log("👋 User logged out");
         setCurrentUser(null);
         setAppointments([]);
+        setIsAuthLoading(false);
 
         // Disconnect Stream client (async, non-blocking)
         (async () => {
@@ -871,6 +889,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     <AppContext.Provider
       value={{
         currentUser,
+        isAuthLoading,
         lawyers,
         appointments,
         darkMode,

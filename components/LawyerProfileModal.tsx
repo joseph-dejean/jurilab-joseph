@@ -4,7 +4,7 @@ import { useApp } from '../store/store';
 import { Button } from './Button';
 import { BookingCalendar } from './BookingCalendar';
 import { ProfileViewer } from './profile-builder/ProfileViewer';
-import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, Video, MapPin, Phone } from 'lucide-react';
+import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, Video, MapPin, Phone, Award, CheckCircle, ChevronLeft } from 'lucide-react';
 import { format, addDays, setHours, setMinutes, setSeconds, isPast, startOfDay, isSameDay, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
@@ -21,13 +21,22 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [consultationType, setConsultationType] = useState<Appointment['type']>('VIDEO');
   const [notes, setNotes] = useState('');
-  const [duration, setDuration] = useState<number>(60); // Durée par défaut 60 minutes
+  const [duration, setDuration] = useState<number>(60);
   const [isBooking, setIsBooking] = useState(false);
   const [isLoadingGoogleCalendar, setIsLoadingGoogleCalendar] = useState(false);
   const [googleCalendarSlots, setGoogleCalendarSlots] = useState<string[] | null>(null);
+  const [activeTab, setActiveTab] = useState<'profile' | 'booking'>('profile');
   const navigate = useNavigate();
 
-  // Charger les disponibilités Google Calendar si le calendrier est connecté
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  // Load Google Calendar slots if connected
   useEffect(() => {
     const loadGoogleCalendarSlots = async () => {
       if (!lawyer.googleCalendarConnected) {
@@ -44,12 +53,10 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
           return;
         }
 
-        // Calculer la plage de dates (aujourd'hui + 8 jours)
         const now = new Date();
         const startDate = now.toISOString();
         const endDate = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
 
-        // Récupérer les créneaux disponibles depuis Google Calendar
         let accessToken = credentials.googleCalendarAccessToken;
         try {
           const slots = await getAvailableSlots(
@@ -58,24 +65,21 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
             endDate, 
             duration, 
             15,
-            lawyer.availabilityHours // Passer les heures de disponibilité
+            lawyer.availabilityHours
           );
           setGoogleCalendarSlots(slots);
         } catch (error: any) {
-          // Si le token a expiré (401), on ne peut pas le rafraîchir sans refresh token
-          // On utilise les créneaux fixes en fallback
           if (error.message?.includes('401') || error.message?.includes('Unauthorized') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
             console.warn('⚠️ Google Calendar token expired. Please reconnect your calendar.');
-            // Ne pas bloquer, utiliser les créneaux fixes
             setGoogleCalendarSlots(null);
           } else {
             console.error('❌ Error loading Google Calendar slots:', error);
-            setGoogleCalendarSlots(null); // Fallback sur les créneaux fixes
+            setGoogleCalendarSlots(null);
           }
         }
       } catch (error) {
         console.error('❌ Error loading Google Calendar slots:', error);
-        setGoogleCalendarSlots(null); // Fallback sur les créneaux fixes
+        setGoogleCalendarSlots(null);
       } finally {
         setIsLoadingGoogleCalendar(false);
       }
@@ -84,10 +88,8 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
     loadGoogleCalendarSlots();
   }, [lawyer.id, lawyer.googleCalendarConnected, duration]);
 
-  // Generate mock slots if the lawyer has none, for demonstration purposes
-  // Si Google Calendar est connecté, utiliser les créneaux Google Calendar, sinon utiliser les créneaux fixes
+  // Generate available slots
   const availableSlots = useMemo(() => {
-    // Filtrer les créneaux déjà réservés pour cet avocat (dans l'app)
     const bookedSlots = appointments
       .filter(apt => 
         apt.lawyerId === lawyer.id && 
@@ -100,7 +102,6 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
         return { start: aptDate, end: aptEnd };
       });
 
-    // Filtrer aussi les créneaux réservés par le client actuel (si connecté)
     const clientBookedSlots = currentUser 
       ? appointments
           .filter(apt => 
@@ -115,18 +116,15 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
           })
       : [];
 
-    // Si Google Calendar est connecté et qu'on a des créneaux, les utiliser et filtrer
     if (lawyer.googleCalendarConnected && googleCalendarSlots && googleCalendarSlots.length > 0) {
       const filteredGoogleSlots = googleCalendarSlots.filter(slotStr => {
         const slotDate = parseISO(slotStr);
         const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
         
-        // Vérifier les conflits avec les RDV de l'avocat
         const hasLawyerConflict = bookedSlots.some(booked => 
           slotDate < booked.end && slotEnd > booked.start
         );
         
-        // Vérifier les conflits avec les RDV du client
         const hasClientConflict = clientBookedSlots.some(booked => 
           slotDate < booked.end && slotEnd > booked.start
         );
@@ -137,21 +135,17 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
       return filteredGoogleSlots;
     }
     
-    // Si l'avocat a des créneaux fixes, les filtrer selon les heures de disponibilité
     if (lawyer.availableSlots && lawyer.availableSlots.length > 0) {
       const filteredSlots = lawyer.availableSlots.filter(slotStr => {
         const slotDate = parseISO(slotStr);
         const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
         
-        // Vérifier si le créneau est dans les heures de disponibilité
         const isInAvailability = isSlotInAvailabilityHours(slotDate, lawyer.availabilityHours);
         
-        // Vérifier les conflits avec les RDV de l'avocat
         const hasLawyerConflict = bookedSlots.some(booked => 
           slotDate < booked.end && slotEnd > booked.start
         );
         
-        // Vérifier les conflits avec les RDV du client
         const hasClientConflict = clientBookedSlots.some(booked => 
           slotDate < booked.end && slotEnd > booked.start
         );
@@ -161,67 +155,42 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
       
       return filteredSlots;
     }
+
+    // Generate mock slots
     const mockSlots: string[] = [];
     const now = new Date();
     
-    // Calculer le premier créneau disponible (minimum 15 minutes)
-    const getNextAvailableSlot = (baseDate: Date): Date => {
-      const minutesToAdd = 15 - (baseDate.getMinutes() % 15);
-      const nextSlot = new Date(baseDate);
-      nextSlot.setMinutes(baseDate.getMinutes() + minutesToAdd, 0, 0);
-      
-      // Si le créneau est dans moins de 15 minutes, passer au suivant
-      const minTime = new Date(now.getTime() + 15 * 60 * 1000); // Maintenant + 15 minutes
-      if (nextSlot < minTime) {
-        nextSlot.setMinutes(nextSlot.getMinutes() + 15, 0, 0);
-      }
-      
-      return nextSlot;
-    };
-    
-    // Générer les créneaux à partir d'aujourd'hui
     for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
       const targetDay = addDays(startOfDay(now), dayOffset);
       const isToday = dayOffset === 0;
       
-      // Générer des créneaux toutes les 15 minutes de 8h à 19h (19h exclu)
-      // 8h = 8*60 = 480 minutes, 19h = 19*60 = 1140 minutes
-      // Créneaux : 8:00, 8:15, 8:30, 8:45, 9:00, ..., 18:45
       for (let minutesFromMidnight = 8 * 60; minutesFromMidnight < 19 * 60; minutesFromMidnight += 15) {
         const slotDate = new Date(targetDay);
         slotDate.setMinutes(minutesFromMidnight, 0, 0);
         
-        // Pour aujourd'hui, vérifier que le créneau n'est pas passé et respecte le minimum de 15 minutes
         if (isToday) {
           const minTime = new Date(now.getTime() + 15 * 60 * 1000);
           if (slotDate < minTime || isPast(slotDate)) {
-            continue; // Passer ce créneau
+            continue;
           }
         }
         
-        // Vérifier que le créneau n'est pas dans le passé
         if (!isPast(slotDate)) {
           mockSlots.push(slotDate.toISOString());
         }
       }
     }
     
-    // Trier et dédupliquer les créneaux, puis filtrer selon les heures de disponibilité
     const uniqueSlots = Array.from(new Set(mockSlots))
       .map(slot => parseISO(slot))
       .filter(slot => slot >= new Date(now.getTime() + 15 * 60 * 1000))
+      .filter(slot => isSlotInAvailabilityHours(slot, lawyer.availabilityHours))
       .filter(slot => {
-        // Vérifier si le créneau est dans les heures de disponibilité
-        return isSlotInAvailabilityHours(slot, lawyer.availabilityHours);
-      })
-      .filter(slot => {
-        // Vérifier les conflits avec les RDV de l'avocat
         const slotEnd = new Date(slot.getTime() + (duration || 60) * 60 * 1000);
         const hasLawyerConflict = bookedSlots.some(booked => 
           slot < booked.end && slotEnd > booked.start
         );
         
-        // Vérifier les conflits avec les RDV du client
         const hasClientConflict = clientBookedSlots.some(booked => 
           slot < booked.end && slotEnd > booked.start
         );
@@ -238,11 +207,9 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
       setIsBooking(true);
       try {
         await bookAppointment(lawyer.id, selectedSlot.toISOString(), consultationType, notes, duration);
-        // Le message est déjà affiché dans bookAppointment
         onClose();
       } catch (error: any) {
         console.error(error);
-        // L'erreur est déjà affichée dans bookAppointment (conflit, etc.)
         if (!error.message?.includes('conflict') && !error.message?.includes('créneau')) {
           alert('Erreur lors de la réservation. Veuillez réessayer.');
         }
@@ -255,155 +222,250 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
   };
 
   const handleLoginRedirect = () => {
-      onClose();
-      navigate('/login');
+    onClose();
+    navigate('/login');
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white dark:bg-navy-dark rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] grid grid-cols-1 lg:grid-cols-3 overflow-hidden">
-        
-        {/* Left Column: Info & Contact */}
-        <div className="lg:col-span-1 bg-slate-50 dark:bg-navy p-6 flex flex-col overflow-y-auto">
-          <div className="text-center">
-            <img
-              src={lawyer.avatarUrl}
-              alt={lawyer.name}
-              className="w-32 h-32 rounded-full object-cover ring-4 ring-white dark:ring-navy mx-auto"
-            />
-            <h1 className="text-2xl font-bold text-navy dark:text-white mt-4">{lawyer.name}</h1>
-            <p className="text-md text-slate-500 dark:text-slate-400">{lawyer.firmName}</p>
-            {lawyer.rating && lawyer.reviewCount && (
-              <div className="flex items-center justify-center mt-2">
-                <Star className="w-4 h-4 text-yellow-400" />
-                <p className="ml-1 text-sm text-slate-600 dark:text-slate-300">
-                  {lawyer.rating} ({lawyer.reviewCount} {t.modal.reviewsTitle})
-                </p>
-              </div>
-            )}
-          </div>
-          
-          <div className="mt-8 space-y-4">
-             <div className="flex items-start space-x-3">
-              <Briefcase className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
-              <div>
-                <h3 className="font-semibold text-sm text-navy dark:text-white">{t.modal.specialties}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">{translateSpecialty(lawyer.specialty)}</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Languages className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
-              <div>
-                <h3 className="font-semibold text-sm text-navy dark:text-white">{t.modal.languages}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">{lawyer.languages?.join(', ') || 'Non spécifié'}</p>
-              </div>
-            </div>
-             <div className="flex items-start space-x-3">
-              <Clock className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
-              <div>
-                <h3 className="font-semibold text-sm text-navy dark:text-white">{t.modal.experience}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">{lawyer.yearsExperience} {t.modal.years}</p>
-              </div>
-            </div>
-          </div>
+  const consultationTypes = [
+    { type: 'VIDEO' as const, icon: Video, label: t.modal.video },
+    { type: 'IN_PERSON' as const, icon: MapPin, label: t.modal.inPerson },
+    { type: 'PHONE' as const, icon: Phone, label: t.modal.phone },
+  ];
 
-          <div className="mt-auto pt-6">
-             <h3 className="text-lg font-semibold text-navy dark:text-white border-b-2 border-red-500 pb-2 mb-4 inline-block">Contacter</h3>
-             <div className="space-y-3">
-                <textarea 
-                  className="w-full p-2 text-sm border border-slate-300 dark:border-navy-light rounded-md bg-transparent focus:ring-2 focus:ring-red-500 outline-none"
-                  rows={3}
-                  placeholder="Votre message..."
+  return (
+    <div 
+      className="fixed inset-0 bg-deep-950/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center animate-fade-in"
+      onClick={onClose}
+    >
+      {/* Modal Container - Full screen on mobile, centered card on desktop */}
+      <div 
+        className="bg-white dark:bg-deep-900 w-full md:rounded-3xl md:shadow-glass-lg md:max-w-5xl md:max-h-[90vh] h-full md:h-auto overflow-hidden animate-slide-up md:animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Mobile Header */}
+        <div className="md:hidden sticky top-0 z-10 bg-white dark:bg-deep-900 border-b border-surface-200 dark:border-deep-800 px-4 py-3 flex items-center gap-3 safe-area-top">
+          <button 
+            onClick={onClose}
+            className="p-2 -ml-2 rounded-lg hover:bg-surface-100 dark:hover:bg-deep-800 transition-colors"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-deep-900 dark:text-surface-100 truncate">{lawyer.name}</h2>
+            <p className="text-xs text-deep-500 dark:text-surface-500 truncate">{lawyer.firmName}</p>
+          </div>
+          {lawyer.rating && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-accent-50 dark:bg-accent-950/50 rounded-lg">
+              <Star className="w-3.5 h-3.5 text-accent-500 fill-accent-500" />
+              <span className="text-sm font-semibold text-accent-700 dark:text-accent-300">{lawyer.rating}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Tabs */}
+        <div className="md:hidden sticky top-[60px] z-10 bg-white dark:bg-deep-900 border-b border-surface-200 dark:border-deep-800">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                activeTab === 'profile'
+                  ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500'
+                  : 'text-deep-500 dark:text-surface-500'
+              }`}
+            >
+              Profil
+            </button>
+            <button
+              onClick={() => setActiveTab('booking')}
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                activeTab === 'booking'
+                  ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500'
+                  : 'text-deep-500 dark:text-surface-500'
+              }`}
+            >
+              Réserver
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden md:grid md:grid-cols-5 h-full md:h-auto md:max-h-[90vh]">
+          {/* Left Column: Profile Info */}
+          <div className="md:col-span-2 bg-surface-50 dark:bg-deep-800 p-6 lg:p-8 flex flex-col overflow-y-auto">
+            {/* Profile Header */}
+            <div className="text-center mb-8">
+              <div className="relative inline-block">
+                <img
+                  src={lawyer.avatarUrl}
+                  alt={lawyer.name}
+                  className="w-28 h-28 lg:w-32 lg:h-32 rounded-2xl object-cover ring-4 ring-white dark:ring-deep-700 shadow-card"
                 />
-                <div className="flex justify-between items-center">
-                  <Button variant="outline" size="sm" className="flex items-center">
-                    <Paperclip className="w-4 h-4 mr-2" />
-                    Joindre un document
+                {lawyer.rating && (
+                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1 bg-accent-500 rounded-full shadow-md">
+                    <Star className="w-4 h-4 text-white fill-white" />
+                    <span className="text-sm font-bold text-white">{lawyer.rating}</span>
+                  </div>
+                )}
+              </div>
+              <h1 className="text-xl lg:text-2xl font-serif font-bold text-deep-900 dark:text-surface-100 mt-6">
+                {lawyer.name}
+              </h1>
+              <p className="text-deep-500 dark:text-surface-500">{lawyer.firmName}</p>
+              {lawyer.reviewCount && (
+                <p className="text-sm text-deep-400 dark:text-surface-600 mt-1">
+                  {lawyer.reviewCount} {t.modal.reviewsTitle}
+                </p>
+              )}
+            </div>
+            
+            {/* Quick Info */}
+            <div className="space-y-3 mb-8">
+              <div className="flex items-start gap-3 p-3 lg:p-4 rounded-xl bg-white dark:bg-deep-900 border border-surface-100 dark:border-deep-700">
+                <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="w-4 h-4 lg:w-5 lg:h-5 text-primary-600 dark:text-primary-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-deep-900 dark:text-surface-100">
+                    {t.modal.specialties}
+                  </h3>
+                  <p className="text-sm text-deep-600 dark:text-surface-400">
+                    {translateSpecialty(lawyer.specialty)}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 lg:p-4 rounded-xl bg-white dark:bg-deep-900 border border-surface-100 dark:border-deep-700">
+                <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-accent-600 dark:text-accent-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-deep-900 dark:text-surface-100">
+                    {t.modal.experience}
+                  </h3>
+                  <p className="text-sm text-deep-600 dark:text-surface-400">
+                    {lawyer.yearsExperience} {t.modal.years}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 lg:p-4 rounded-xl bg-white dark:bg-deep-900 border border-surface-100 dark:border-deep-700">
+                <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-surface-200 dark:bg-deep-700 flex items-center justify-center flex-shrink-0">
+                  <Languages className="w-4 h-4 lg:w-5 lg:h-5 text-deep-500 dark:text-surface-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-deep-900 dark:text-surface-100">
+                    {t.modal.languages}
+                  </h3>
+                  <p className="text-sm text-deep-600 dark:text-surface-400">
+                    {lawyer.languages?.join(', ') || 'Non spécifié'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Contact */}
+            <div className="mt-auto pt-6 border-t border-surface-200 dark:border-deep-700">
+              <h3 className="font-semibold text-deep-900 dark:text-surface-100 mb-4">
+                Envoyer un message
+              </h3>
+              <div className="space-y-3">
+                <textarea 
+                  className="w-full p-3 text-sm border-2 border-surface-200 dark:border-deep-700 rounded-xl bg-white dark:bg-deep-900 input-focus outline-none resize-none text-deep-800 dark:text-surface-200"
+                  rows={3}
+                  placeholder="Décrivez brièvement votre situation..."
+                  style={{ fontSize: '16px' }}
+                />
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" className="flex-1">
+                    <Paperclip className="w-4 h-4 mr-1" />
+                    Joindre
                   </Button>
-                   <Button variant="solid" size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center">
-                    <MessageSquare className="w-4 h-4 mr-2" />
+                  <Button variant="primary" size="sm" className="flex-1">
+                    <MessageSquare className="w-4 h-4 mr-1" />
                     Envoyer
                   </Button>
                 </div>
-             </div>
-           </div>
-        </div>
+              </div>
+            </div>
+          </div>
 
-        {/* Right Column: About & Booking */}
-        <div className="lg:col-span-2 p-8 flex flex-col overflow-y-auto">
-           <div className="flex items-start justify-between">
-             <h2 className="text-xl font-semibold text-navy dark:text-white border-b-2 border-red-500 pb-2 inline-block">{t.modal.about}</h2>
-             <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-navy-light transition-colors">
-              <X className="w-6 h-6 text-slate-500" />
-            </button>
-           </div>
-           
-           {/* Show profile blocks if they exist, otherwise show classic bio */}
-           {lawyer.profileConfig && lawyer.profileConfig.length > 0 ? (
-             <div className="mt-4">
-               <ProfileViewer 
-                 blocks={lawyer.profileConfig}
-                 lawyerData={{
-                   coordinates: lawyer.coordinates,
-                   location: lawyer.location
-                 }}
-                 onContactClick={() => {
-                   // Scroll to booking section
-                   const bookingSection = document.querySelector('[data-booking-section]');
-                   bookingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                 }}
-                 onVideoClick={() => {
-                   setConsultationType('VIDEO');
-                   const bookingSection = document.querySelector('[data-booking-section]');
-                   bookingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                 }}
-               />
-             </div>
-           ) : (
-             <p className="mt-4 text-slate-600 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none flex-shrink-0">{lawyer.bio}</p>
-           )}
-           
-           <div className="mt-8 flex-grow flex flex-col" data-booking-section>
-              <h2 className="text-xl font-semibold text-navy dark:text-white mb-4">{t.modal.bookTitle}</h2>
+          {/* Right Column: About & Booking */}
+          <div className="md:col-span-3 p-6 lg:p-8 flex flex-col overflow-y-auto max-h-[90vh]">
+            {/* Header with close button */}
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-serif font-bold text-deep-900 dark:text-surface-100">
+                  {t.modal.about}
+                </h2>
+                <p className="text-sm text-deep-500 dark:text-surface-500">
+                  Profil et disponibilités
+                </p>
+              </div>
+              <button 
+                onClick={onClose} 
+                className="p-2 rounded-xl hover:bg-surface-100 dark:hover:bg-deep-800 transition-colors"
+              >
+                <X className="w-6 h-6 text-deep-400" />
+              </button>
+            </div>
+             
+            {/* Profile Content */}
+            {lawyer.profileConfig && lawyer.profileConfig.length > 0 ? (
+              <div className="mb-8">
+                <ProfileViewer 
+                  blocks={lawyer.profileConfig}
+                  lawyerData={{
+                    coordinates: lawyer.coordinates,
+                    location: lawyer.location
+                  }}
+                  onContactClick={() => {
+                    const bookingSection = document.querySelector('[data-booking-section]');
+                    bookingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  onVideoClick={() => {
+                    setConsultationType('VIDEO');
+                    const bookingSection = document.querySelector('[data-booking-section]');
+                    bookingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="text-deep-600 dark:text-surface-400 leading-relaxed mb-8">
+                {lawyer.bio}
+              </p>
+            )}
+             
+            {/* Booking Section */}
+            <div className="flex-grow" data-booking-section>
+              <h2 className="text-xl font-serif font-bold text-deep-900 dark:text-surface-100 mb-6">
+                {t.modal.bookTitle}
+              </h2>
               
               {/* Consultation Type Selection */}
-              <div className="mb-6 flex gap-4">
-                <button
-                  onClick={() => setConsultationType('VIDEO')}
-                  className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 transition-all ${
-                    consultationType === 'VIDEO' 
-                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <Video className="h-6 w-6" />
-                  <span className="font-medium text-sm">{t.modal.video}</span>
-                </button>
-                <button
-                  onClick={() => setConsultationType('IN_PERSON')}
-                  className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 transition-all ${
-                    consultationType === 'IN_PERSON' 
-                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <MapPin className="h-6 w-6" />
-                  <span className="font-medium text-sm">{t.modal.inPerson}</span>
-                </button>
-                <button
-                  onClick={() => setConsultationType('PHONE')}
-                  className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 transition-all ${
-                    consultationType === 'PHONE' 
-                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <Phone className="h-6 w-6" />
-                  <span className="font-medium text-sm">{t.modal.phone}</span>
-                </button>
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-3">
+                  Type de consultation
+                </label>
+                <div className="grid grid-cols-3 gap-2 lg:gap-3">
+                  {consultationTypes.map(({ type, icon: Icon, label }) => (
+                    <button
+                      key={type}
+                      onClick={() => setConsultationType(type)}
+                      className={`p-3 lg:p-4 rounded-xl border-2 flex flex-col items-center gap-1.5 lg:gap-2 transition-all duration-200 ${
+                        consultationType === type 
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' 
+                          : 'border-surface-200 dark:border-deep-700 hover:border-primary-300 dark:hover:border-primary-700'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
+                      <span className="font-medium text-xs lg:text-sm">{label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex-grow">
+              {/* Calendar */}
+              <div className="mb-6">
                 <BookingCalendar 
                   availableSlots={availableSlots}
                   onSlotSelect={setSelectedSlot} 
@@ -411,56 +473,256 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
               </div>
 
               {/* Duration Selection */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
                   Durée de la consultation
                 </label>
-                <select
-                  value={duration}
-                  onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-navy dark:text-white"
-                >
-                  <option value={30}>30 minutes</option>
-                  <option value={60}>1 heure</option>
-                  <option value={90}>1h30</option>
-                  <option value={120}>2 heures</option>
-                </select>
+                <div className="grid grid-cols-4 gap-2">
+                  {[30, 60, 90, 120].map((mins) => (
+                    <button
+                      key={mins}
+                      onClick={() => setDuration(mins)}
+                      className={`py-2.5 px-2 lg:px-3 rounded-lg text-xs lg:text-sm font-medium transition-all ${
+                        duration === mins
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-surface-100 dark:bg-deep-800 text-deep-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-deep-700'
+                      }`}
+                    >
+                      {mins < 60 ? `${mins}min` : `${mins / 60}h${mins % 60 > 0 ? mins % 60 : ''}`}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Optional Notes */}
-              <div className="mt-4">
+              {/* Notes */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+                  Notes (optionnel)
+                </label>
                 <input 
-                    type="text" 
-                    placeholder={t.modal.notes}
-                    className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-red-500"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
+                  type="text" 
+                  placeholder={t.modal.notes}
+                  className="w-full p-3 rounded-xl border-2 border-surface-200 dark:border-deep-700 bg-white dark:bg-deep-900 text-sm input-focus outline-none text-deep-800 dark:text-surface-200"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  style={{ fontSize: '16px' }}
                 />
               </div>
 
-              <div className="mt-4 pt-2">
+              {/* Book Button */}
+              <div className="pt-4 border-t border-surface-200 dark:border-deep-700">
                 {currentUser ? (
                   <Button 
                     size="lg" 
-                    className="w-full bg-red-600 hover:bg-red-700 text-white" 
+                    variant="primary"
+                    className="w-full shadow-glow" 
                     onClick={handleBooking}
                     disabled={!selectedSlot || isBooking}
+                    isLoading={isBooking}
                   >
-                    {isBooking ? 'Réservation...' : t.modal.confirm}
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    {t.modal.confirm}
                   </Button>
                 ) : (
-                   <Button 
+                  <Button 
                     size="lg" 
-                    className="w-full flex items-center justify-center"
-                    variant="outline"
+                    variant="secondary"
+                    className="w-full"
                     onClick={handleLoginRedirect}
                   >
                     <LogIn className="w-5 h-5 mr-2" />
                     {t.modal.loginToBook}
                   </Button>
                 )}
+                
+                {selectedSlot && (
+                  <p className="text-center text-sm text-primary-600 dark:text-primary-400 font-medium mt-3">
+                    📅 {format(selectedSlot, "EEEE d MMMM 'à' HH:mm", { locale: fr })}
+                  </p>
+                )}
               </div>
-           </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Content */}
+        <div className="md:hidden flex-1 overflow-y-auto momentum-scroll">
+          {/* Profile Tab */}
+          {activeTab === 'profile' && (
+            <div className="p-4 space-y-6 safe-area-bottom pb-24">
+              {/* Profile Header */}
+              <div className="flex items-center gap-4">
+                <img
+                  src={lawyer.avatarUrl}
+                  alt={lawyer.name}
+                  className="w-20 h-20 rounded-2xl object-cover ring-2 ring-surface-100 dark:ring-deep-700"
+                />
+                <div>
+                  <h2 className="font-serif font-bold text-lg text-deep-900 dark:text-surface-100">
+                    {lawyer.name}
+                  </h2>
+                  <p className="text-sm text-deep-500 dark:text-surface-500">{lawyer.firmName}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="badge badge-primary text-xs">
+                      {translateSpecialty(lawyer.specialty)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Info Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-surface-50 dark:bg-deep-800 border border-surface-100 dark:border-deep-700">
+                  <Clock className="w-5 h-5 text-primary-600 dark:text-primary-400 mb-2" />
+                  <p className="text-xs text-deep-500 dark:text-surface-500">{t.modal.experience}</p>
+                  <p className="font-semibold text-deep-900 dark:text-surface-100">{lawyer.yearsExperience} {t.modal.years}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-surface-50 dark:bg-deep-800 border border-surface-100 dark:border-deep-700">
+                  <Languages className="w-5 h-5 text-accent-600 dark:text-accent-400 mb-2" />
+                  <p className="text-xs text-deep-500 dark:text-surface-500">{t.modal.languages}</p>
+                  <p className="font-semibold text-deep-900 dark:text-surface-100 text-sm">{lawyer.languages?.join(', ') || 'FR'}</p>
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div>
+                <h3 className="font-semibold text-deep-900 dark:text-surface-100 mb-2">{t.modal.about}</h3>
+                {lawyer.profileConfig && lawyer.profileConfig.length > 0 ? (
+                  <ProfileViewer 
+                    blocks={lawyer.profileConfig}
+                    lawyerData={{
+                      coordinates: lawyer.coordinates,
+                      location: lawyer.location
+                    }}
+                    onContactClick={() => setActiveTab('booking')}
+                    onVideoClick={() => {
+                      setConsultationType('VIDEO');
+                      setActiveTab('booking');
+                    }}
+                  />
+                ) : (
+                  <p className="text-sm text-deep-600 dark:text-surface-400 leading-relaxed">
+                    {lawyer.bio}
+                  </p>
+                )}
+              </div>
+
+              {/* CTA Button */}
+              <Button 
+                variant="primary" 
+                size="lg" 
+                className="w-full"
+                onClick={() => setActiveTab('booking')}
+              >
+                Prendre rendez-vous
+              </Button>
+            </div>
+          )}
+
+          {/* Booking Tab */}
+          {activeTab === 'booking' && (
+            <div className="p-4 space-y-6 safe-area-bottom pb-24">
+              {/* Consultation Type */}
+              <div>
+                <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-3">
+                  Type de consultation
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {consultationTypes.map(({ type, icon: Icon, label }) => (
+                    <button
+                      key={type}
+                      onClick={() => setConsultationType(type)}
+                      className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all ${
+                        consultationType === type 
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' 
+                          : 'border-surface-200 dark:border-deep-700'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="font-medium text-xs">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calendar */}
+              <BookingCalendar 
+                availableSlots={availableSlots}
+                onSlotSelect={setSelectedSlot} 
+              />
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+                  Durée
+                </label>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+                  {[30, 60, 90, 120].map((mins) => (
+                    <button
+                      key={mins}
+                      onClick={() => setDuration(mins)}
+                      className={`flex-shrink-0 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
+                        duration === mins
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-surface-100 dark:bg-deep-800 text-deep-600 dark:text-surface-400'
+                      }`}
+                    >
+                      {mins < 60 ? `${mins} min` : `${mins / 60}h${mins % 60 > 0 ? mins % 60 : ''}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+                  Notes (optionnel)
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Précisez votre demande..."
+                  className="w-full p-3 rounded-xl border-2 border-surface-200 dark:border-deep-700 bg-white dark:bg-deep-900 text-sm"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  style={{ fontSize: '16px' }}
+                />
+              </div>
+
+              {/* Selected Slot Info */}
+              {selectedSlot && (
+                <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-950/30 border border-primary-200 dark:border-primary-800">
+                  <p className="text-center text-sm font-medium text-primary-700 dark:text-primary-300">
+                    📅 {format(selectedSlot, "EEEE d MMMM 'à' HH:mm", { locale: fr })}
+                  </p>
+                </div>
+              )}
+
+              {/* Book Button */}
+              {currentUser ? (
+                <Button 
+                  size="lg" 
+                  variant="primary"
+                  className="w-full shadow-glow" 
+                  onClick={handleBooking}
+                  disabled={!selectedSlot || isBooking}
+                  isLoading={isBooking}
+                >
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  {t.modal.confirm}
+                </Button>
+              ) : (
+                <Button 
+                  size="lg" 
+                  variant="secondary"
+                  className="w-full"
+                  onClick={handleLoginRedirect}
+                >
+                  <LogIn className="w-5 h-5 mr-2" />
+                  {t.modal.loginToBook}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

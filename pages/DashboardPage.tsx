@@ -14,12 +14,18 @@ import {
   Settings,
   Video,
   XCircle,
+  User,
+  ArrowRight,
+  Bell,
+  Briefcase,
 } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { GoogleCalendarConnection } from "../components/GoogleCalendarConnection";
 import { AvailabilitySettings } from "../components/AvailabilitySettings";
+import { LawyerWorkstation } from "../components/LawyerWorkstation";
+import { SettingsModal } from "../components/SettingsModal";
 import { useApp } from "../store/store";
 import { Appointment, UserRole } from "../types";
 
@@ -28,6 +34,7 @@ export const DashboardPage: React.FC = () => {
     useApp();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Redirect to login if not authenticated
   React.useEffect(() => {
@@ -47,41 +54,41 @@ export const DashboardPage: React.FC = () => {
       : a.clientId === currentUser.id
   );
 
-  // Trier les rendez-vous (à venir en premier)
+  // Sort appointments
   const sortedAppointments = [...myAppointments].sort((a, b) => {
     const dateA = parseISO(a.date).getTime();
     const dateB = parseISO(b.date).getTime();
     return dateA - dateB;
   });
 
-  // Obtenir le badge de statut
+  // Get status badge
   const getStatusBadge = (status: Appointment["status"]) => {
     switch (status) {
       case "CONFIRMED":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-            <CheckCircle2 className="w-3 h-3" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+            <CheckCircle2 className="w-3.5 h-3.5" />
             Confirmé
           </span>
         );
       case "PENDING":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
-            <AlertCircle className="w-3 h-3" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300">
+            <AlertCircle className="w-3.5 h-3.5" />
             En attente
           </span>
         );
       case "CANCELLED":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
-            <XCircle className="w-3 h-3" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+            <XCircle className="w-3.5 h-3.5" />
             Annulé
           </span>
         );
       case "COMPLETED":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-            <CheckCircle2 className="w-3 h-3" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-surface-200 dark:bg-deep-800 text-deep-600 dark:text-surface-400">
+            <CheckCircle2 className="w-3.5 h-3.5" />
             Terminé
           </span>
         );
@@ -90,7 +97,7 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  // Obtenir l'icône du type
+  // Get type icon
   const getTypeIcon = (type: Appointment["type"]) => {
     switch (type) {
       case "VIDEO":
@@ -102,13 +109,12 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  // Vérifier si on peut rejoindre la visio
+  // Check if can join video
   const canJoinVideo = (appointment: Appointment) => {
     if (appointment.type !== "VIDEO") return false;
     if (appointment.status === "CANCELLED") return false;
     const aptDate = parseISO(appointment.date);
     const now = new Date();
-    // Peut rejoindre 5 minutes avant et jusqu'à 1h après
     const canJoinBefore = new Date(aptDate.getTime() - 5 * 60 * 1000);
     const canJoinAfter = new Date(aptDate.getTime() + 60 * 60 * 1000);
     return now >= canJoinBefore && now <= canJoinAfter;
@@ -126,265 +132,299 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  // Check if user is a lawyer
   const isLawyer = currentUser.role === UserRole.LAWYER;
 
+  const menuItems = [
+    { path: "/my-appointments", icon: Calendar, label: t.dashboard.appointments },
+    { path: "/messages", icon: MessageSquare, label: t.dashboard.messages, badge: unreadMessagesCount },
+    { path: "/documents", icon: FileText, label: t.dashboard.documents },
+    { path: "#settings", icon: Settings, label: t.dashboard.settings },
+  ];
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar */}
-        <aside className="w-full md:w-64 space-y-4">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
-            <img
-              src={currentUser.avatarUrl}
-              alt="Profile"
-              className="w-20 h-20 mx-auto rounded-full mb-4 border-2 border-primary-500"
-            />
-            <h2 className="font-bold text-lg">{currentUser.name}</h2>
-            <p className="text-sm text-slate-500 capitalize">
-              {currentUser.role.toLowerCase()}
-            </p>
-            {isLawyer && (
-              <button
-                className="mt-4 w-full px-4 py-2 bg-navy dark:bg-brand-DEFAULT hover:bg-navy-light dark:hover:bg-brand-dark text-white rounded-lg font-semibold text-sm flex items-center justify-center transition-all shadow-lg hover:shadow-xl border-2 border-navy-dark dark:border-brand-dark active:scale-95"
-                onClick={() => {
-                  console.log("🖱️ Bouton Éditer mon profil cliqué");
-                  navigate("/lawyer/profile-editor");
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Éditer mon profil
-              </button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              className={`mt-${
-                currentUser.role === UserRole.LAWYER ? "3" : "4"
-              } w-full`}
-              onClick={logout}
-            >
-              {t.nav.signout}
-            </Button>
-          </div>
+    <div className="min-h-[calc(100vh-80px)] bg-surface-50 dark:bg-deep-950">
+      <div className="container mx-auto px-4 py-8">
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-display-sm font-serif text-deep-900 dark:text-surface-100 mb-2">
+            Bonjour, {currentUser.name?.split(' ')[0]} 👋
+          </h1>
+          <p className="text-deep-600 dark:text-surface-400">
+            {isLawyer ? "Gérez vos rendez-vous et votre activité" : "Suivez vos consultations et communiquez avec vos avocats"}
+          </p>
+        </div>
 
-          <nav className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <button
-              onClick={() => navigate("/my-appointments")}
-              className={`w-full flex items-center px-6 py-4 font-medium transition-colors text-left ${
-                location.pathname === "/my-appointments"
-                  ? "text-primary-700 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary-700 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/30"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-              }`}
-            >
-              <Calendar className="h-5 w-5 mr-3" /> {t.dashboard.appointments}
-            </button>
-            <button
-              onClick={() => navigate("/messages")}
-              className={`w-full flex items-center px-6 py-4 font-medium transition-colors text-left relative ${
-                location.pathname === "/messages"
-                  ? "text-navy dark:text-white bg-brand/10 dark:bg-brand/20 border-l-4 border-brand-dark dark:border-brand hover:bg-brand/20 dark:hover:bg-brand/30"
-                  : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-              }`}
-            >
-              <MessageSquare className="h-5 w-5 mr-3" /> {t.dashboard.messages}
-              {unreadMessagesCount > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+        <div className="grid grid-cols-12 gap-6">
+          {/* Sidebar */}
+          <aside className="col-span-12 lg:col-span-3 space-y-6">
+            {/* Profile Card */}
+            <div className="glass rounded-2xl p-6 text-center">
+              <div className="relative inline-block">
+                <img
+                  src={currentUser.avatarUrl}
+                  alt="Profile"
+                  className="w-24 h-24 rounded-2xl object-cover ring-4 ring-white dark:ring-deep-800 shadow-card mx-auto"
+                />
+                <span className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center shadow-glow">
+                  <User className="w-4 h-4 text-white" />
                 </span>
+              </div>
+              <h2 className="font-semibold text-lg text-deep-900 dark:text-surface-100 mt-4">
+                {currentUser.name}
+              </h2>
+              <p className="text-sm text-deep-500 dark:text-surface-500 capitalize mb-4">
+                {currentUser.role === UserRole.LAWYER ? "Avocat" : "Client"}
+              </p>
+              
+              {isLawyer && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full mb-3"
+                  onClick={() => navigate("/lawyer/profile-editor")}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Éditer mon profil
+                </Button>
               )}
-            </button>
-            <a
-              href="#"
-              className="flex items-center px-6 py-4 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-              <FileText className="h-5 w-5 mr-3" /> {t.dashboard.documents}
-            </a>
-            <a
-              href="#"
-              className="flex items-center px-6 py-4 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-              <Settings className="h-5 w-5 mr-3" /> {t.dashboard.settings}
-            </a>
-          </nav>
-
-          {currentUser.role === UserRole.LAWYER && (
-            <>
-              <AvailabilitySettings lawyerId={currentUser.id} />
-              <GoogleCalendarConnection
-                lawyerId={currentUser.id}
-                onConnectionChange={(connected) => {
-                  console.log("📅 Google Calendar connection changed:", connected);
-                }}
-              />
-            </>
-          )}
-        </aside>
-
-        {/* Main Content */}
-        <div className="flex-grow space-y-8">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-primary-800 to-primary-950 rounded-xl p-6 text-white shadow-lg">
-              <h3 className="text-lg font-medium opacity-90">
-                {t.dashboard.upcoming}
-              </h3>
-              <p className="text-3xl font-bold mt-2">
-                {myAppointments.filter((a) => a.status === "CONFIRMED").length}
-              </p>
-              <p className="text-sm opacity-75 mt-1">
-                {t.dashboard.appointments}
-              </p>
-            </div>
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-medium text-slate-500">
-                {t.dashboard.unread}
-              </h3>
-              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-2">
-                0
-              </p>
-              <p className="text-sm text-slate-400 mt-1">
-                {t.dashboard.inboxClear}
-              </p>
-            </div>
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-medium text-slate-500">
-                {t.dashboard.documents}
-              </h3>
-              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-2">
-                3
-              </p>
-              <p className="text-sm text-slate-400 mt-1">
-                {t.dashboard.sharedFiles}
-              </p>
-            </div>
-          </div>
-
-          {/* Appointments List */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-              <h3 className="font-bold text-lg">
-                {t.dashboard.myAppointments}
-              </h3>
+              
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate("/my-appointments")}
+                className="w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                onClick={logout}
               >
-                {t.dashboard.viewAll}
+                {t.nav.signout}
               </Button>
             </div>
 
-            {sortedAppointments.length > 0 ? (
-              <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                {sortedAppointments.map((appt) => {
-                  const otherPartyId =
-                    currentUser.role === UserRole.LAWYER
-                      ? appt.clientId
-                      : appt.lawyerId;
-                  // In a real app we would fetch the other party's details.
-                  // For now, if we are lawyer, we don't have client list loaded.
-                  // If we are client, we have lawyer list loaded.
+            {/* Navigation */}
+            <nav className="glass rounded-2xl overflow-hidden">
+              {menuItems.map((item, index) => (
+                <button
+                  key={item.path}
+                  onClick={() => {
+                    if (item.path === '#settings') {
+                      setIsSettingsOpen(true);
+                    } else if (!item.path.startsWith('#')) {
+                      navigate(item.path);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-5 py-4 transition-all duration-200 ${
+                    location.pathname === item.path
+                      ? "bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 border-l-4 border-primary-500"
+                      : "text-deep-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-deep-800"
+                  } ${index !== menuItems.length - 1 ? "border-b border-surface-100 dark:border-deep-800" : ""}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <item.icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </span>
+                  {item.badge && item.badge > 0 && (
+                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  )}
+                  <ChevronRight className="w-4 h-4 opacity-50" />
+                </button>
+              ))}
+            </nav>
 
-                  let otherPartyName = "Unknown";
-                  let subtitle: string = appt.type;
-
-                  if (currentUser.role === UserRole.CLIENT) {
-                    const lawyer = lawyers.find((l) => l.id === appt.lawyerId);
-                    otherPartyName = lawyer?.name || "Avocat";
-                    subtitle = `${lawyer?.specialty} • ${appt.type}`;
-                  } else {
-                    otherPartyName =
-                      "Client (ID: " + appt.clientId.substring(0, 5) + "...)";
-                  }
-
-                  const aptDate = parseISO(appt.date);
-                  const isUpcoming = isFuture(aptDate) || isToday(aptDate);
-
-                  return (
-                    <div
-                      key={appt.id}
-                      className="p-6 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                    >
-                      <div className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 p-3 rounded-lg text-center min-w-[60px]">
-                        <span className="block text-xs uppercase font-bold">
-                          {format(aptDate, "MMM", { locale: fr })}
-                        </span>
-                        <span className="block text-xl font-bold">
-                          {format(aptDate, "d")}
-                        </span>
-                      </div>
-                      <div className="flex-grow">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-bold text-slate-900 dark:text-slate-100">
-                            {otherPartyName}
-                          </h4>
-                          {getStatusBadge(appt.status)}
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 mb-1">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {format(aptDate, "HH:mm", { locale: fr })}
-                          </span>
-                          {appt.duration && (
-                            <span className="flex items-center gap-1">
-                              • {appt.duration} min
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            {getTypeIcon(appt.type)}
-                            {appt.type === "VIDEO"
-                              ? "Visio"
-                              : appt.type === "PHONE"
-                              ? "Téléphone"
-                              : "Présentiel"}
-                          </span>
-                        </div>
-                        {subtitle && (
-                          <p className="text-xs text-slate-400 mt-1">
-                            {subtitle}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {canJoinVideo(appt) && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleJoinVideo(appt)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-                          >
-                            <Video className="h-4 w-4 mr-2" />
-                            Rejoindre la visio
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate("/my-appointments")}
-                        >
-                          Voir détails
-                          <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-8 text-center text-slate-500">
-                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p>{t.dashboard.noAppts}</p>
-                {currentUser.role === UserRole.CLIENT && (
-                  <Button className="mt-4" onClick={() => navigate("/search")}>
-                    {t.dashboard.findLawyer}
-                  </Button>
-                )}
+            {/* Lawyer-specific settings */}
+            {isLawyer && (
+              <div className="space-y-4">
+                <AvailabilitySettings lawyerId={currentUser.id} />
+                <GoogleCalendarConnection
+                  lawyerId={currentUser.id}
+                  onConnectionChange={(connected) => {
+                    console.log("📅 Google Calendar connection changed:", connected);
+                  }}
+                />
               </div>
             )}
+          </aside>
+
+          {/* Main Content */}
+          <div className="col-span-12 lg:col-span-9 space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="glass rounded-2xl p-6 border-l-4 border-primary-500">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-deep-500 dark:text-surface-500 text-sm font-medium">
+                    {t.dashboard.upcoming}
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-deep-900 dark:text-surface-100">
+                  {myAppointments.filter((a) => a.status === "CONFIRMED").length}
+                </p>
+                <p className="text-sm text-deep-500 dark:text-surface-500 mt-1">
+                  {t.dashboard.appointments}
+                </p>
+              </div>
+
+              <div className="glass rounded-2xl p-6 border-l-4 border-accent-500">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-deep-500 dark:text-surface-500 text-sm font-medium">
+                    {t.dashboard.unread}
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+                    <Bell className="w-5 h-5 text-accent-600 dark:text-accent-400" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-deep-900 dark:text-surface-100">
+                  {unreadMessagesCount}
+                </p>
+                <p className="text-sm text-deep-500 dark:text-surface-500 mt-1">
+                  {unreadMessagesCount === 0 ? t.dashboard.inboxClear : "messages"}
+                </p>
+              </div>
+
+              <div className="glass rounded-2xl p-6 border-l-4 border-deep-300 dark:border-deep-600">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-deep-500 dark:text-surface-500 text-sm font-medium">
+                    {t.dashboard.documents}
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-surface-200 dark:bg-deep-800 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-deep-500 dark:text-surface-400" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-deep-900 dark:text-surface-100">3</p>
+                <p className="text-sm text-deep-500 dark:text-surface-500 mt-1">
+                  {t.dashboard.sharedFiles}
+                </p>
+              </div>
+            </div>
+
+            {/* Lawyer Workstation */}
+            {isLawyer && (
+              <div className="glass rounded-2xl overflow-hidden h-[500px]">
+                <LawyerWorkstation />
+              </div>
+            )}
+
+            {/* Appointments List */}
+            <div className="glass rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-surface-100 dark:border-deep-800 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg text-deep-900 dark:text-surface-100">
+                    {t.dashboard.myAppointments}
+                  </h3>
+                  <p className="text-sm text-deep-500 dark:text-surface-500">
+                    Vos prochaines consultations
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => navigate("/my-appointments")}>
+                  {t.dashboard.viewAll}
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+
+              {sortedAppointments.length > 0 ? (
+                <div className="divide-y divide-surface-100 dark:divide-deep-800">
+                  {sortedAppointments.slice(0, 5).map((appt) => {
+                    let otherPartyName = "Unknown";
+                    let subtitle: string = appt.type;
+
+                    if (currentUser.role === UserRole.CLIENT) {
+                      const lawyer = lawyers.find((l) => l.id === appt.lawyerId);
+                      otherPartyName = lawyer?.name || "Avocat";
+                      subtitle = `${lawyer?.specialty} • ${appt.type}`;
+                    } else {
+                      otherPartyName = appt.clientName || "Client";
+                    }
+
+                    const aptDate = parseISO(appt.date);
+
+                    return (
+                      <div
+                        key={appt.id}
+                        className="p-5 flex flex-col md:flex-row md:items-center gap-4 hover:bg-surface-50 dark:hover:bg-deep-800/50 transition-colors"
+                      >
+                        {/* Date Badge */}
+                        <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-primary-50 dark:bg-primary-950/50 flex flex-col items-center justify-center">
+                          <span className="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase">
+                            {format(aptDate, "MMM", { locale: fr })}
+                          </span>
+                          <span className="text-2xl font-bold text-primary-700 dark:text-primary-300">
+                            {format(aptDate, "d")}
+                          </span>
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h4 className="font-semibold text-deep-900 dark:text-surface-100">
+                              {otherPartyName}
+                            </h4>
+                            {getStatusBadge(appt.status)}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-deep-500 dark:text-surface-500">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {format(aptDate, "HH:mm", { locale: fr })}
+                            </span>
+                            {appt.duration && (
+                              <span>{appt.duration} min</span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              {getTypeIcon(appt.type)}
+                              {appt.type === "VIDEO" ? "Visio" : appt.type === "PHONE" ? "Téléphone" : "Présentiel"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {canJoinVideo(appt) && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleJoinVideo(appt)}
+                            >
+                              <Video className="w-4 h-4 mr-2" />
+                              Rejoindre
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate("/my-appointments")}
+                          >
+                            Détails
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-12 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface-100 dark:bg-deep-800 flex items-center justify-center">
+                    <Calendar className="w-8 h-8 text-deep-300 dark:text-deep-600" />
+                  </div>
+                  <p className="text-deep-500 dark:text-surface-500 mb-4">{t.dashboard.noAppts}</p>
+                  {currentUser.role === UserRole.CLIENT && (
+                    <Button variant="primary" onClick={() => navigate("/search")}>
+                      {t.dashboard.findLawyer}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+      />
     </div>
   );
 };

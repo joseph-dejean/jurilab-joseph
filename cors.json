@@ -1,0 +1,29 @@
+[
+    {
+        "origin": [
+            "*"
+        ],
+        "method": [
+            "GET",
+            "HEAD",
+            "PUT",
+            "POST",
+            "DELETE",
+            "OPTIONS"
+        ],
+        "responseHeader": [
+            "Authorization",
+            "Content-Type",
+            "x-goog-resumable-start-ack",
+            "x-goog-resumable-status",
+            "x-goog-resumable-url-length",
+            "x-goog-resumable-command",
+            "x-firebase-storage-version",
+            "x-goog-meta-full-image-url",
+            "x-goog-meta-initial-image-url",
+            "x-goog-meta-width",
+            "x-goog-meta-height",
+            "x-goog-meta-average-color"
+        ]
+    }
+]

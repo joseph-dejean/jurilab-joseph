@@ -1,8 +1,30 @@
 import { ref, get, set, onValue, push, update, remove } from 'firebase/database';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
-import { database, auth, googleProvider } from '../firebaseConfig';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { database, auth, storage, googleProvider } from '../firebaseConfig';
 import { Lawyer, Client, UserRole, Appointment, User, ProfileBlock, GoogleCalendarCredentials, AvailabilityHours } from '../types';
-import { encryptToken, decryptToken } from './googleCalendarService';
+import { encryptToken, decryptToken, getGoogleCalendarEvents as fetchGoogleEvents, refreshGoogleAccessToken } from './googleCalendarService';
+
+/**
+ * Upload a file to Firebase Storage and return the download URL
+ */
+export const uploadFileToStorage = async (file: File, path: string): Promise<string> => {
+  try {
+    console.log(`📤 Uploading file to ${path}...`);
+    const fileRef = storageRef(storage, path);
+
+    const snapshot = await uploadBytes(fileRef, file);
+    console.log('✅ File uploaded successfully');
+
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    console.log('🔗 Download URL generated:', downloadURL);
+
+    return downloadURL;
+  } catch (error) {
+    console.error('❌ Error uploading file to storage:', error);
+    throw error;
+  }
+};
 
 /**
  * Load all lawyers from Firebase Realtime Database
@@ -12,7 +34,7 @@ export const loadLawyersFromFirebase = async (): Promise<Lawyer[]> => {
     console.log('🔥 Loading lawyers from Firebase...');
     const lawyersRef = ref(database, 'lawyers');
     const snapshot = await get(lawyersRef);
-    
+
     if (snapshot.exists()) {
       const data = snapshot.val();
       const lawyers: Lawyer[] = Object.values(data);
@@ -34,7 +56,7 @@ export const loadLawyersFromFirebase = async (): Promise<Lawyer[]> => {
 export const subscribeToLawyers = (callback: (lawyers: Lawyer[]) => void) => {
   console.log('👂 Subscribing to real-time lawyer updates...');
   const lawyersRef = ref(database, 'lawyers');
-  
+
   return onValue(lawyersRef, (snapshot) => {
     if (snapshot.exists()) {
       const data = snapshot.val();
@@ -55,16 +77,16 @@ export const subscribeToLawyers = (callback: (lawyers: Lawyer[]) => void) => {
 export const uploadLawyersToFirebase = async (lawyers: Lawyer[]): Promise<void> => {
   try {
     console.log(`📤 Uploading ${lawyers.length} lawyers to Firebase...`);
-    
+
     // Convert array to object with IDs as keys
     const lawyersObject: Record<string, Lawyer> = {};
     lawyers.forEach(lawyer => {
       lawyersObject[lawyer.id] = lawyer;
     });
-    
+
     const lawyersRef = ref(database, 'lawyers');
     await set(lawyersRef, lawyersObject);
-    
+
     console.log('✅ Successfully uploaded lawyers to Firebase');
   } catch (error) {
     console.error('❌ Error uploading lawyers to Firebase:', error);
@@ -79,7 +101,7 @@ export const getLawyerById = async (lawyerId: string): Promise<Lawyer | null> =>
   try {
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
     const snapshot = await get(lawyerRef);
-    
+
     if (snapshot.exists()) {
       return snapshot.val() as Lawyer;
     }
@@ -99,13 +121,11 @@ export const getClientById = async (clientId: string): Promise<Client | User | n
     // Utiliser getUserProfile qui gère déjà tous les cas
     const userProfile = await getUserProfile(clientId);
     console.log(`📊 getUserProfile returned for ${clientId}:`, userProfile ? { id: userProfile.id, name: userProfile.name, role: userProfile.role } : null);
-    
+
     if (userProfile) {
-      // Vérifier le rôle (peut être string ou enum)
-      const isClient = userProfile.role === UserRole.CLIENT || 
-                       userProfile.role === 'CLIENT' ||
-                       (userProfile as any).role === 'CLIENT';
-      
+      // Vérifier le rôle
+      const isClient = userProfile.role === UserRole.CLIENT;
+
       if (isClient) {
         console.log(`✅ Client found: ${userProfile.name} (${clientId})`);
         return userProfile as Client;
@@ -142,18 +162,18 @@ export const addLawyerToFirebase = async (lawyer: Lawyer): Promise<void> => {
  * This only updates the profileConfig field without overwriting other lawyer data
  */
 export const updateLawyerProfileConfig = async (
-  lawyerId: string, 
+  lawyerId: string,
   profileConfig: ProfileBlock[]
 ): Promise<void> => {
   try {
     console.log(`📝 Updating profile config for lawyer: ${lawyerId}`);
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
-    
+
     // Use update() to only modify the profileConfig field
     await update(lawyerRef, {
       profileConfig: profileConfig
     });
-    
+
     console.log(`✅ Successfully updated profile config (${profileConfig.length} blocks)`);
   } catch (error) {
     console.error('❌ Error updating profile config:', error);
@@ -170,7 +190,7 @@ export const getUserByEmail = async (email: string): Promise<User | Lawyer | nul
     // Try to find in 'users' node first
     const usersRef = ref(database, 'users');
     const usersSnapshot = await get(usersRef);
-    
+
     if (usersSnapshot.exists()) {
       const users: User[] = Object.values(usersSnapshot.val());
       const user = users.find(u => u.email === email);
@@ -183,11 +203,11 @@ export const getUserByEmail = async (email: string): Promise<User | Lawyer | nul
         return user;
       }
     }
-    
+
     // Try to find as lawyer in 'lawyers' node
     const lawyersRef = ref(database, 'lawyers');
     const lawyersSnapshot = await get(lawyersRef);
-    
+
     if (lawyersSnapshot.exists()) {
       const lawyers: Lawyer[] = Object.values(lawyersSnapshot.val());
       const lawyer = lawyers.find(l => l.email === email);
@@ -195,11 +215,11 @@ export const getUserByEmail = async (email: string): Promise<User | Lawyer | nul
         return lawyer;
       }
     }
-    
+
     // Try to find as client in 'clients' node (legacy support)
     const clientsRef = ref(database, 'clients');
     const clientsSnapshot = await get(clientsRef);
-    
+
     if (clientsSnapshot.exists()) {
       const clients: Client[] = Object.values(clientsSnapshot.val());
       const client = clients.find(c => c.email === email);
@@ -207,7 +227,7 @@ export const getUserByEmail = async (email: string): Promise<User | Lawyer | nul
         return client;
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error('❌ Error getting user by email:', error);
@@ -218,242 +238,246 @@ export const getUserByEmail = async (email: string): Promise<User | Lawyer | nul
 // --- AUTHENTICATION ---
 
 export const registerUser = async (email: string, password: string, role: UserRole, name: string): Promise<FirebaseUser> => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const user = userCredential.user;
 
-    // Create user profile in database
-    const userRef = ref(database, `users/${user.uid}`);
-    const userData: Partial<User> = {
-        id: user.uid,
-        name,
-        email,
-        role,
-        avatarUrl: `https://ui-avatars.com/api/?name=${name}`
+  // Create user profile in database
+  const userRef = ref(database, `users/${user.uid}`);
+  const userData: Partial<User> = {
+    id: user.uid,
+    name,
+    email,
+    role,
+    avatarUrl: `https://ui-avatars.com/api/?name=${name}`,
+    disabled: false,
+  };
+
+  if (role === UserRole.CLIENT) {
+    const clientData: Client = {
+      ...(userData as Client),
+      favorites: []
     };
-    
-    if (role === UserRole.CLIENT) {
-        const clientData: Client = {
-            ...(userData as Client),
-            favorites: []
-        };
-        await set(userRef, clientData);
-    } 
-    // Lawyers are handled separately in registerLawyer because they have much more data
-    
-    return user;
+    await set(userRef, clientData);
+  }
+  // Lawyers are handled separately in registerLawyer because they have much more data
+
+  return user;
 };
 
 export const registerLawyer = async (email: string, password: string, lawyerData: Omit<Lawyer, 'id' | 'email'>): Promise<FirebaseUser> => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const user = userCredential.user;
 
-    const newLawyer: Lawyer = {
-        ...lawyerData,
-        id: user.uid,
-        email: email,
-    };
+  const newLawyer: Lawyer = {
+    ...lawyerData,
+    id: user.uid,
+    email: email,
+  };
 
-    await addLawyerToFirebase(newLawyer);
-    
-    // Also save a basic user record for auth lookups if needed, or just rely on lawyers node
-    // For simplicity, we might want to keep all "users" in users node too, but for now let's keep them separate to match existing structure
-    // or duplicate the basic info. Let's duplicate basic info to users node for easier login role check
-    const userRef = ref(database, `users/${user.uid}`);
-    const basicUser: User = {
-        id: user.uid,
-        name: lawyerData.name,
-        email: email,
-        role: UserRole.LAWYER,
-        avatarUrl: `https://ui-avatars.com/api/?name=${lawyerData.name}`
-    };
-    await set(userRef, basicUser);
+  await addLawyerToFirebase(newLawyer);
 
-    return user;
+  // Also save a basic user record for auth lookups if needed, or just rely on lawyers node
+  // For simplicity, we might want to keep all "users" in users node too, but for now let's keep them separate to match existing structure
+  // or duplicate the basic info. Let's duplicate basic info to users node for easier login role check
+  const userRef = ref(database, `users/${user.uid}`);
+  const basicUser: User = {
+    id: user.uid,
+    name: lawyerData.name,
+    email: email,
+    role: UserRole.LAWYER,
+    avatarUrl: `https://ui-avatars.com/api/?name=${lawyerData.name}`,
+    disabled: false,
+  };
+  await set(userRef, basicUser);
+
+  return user;
 };
 
 export const loginUser = async (email: string, password: string) => {
-    return await signInWithEmailAndPassword(auth, email, password);
+  return await signInWithEmailAndPassword(auth, email, password);
 };
 
 export const loginWithGoogle = async (defaultRole: UserRole = UserRole.CLIENT): Promise<FirebaseUser> => {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-    
-    // Check if user exists in DB
-    const userRef = ref(database, `users/${user.uid}`);
-    const snapshot = await get(userRef);
-    
-    if (!snapshot.exists()) {
-        // New user - create default profile
-        const userData: Partial<User> = {
-            id: user.uid,
-            name: user.displayName || 'Utilisateur Google',
-            email: user.email || '',
-            role: defaultRole,
-            avatarUrl: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}`
-        };
-        
-        if (defaultRole === UserRole.CLIENT) {
-             const clientData: Client = {
-                ...(userData as Client),
-                favorites: []
-            };
-            await set(userRef, clientData);
-        } else {
-            // For lawyers, we create a basic entry but they might need to complete profile later
-            // For now, just save basic user info
-            await set(userRef, userData);
-        }
+  const result = await signInWithPopup(auth, googleProvider);
+  const user = result.user;
+
+  // Check if user exists in DB
+  const userRef = ref(database, `users/${user.uid}`);
+  const snapshot = await get(userRef);
+
+  if (!snapshot.exists()) {
+    // New user - create default profile
+    const userData: Partial<User> = {
+      id: user.uid,
+      name: user.displayName || 'Utilisateur Google',
+      email: user.email || '',
+      role: defaultRole,
+      avatarUrl: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}`,
+      disabled: false,
+    };
+
+    if (defaultRole === UserRole.CLIENT) {
+      const clientData: Client = {
+        ...(userData as Client),
+        favorites: []
+      };
+      await set(userRef, clientData);
+    } else {
+      // For lawyers, we create a basic entry but they might need to complete profile later
+      // For now, just save basic user info
+      await set(userRef, userData);
     }
-    
-    return user;
+  }
+
+  return user;
 };
 
 export const logoutUser = async () => {
-    return await signOut(auth);
+  return await signOut(auth);
 };
 
 /**
  * Create a default client profile if user exists in Auth but not in DB
  */
 const createDefaultClientProfile = async (uid: string, email: string | null): Promise<Client> => {
-    console.log(`📝 Creating default client profile for UID: ${uid}`);
-    const defaultClient: Client = {
-        id: uid,
-        name: email ? email.split('@')[0] : 'Client',
-        email: email || '',
-        role: UserRole.CLIENT,
-        avatarUrl: `https://ui-avatars.com/api/?name=${email ? email.split('@')[0] : 'Client'}`,
-        favorites: []
-    };
-    
-    const userRef = ref(database, `users/${uid}`);
-    await set(userRef, defaultClient);
-    console.log(`✅ Default client profile created`);
-    return defaultClient;
+  console.log(`📝 Creating default client profile for UID: ${uid}`);
+  const defaultClient: Client = {
+    id: uid,
+    name: email ? email.split('@')[0] : 'Client',
+    email: email || '',
+    role: UserRole.CLIENT,
+    avatarUrl: `https://ui-avatars.com/api/?name=${email ? email.split('@')[0] : 'Client'}`,
+    disabled: false,
+    favorites: []
+  };
+
+  const userRef = ref(database, `users/${uid}`);
+  await set(userRef, defaultClient);
+  console.log(`✅ Default client profile created`);
+  return defaultClient;
 };
 
 export const getUserProfile = async (uid: string): Promise<User | Lawyer | null> => {
+  try {
+    console.log(`🔍 Getting user profile for UID: ${uid}`);
+
+    // First check 'users' path
+    let userRef = ref(database, `users/${uid}`);
+    let snapshot;
+
     try {
-        console.log(`🔍 Getting user profile for UID: ${uid}`);
-        
-        // First check 'users' path
-        let userRef = ref(database, `users/${uid}`);
-        let snapshot;
-        
-        try {
-            snapshot = await get(userRef);
-            console.log(`📊 Snapshot exists: ${snapshot.exists()}`);
-        } catch (error) {
-            console.error(`❌ Error reading from Firebase for UID ${uid}:`, error);
-            throw error;
-        }
-        
-        if (snapshot.exists()) {
-            const userData = snapshot.val();
-            console.log(`✅ Found user in 'users' node:`, { 
-                email: userData.email, 
-                role: userData.role,
-                name: userData.name 
-            });
-            
-            // Normalize role (handle both string and enum)
-            const userRole = userData.role === 'LAWYER' || userData.role === UserRole.LAWYER ? UserRole.LAWYER : 
-                             userData.role === 'CLIENT' || userData.role === UserRole.CLIENT ? UserRole.CLIENT : 
-                             UserRole.CLIENT; // Default to CLIENT if role is unclear
-            
-            console.log(`📝 Normalized role: ${userRole}`);
-            
-            // If it's a lawyer, we might want the full lawyer profile from 'lawyers' node
-            if (userRole === UserRole.LAWYER) {
-                console.log(`🔍 Checking for full lawyer profile...`);
-                const lawyerProfile = await getLawyerById(uid);
-                if (lawyerProfile) {
-                    console.log(`✅ Found full lawyer profile in 'lawyers' node`);
-                    return lawyerProfile;
-                }
-                console.log(`⚠️ Lawyer profile not found in 'lawyers' node, using basic user data`);
-                return { ...userData, role: userRole };
-            }
-            
-            // Ensure role is properly set for clients
-            const finalUser = { ...userData, role: userRole };
-            console.log(`✅ Returning user profile:`, { id: finalUser.id, email: finalUser.email, role: finalUser.role });
-            return finalUser;
-        }
-        
-        console.log(`⚠️ User not found in 'users' node, checking 'lawyers' node...`);
-        
-        // Fallback: check 'lawyers' path directly if not found in users
+      snapshot = await get(userRef);
+      console.log(`📊 Snapshot exists: ${snapshot.exists()}`);
+    } catch (error) {
+      console.error(`❌ Error reading from Firebase for UID ${uid}:`, error);
+      throw error;
+    }
+
+    if (snapshot.exists()) {
+      const userData = snapshot.val();
+      console.log(`✅ Found user in 'users' node:`, {
+        email: userData.email,
+        role: userData.role,
+        name: userData.name
+      });
+
+      // Normalize role (handle both string and enum)
+      const userRole = userData.role === 'LAWYER' || userData.role === UserRole.LAWYER ? UserRole.LAWYER :
+        userData.role === 'CLIENT' || userData.role === UserRole.CLIENT ? UserRole.CLIENT :
+          UserRole.CLIENT; // Default to CLIENT if role is unclear
+
+      console.log(`📝 Normalized role: ${userRole}`);
+
+      // If it's a lawyer, we might want the full lawyer profile from 'lawyers' node
+      if (userRole === UserRole.LAWYER) {
+        console.log(`🔍 Checking for full lawyer profile...`);
         const lawyerProfile = await getLawyerById(uid);
         if (lawyerProfile) {
-            console.log(`✅ Found lawyer in 'lawyers' node`);
-            return lawyerProfile;
+          console.log(`✅ Found full lawyer profile in 'lawyers' node`);
+          return lawyerProfile;
         }
-        
-        // Last fallback: check 'clients' node (legacy support)
-        console.log(`⚠️ User not found in 'lawyers' node, checking 'clients' node (legacy)...`);
-        const clientsRef = ref(database, `clients/${uid}`);
-        const clientSnapshot = await get(clientsRef);
-        
-        if (clientSnapshot.exists()) {
-            const clientData = clientSnapshot.val();
-            console.log(`✅ Found client in 'clients' node (legacy)`);
-            // Migrate to users node for consistency
-            const userRef = ref(database, `users/${uid}`);
-            await set(userRef, { ...clientData, role: UserRole.CLIENT });
-            return { ...clientData, role: UserRole.CLIENT };
-        }
-        
-        // If user exists in Auth but not in DB, try to get email from Auth and create default profile
-        console.log(`⚠️ User profile not found anywhere for UID: ${uid}`);
-        console.log(`⚠️ Attempting to get user email from Auth to create default profile...`);
-        
-        // Import auth to get current user
-        const { auth } = await import('../firebaseConfig');
-        const firebaseUser = auth.currentUser;
-        
-        if (firebaseUser && firebaseUser.uid === uid) {
-            console.log(`✅ Found user in Auth (${firebaseUser.email}), creating default client profile`);
-            const defaultClient = await createDefaultClientProfile(uid, firebaseUser.email);
-            return defaultClient;
-        } else {
-            console.error(`❌ User not found in Auth either. Current user:`, firebaseUser?.uid);
-        }
-        
-        console.error(`❌ Could not retrieve or create user profile for UID: ${uid}`);
-        return null;
-    } catch (error) {
-        console.error(`❌ Error in getUserProfile for UID ${uid}:`, error);
-        return null;
+        console.log(`⚠️ Lawyer profile not found in 'lawyers' node, using basic user data`);
+        return { ...userData, role: userRole };
+      }
+
+      // Ensure role is properly set for clients
+      const finalUser = { ...userData, role: userRole };
+      console.log(`✅ Returning user profile:`, { id: finalUser.id, email: finalUser.email, role: finalUser.role });
+      return finalUser;
     }
+
+    console.log(`⚠️ User not found in 'users' node, checking 'lawyers' node...`);
+
+    // Fallback: check 'lawyers' path directly if not found in users
+    const lawyerProfile = await getLawyerById(uid);
+    if (lawyerProfile) {
+      console.log(`✅ Found lawyer in 'lawyers' node`);
+      return lawyerProfile;
+    }
+
+    // Last fallback: check 'clients' node (legacy support)
+    console.log(`⚠️ User not found in 'lawyers' node, checking 'clients' node (legacy)...`);
+    const clientsRef = ref(database, `clients/${uid}`);
+    const clientSnapshot = await get(clientsRef);
+
+    if (clientSnapshot.exists()) {
+      const clientData = clientSnapshot.val();
+      console.log(`✅ Found client in 'clients' node (legacy)`);
+      // Migrate to users node for consistency
+      const userRef = ref(database, `users/${uid}`);
+      await set(userRef, { ...clientData, role: UserRole.CLIENT });
+      return { ...clientData, role: UserRole.CLIENT };
+    }
+
+    // If user exists in Auth but not in DB, try to get email from Auth and create default profile
+    console.log(`⚠️ User profile not found anywhere for UID: ${uid}`);
+    console.log(`⚠️ Attempting to get user email from Auth to create default profile...`);
+
+    // Import auth to get current user
+    const { auth } = await import('../firebaseConfig');
+    const firebaseUser = auth.currentUser;
+
+    if (firebaseUser && firebaseUser.uid === uid) {
+      console.log(`✅ Found user in Auth (${firebaseUser.email}), creating default client profile`);
+      const defaultClient = await createDefaultClientProfile(uid, firebaseUser.email);
+      return defaultClient;
+    } else {
+      console.error(`❌ User not found in Auth either. Current user:`, firebaseUser?.uid);
+    }
+
+    console.error(`❌ Could not retrieve or create user profile for UID: ${uid}`);
+    return null;
+  } catch (error) {
+    console.error(`❌ Error in getUserProfile for UID ${uid}:`, error);
+    return null;
+  }
 };
 
 // --- APPOINTMENTS ---
 
 export const createAppointment = async (appointment: Appointment): Promise<void> => {
-    const apptRef = ref(database, `appointments/${appointment.id}`);
-    await set(apptRef, appointment);
-    
-    // Also update lawyer's available slots if necessary? 
-    // For now, we just save the appointment.
+  const apptRef = ref(database, `appointments/${appointment.id}`);
+  await set(apptRef, appointment);
+
+  // Also update lawyer's available slots if necessary? 
+  // For now, we just save the appointment.
 };
 
 export const getUserAppointments = async (userId: string, role: UserRole): Promise<Appointment[]> => {
-    const apptsRef = ref(database, 'appointments');
-    // This is inefficient for large datasets (filtering client side), but fine for MVP
-    // Realtime DB query support is limited without indexing.
-    const snapshot = await get(apptsRef);
-    
-    if (!snapshot.exists()) return [];
-    
-    const allAppts = Object.values(snapshot.val()) as Appointment[];
-    
-    if (role === UserRole.LAWYER) {
-        return allAppts.filter(a => a.lawyerId === userId);
-    } else {
-        return allAppts.filter(a => a.clientId === userId);
-    }
+  const apptsRef = ref(database, 'appointments');
+  // This is inefficient for large datasets (filtering client side), but fine for MVP
+  // Realtime DB query support is limited without indexing.
+  const snapshot = await get(apptsRef);
+
+  if (!snapshot.exists()) return [];
+
+  const allAppts = Object.values(snapshot.val()) as Appointment[];
+
+  if (role === UserRole.LAWYER) {
+    return allAppts.filter(a => a.lawyerId === userId);
+  } else {
+    return allAppts.filter(a => a.clientId === userId);
+  }
 };
 
 /**
@@ -467,7 +491,7 @@ export const updateAppointmentTranscript = async (
 ): Promise<void> => {
   try {
     const apptRef = ref(database, `appointments/${appointmentId}`);
-    
+
     await update(apptRef, {
       transcript,
       summary,
@@ -488,7 +512,7 @@ export const updateAppointmentTranscript = async (
 export const shareSummaryWithClient = async (appointmentId: string): Promise<void> => {
   try {
     const apptRef = ref(database, `appointments/${appointmentId}`);
-    
+
     await update(apptRef, {
       summaryShared: true,
     });
@@ -501,9 +525,9 @@ export const shareSummaryWithClient = async (appointmentId: string): Promise<voi
 };
 
 export const updateAppointmentStatus = async (apptId: string, status: Appointment['status']): Promise<void> => {
-    const apptRef = ref(database, `appointments/${apptId}`);
-    await update(apptRef, { status });
-    console.log(`✅ Appointment ${apptId} status updated to ${status}`);
+  const apptRef = ref(database, `appointments/${apptId}`);
+  await update(apptRef, { status });
+  console.log(`✅ Appointment ${apptId} status updated to ${status}`);
 };
 
 /**
@@ -514,17 +538,17 @@ export const acceptAppointment = async (appointmentId: string): Promise<void> =>
   try {
     const apptRef = ref(database, `appointments/${appointmentId}`);
     const snapshot = await get(apptRef);
-    
+
     if (!snapshot.exists()) {
       throw new Error('Appointment not found');
     }
-    
+
     const appointment = snapshot.val() as Appointment;
-    
+
     if (appointment.status !== 'PENDING') {
       throw new Error(`Cannot accept appointment with status ${appointment.status}`);
     }
-    
+
     await update(apptRef, { status: 'CONFIRMED' });
     console.log(`✅ Appointment ${appointmentId} accepted by lawyer`);
   } catch (error) {
@@ -541,21 +565,21 @@ export const cancelAppointment = async (appointmentId: string): Promise<void> =>
   try {
     const apptRef = ref(database, `appointments/${appointmentId}`);
     const snapshot = await get(apptRef);
-    
+
     if (!snapshot.exists()) {
       throw new Error('Appointment not found');
     }
-    
+
     const appointment = snapshot.val() as Appointment;
-    
+
     if (appointment.status === 'CANCELLED') {
       throw new Error('Appointment is already cancelled');
     }
-    
+
     if (appointment.status === 'COMPLETED') {
       throw new Error('Cannot cancel a completed appointment');
     }
-    
+
     await update(apptRef, { status: 'CANCELLED' });
     console.log(`✅ Appointment ${appointmentId} cancelled`);
   } catch (error) {
@@ -580,49 +604,49 @@ export const checkAppointmentConflict = async (
     const allAppointments = await getAllAppointments();
     const appointmentDate = new Date(date);
     const appointmentEnd = new Date(appointmentDate.getTime() + duration * 60 * 1000);
-    
+
     // Vérifier les conflits pour l'avocat
     const lawyerConflicts = allAppointments.filter(apt => {
       // Exclure l'appointment qu'on est en train de vérifier (utile lors de l'acceptation)
       if (excludeAppointmentId && apt.id === excludeAppointmentId) return false;
       if (apt.lawyerId !== lawyerId) return false;
       if (apt.status === 'CANCELLED' || apt.status === 'COMPLETED') return false;
-      
+
       const aptDate = new Date(apt.date);
       const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
-      
+
       // Vérifier si les créneaux se chevauchent
       return (appointmentDate < aptEnd && appointmentEnd > aptDate);
     });
-    
+
     if (lawyerConflicts.length > 0) {
       return {
         hasConflict: true,
         conflictReason: `L'avocat a déjà un rendez-vous à ce moment-là`
       };
     }
-    
+
     // Vérifier les conflits pour le client
     const clientConflicts = allAppointments.filter(apt => {
       // Exclure l'appointment qu'on est en train de vérifier
       if (excludeAppointmentId && apt.id === excludeAppointmentId) return false;
       if (apt.clientId !== clientId) return false;
       if (apt.status === 'CANCELLED' || apt.status === 'COMPLETED') return false;
-      
+
       const aptDate = new Date(apt.date);
       const aptEnd = new Date(aptDate.getTime() + (apt.duration || 60) * 60 * 1000);
-      
+
       // Vérifier si les créneaux se chevauchent
       return (appointmentDate < aptEnd && appointmentEnd > aptDate);
     });
-    
+
     if (clientConflicts.length > 0) {
       return {
         hasConflict: true,
         conflictReason: `Vous avez déjà un rendez-vous à ce moment-là`
       };
     }
-    
+
     return { hasConflict: false };
   } catch (error) {
     console.error('❌ Error checking appointment conflict:', error);
@@ -650,7 +674,7 @@ export const subscribeToAppointments = (userId: string, role: UserRole, callback
       } else {
         userAppts = allAppts.filter(a => a.clientId === userId);
       }
-      
+
       console.log(`🔄 Received ${userAppts.length} appointments update for user ${userId}`);
       callback(userAppts);
     } else {
@@ -684,10 +708,10 @@ export const getAllUsers = async (): Promise<User[]> => {
  * Get all appointments (for admin panel)
  */
 export const getAllAppointments = async (): Promise<Appointment[]> => {
-    const apptsRef = ref(database, 'appointments');
-    const snapshot = await get(apptsRef);
-    if (!snapshot.exists()) return [];
-    return Object.values(snapshot.val()) as Appointment[];
+  const apptsRef = ref(database, 'appointments');
+  const snapshot = await get(apptsRef);
+  if (!snapshot.exists()) return [];
+  return Object.values(snapshot.val()) as Appointment[];
 };
 
 /**
@@ -718,32 +742,114 @@ export const deleteAppointmentData = async (appointmentId: string): Promise<void
   await remove(apptRef);
 };
 
+/**
+ * Admin: (dés)active un compte applicatif (dans RTDB). Ne désactive pas Firebase Auth.
+ */
+export const setUserDisabled = async (userId: string, disabled: boolean): Promise<void> => {
+  const userRef = ref(database, `users/${userId}`);
+  await update(userRef, { disabled });
+};
+
+/**
+ * Admin: change le rôle applicatif. À utiliser avec prudence.
+ */
+export const setUserRole = async (userId: string, role: UserRole): Promise<void> => {
+  const userRef = ref(database, `users/${userId}`);
+  await update(userRef, { role });
+};
+
+/**
+ * Admin: suppression "app" d'un compte + données associées (RTDB).
+ * Note: ne supprime PAS l'utilisateur Firebase Auth (nécessite Admin SDK / Cloud Function).
+ */
+export const deleteUserAccountCascade = async (userId: string): Promise<void> => {
+  // 1) Read profile to know role
+  const profile = await getUserProfile(userId);
+
+  // 2) Delete tasks
+  try {
+    await remove(ref(database, `tasks/${userId}`));
+  } catch (e) {
+    // ignore
+  }
+
+  // 3) Delete appointments where user is client or lawyer
+  try {
+    const allAppointments = await getAllAppointments();
+    const toDelete = allAppointments.filter(a => a.clientId === userId || a.lawyerId === userId);
+    await Promise.all(toDelete.map(a => deleteAppointmentData(a.id)));
+  } catch (e) {
+    // ignore
+  }
+
+  // 4) Delete chatPermissions involving this user
+  try {
+    const snapshot = await get(ref(database, 'chatPermissions'));
+    if (snapshot.exists()) {
+      const perms: any = snapshot.val();
+      const ids = Object.keys(perms);
+      const toDelete = ids.filter(id => perms[id]?.lawyerId === userId || perms[id]?.clientId === userId);
+      await Promise.all(toDelete.map(id => remove(ref(database, `chatPermissions/${id}`))));
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 5) Delete documents involving this user (best effort)
+  try {
+    const snapshot = await get(ref(database, 'documents'));
+    if (snapshot.exists()) {
+      const docs: any = snapshot.val();
+      const ids = Object.keys(docs);
+      const toDelete = ids.filter(id => {
+        const d = docs[id];
+        return d?.uploadedBy === userId || d?.lawyerId === userId || d?.clientId === userId;
+      });
+      await Promise.all(toDelete.map(id => remove(ref(database, `documents/${id}`))));
+    }
+  } catch (e) {
+    // ignore (rules may block if not configured)
+  }
+
+  // 6) Delete lawyer profile if applicable
+  if (profile?.role === UserRole.LAWYER) {
+    try {
+      await remove(ref(database, `lawyers/${userId}`));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // 7) Delete user profile
+  await deleteUserData(userId);
+};
+
 
 // --- UTILS ---
 
 export const getAuthErrorMessage = (error: any): string => {
-    const code = error.code || '';
-    switch (code) {
-      case 'auth/email-already-in-use':
-        return 'Cette adresse email est déjà utilisée.';
-      case 'auth/invalid-email':
-        return 'Adresse email invalide.';
-      case 'auth/operation-not-allowed':
-      case 'auth/configuration-not-found':
-        return 'La connexion par email/mot de passe n\'est pas activée dans Firebase Console.';
-      case 'auth/popup-closed-by-user':
-        return 'La connexion a été annulée.';
-      case 'auth/weak-password':
-        return 'Le mot de passe est trop faible.';
-      case 'auth/user-disabled':
-        return 'Ce compte a été désactivé.';
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
-      case 'auth/invalid-credential':
-        return 'Email ou mot de passe incorrect.';
-      default:
-        return error.message || 'Une erreur est survenue lors de l\'authentification.';
-    }
+  const code = error.code || '';
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'Cette adresse email est déjà utilisée.';
+    case 'auth/invalid-email':
+      return 'Adresse email invalide.';
+    case 'auth/operation-not-allowed':
+    case 'auth/configuration-not-found':
+      return 'La connexion par email/mot de passe n\'est pas activée dans Firebase Console.';
+    case 'auth/popup-closed-by-user':
+      return 'La connexion a été annulée.';
+    case 'auth/weak-password':
+      return 'Le mot de passe est trop faible.';
+    case 'auth/user-disabled':
+      return 'Ce compte a été désactivé.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Email ou mot de passe incorrect.';
+    default:
+      return error.message || 'Une erreur est survenue lors de l\'authentification.';
+  }
 };
 
 // --- GOOGLE CALENDAR INTEGRATION ---
@@ -761,24 +867,24 @@ export const saveGoogleCalendarCredentials = async (
   try {
     console.log(`💾 Saving Google Calendar credentials for lawyer: ${lawyerId}`);
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
-    
+
     // Chiffrer les tokens avant de les stocker
     const encryptedAccessToken = encryptToken(credentials.accessToken);
-    
+
     // Préparer l'objet de mise à jour (sans undefined)
     const updateData: any = {
       googleCalendarConnected: true,
       googleCalendarAccessToken: encryptedAccessToken,
       googleCalendarLastSyncAt: new Date().toISOString(),
     };
-    
+
     // Ajouter le refresh token seulement s'il existe
     if (credentials.refreshToken) {
       updateData.googleCalendarRefreshToken = encryptToken(credentials.refreshToken);
     }
-    
+
     await update(lawyerRef, updateData);
-    
+
     console.log(`✅ Google Calendar credentials saved successfully`);
   } catch (error) {
     console.error('❌ Error saving Google Calendar credentials:', error);
@@ -795,23 +901,23 @@ export const getGoogleCalendarCredentials = async (
   try {
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
     const snapshot = await get(lawyerRef);
-    
+
     if (!snapshot.exists()) {
       return null;
     }
-    
+
     const lawyer = snapshot.val() as Lawyer;
-    
+
     if (!lawyer.googleCalendarConnected || !lawyer.googleCalendarAccessToken) {
       return null;
     }
-    
+
     // Déchiffrer les tokens
     const accessToken = decryptToken(lawyer.googleCalendarAccessToken);
-    const refreshToken = lawyer.googleCalendarRefreshToken 
+    const refreshToken = lawyer.googleCalendarRefreshToken
       ? decryptToken(lawyer.googleCalendarRefreshToken)
       : undefined;
-    
+
     return {
       googleCalendarConnected: lawyer.googleCalendarConnected || false,
       googleCalendarAccessToken: accessToken,
@@ -831,14 +937,14 @@ export const disconnectGoogleCalendar = async (lawyerId: string): Promise<void> 
   try {
     console.log(`🔌 Disconnecting Google Calendar for lawyer: ${lawyerId}`);
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
-    
+
     await update(lawyerRef, {
       googleCalendarConnected: false,
       googleCalendarAccessToken: null,
       googleCalendarRefreshToken: null,
       googleCalendarLastSyncAt: null,
     });
-    
+
     console.log(`✅ Google Calendar disconnected successfully`);
   } catch (error) {
     console.error('❌ Error disconnecting Google Calendar:', error);
@@ -856,12 +962,12 @@ export const updateGoogleCalendarAccessToken = async (
   try {
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
     const encryptedToken = encryptToken(accessToken);
-    
+
     await update(lawyerRef, {
       googleCalendarAccessToken: encryptedToken,
       googleCalendarLastSyncAt: new Date().toISOString(),
     });
-    
+
     console.log(`✅ Google Calendar access token updated`);
   } catch (error) {
     console.error('❌ Error updating Google Calendar access token:', error);
@@ -878,10 +984,10 @@ export const syncAppointmentToGoogleCalendar = async (
 ): Promise<string | null> => {
   try {
     console.log('🔄 Starting Google Calendar sync for appointment:', appointment.id);
-    
+
     // Récupérer les credentials Google Calendar de l'avocat
     const credentials = await getGoogleCalendarCredentials(appointment.lawyerId);
-    
+
     if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
       console.log('⚠️ Google Calendar not connected for lawyer, skipping sync');
       return null;
@@ -895,20 +1001,20 @@ export const syncAppointmentToGoogleCalendar = async (
     } = await import('./googleCalendarService');
 
     let accessToken = credentials.googleCalendarAccessToken;
-    
+
     try {
       // Calculer les heures de début et fin
       const startTime = new Date(appointment.date);
       const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
-      
+
       // Créer le titre et la description de l'événement
       const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
       const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
-      const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
-                       appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
-      
+      const location = appointment.type === 'IN_PERSON' ? 'Cabinet' :
+        appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+
       console.log('📅 Creating event:', { summary, startTime: startTime.toISOString(), endTime: endTime.toISOString() });
-      
+
       // Créer l'événement dans Google Calendar
       const googleEvent = await createGoogleCalendarEvent(
         accessToken,
@@ -918,11 +1024,11 @@ export const syncAppointmentToGoogleCalendar = async (
         description,
         location
       );
-      
+
       // Stocker l'ID de l'événement Google Calendar dans l'appointment
       const apptRef = ref(database, `appointments/${appointment.id}`);
       await update(apptRef, { googleCalendarEventId: googleEvent.id });
-      
+
       console.log(`✅ Appointment synced to Google Calendar: ${googleEvent.id}`);
       return googleEvent.id;
     } catch (error: any) {
@@ -932,15 +1038,15 @@ export const syncAppointmentToGoogleCalendar = async (
           const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
           accessToken = newAccessToken;
           await updateGoogleCalendarAccessToken(appointment.lawyerId, accessToken);
-          
+
           // Réessayer avec le nouveau token
           const startTime = new Date(appointment.date);
           const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
           const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
           const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
-          const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
-                           appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
-          
+          const location = appointment.type === 'IN_PERSON' ? 'Cabinet' :
+            appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+
           const googleEvent = await createGoogleCalendarEvent(
             accessToken,
             summary,
@@ -949,10 +1055,10 @@ export const syncAppointmentToGoogleCalendar = async (
             description,
             location
           );
-          
+
           const apptRef = ref(database, `appointments/${appointment.id}`);
           await update(apptRef, { googleCalendarEventId: googleEvent.id });
-          
+
           console.log(`✅ Appointment synced to Google Calendar (after token refresh): ${googleEvent.id}`);
           return googleEvent.id;
         }
@@ -979,7 +1085,7 @@ export const updateGoogleCalendarEvent = async (
     }
 
     const credentials = await getGoogleCalendarCredentials(appointment.lawyerId);
-    
+
     if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
       console.log('⚠️ Google Calendar not connected, skipping update');
       return;
@@ -991,15 +1097,15 @@ export const updateGoogleCalendarEvent = async (
     } = await import('./googleCalendarService');
 
     let accessToken = credentials.googleCalendarAccessToken;
-    
+
     try {
       const startTime = new Date(appointment.date);
       const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
       const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
       const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
-      const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
-                       appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
-      
+      const location = appointment.type === 'IN_PERSON' ? 'Cabinet' :
+        appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+
       await updateEvent(accessToken, appointment.googleCalendarEventId, {
         summary,
         startTime: startTime.toISOString(),
@@ -1007,7 +1113,7 @@ export const updateGoogleCalendarEvent = async (
         description,
         location,
       });
-      
+
       console.log(`✅ Google Calendar event updated: ${appointment.googleCalendarEventId}`);
     } catch (error: any) {
       if (error.message?.includes('401') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
@@ -1015,14 +1121,14 @@ export const updateGoogleCalendarEvent = async (
           const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
           accessToken = newAccessToken;
           await updateGoogleCalendarAccessToken(appointment.lawyerId, accessToken);
-          
+
           const startTime = new Date(appointment.date);
           const endTime = new Date(startTime.getTime() + (appointment.duration || 60) * 60 * 1000);
           const summary = `Consultation avec ${appointment.clientName || 'Client'}`;
           const description = `Type: ${appointment.type}\n${appointment.notes ? `Notes: ${appointment.notes}` : ''}`;
-          const location = appointment.type === 'IN_PERSON' ? 'Cabinet' : 
-                           appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
-          
+          const location = appointment.type === 'IN_PERSON' ? 'Cabinet' :
+            appointment.type === 'VIDEO' ? 'Visioconférence' : 'Téléphone';
+
           await updateEvent(accessToken, appointment.googleCalendarEventId, {
             summary,
             startTime: startTime.toISOString(),
@@ -1030,7 +1136,7 @@ export const updateGoogleCalendarEvent = async (
             description,
             location,
           });
-          
+
           console.log(`✅ Google Calendar event updated (after token refresh): ${appointment.googleCalendarEventId}`);
         }
       } else {
@@ -1056,7 +1162,7 @@ export const deleteGoogleCalendarEvent = async (
     }
 
     const credentials = await getGoogleCalendarCredentials(appointment.lawyerId);
-    
+
     if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
       console.log('⚠️ Google Calendar not connected, skipping delete');
       return;
@@ -1068,7 +1174,7 @@ export const deleteGoogleCalendarEvent = async (
     } = await import('./googleCalendarService');
 
     let accessToken = credentials.googleCalendarAccessToken;
-    
+
     try {
       await deleteEvent(accessToken, appointment.googleCalendarEventId);
       console.log(`✅ Google Calendar event deleted: ${appointment.googleCalendarEventId}`);
@@ -1078,7 +1184,7 @@ export const deleteGoogleCalendarEvent = async (
           const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
           accessToken = newAccessToken;
           await updateGoogleCalendarAccessToken(appointment.lawyerId, accessToken);
-          
+
           await deleteEvent(accessToken, appointment.googleCalendarEventId);
           console.log(`✅ Google Calendar event deleted (after token refresh): ${appointment.googleCalendarEventId}`);
         }
@@ -1104,11 +1210,11 @@ export const saveAvailabilityHours = async (
   try {
     console.log(`💾 Saving availability hours for lawyer: ${lawyerId}`);
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
-    
+
     await update(lawyerRef, {
       availabilityHours,
     });
-    
+
     console.log(`✅ Availability hours saved successfully`);
   } catch (error) {
     console.error('❌ Error saving availability hours:', error);
@@ -1125,15 +1231,130 @@ export const getAvailabilityHours = async (
   try {
     const lawyerRef = ref(database, `lawyers/${lawyerId}`);
     const snapshot = await get(lawyerRef);
-    
+
     if (!snapshot.exists()) {
       return null;
     }
-    
+
     const lawyerData = snapshot.val();
     return lawyerData.availabilityHours || null;
   } catch (error) {
     console.error('❌ Error getting availability hours:', error);
+    throw error;
+  }
+};
+
+/**
+ * Récupère les événements Google Calendar pour un avocat (wrapper)
+ * Cette fonction gère la récupération des credentials et les dates par défaut
+ */
+export const getGoogleCalendarEvents = async (lawyerId: string): Promise<any[]> => {
+  try {
+    const credentials = await getGoogleCalendarCredentials(lawyerId);
+
+    if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
+      console.log('⚠️ Google Calendar not connected for lawyer, returning empty list');
+      return [];
+    }
+
+    let accessToken = credentials.googleCalendarAccessToken;
+
+    // Définir une plage par défaut (ex: 2 semaines avant, 3 mois après)
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(now.getDate() - 14);
+
+    const endDate = new Date(now);
+    endDate.setMonth(now.getMonth() + 3);
+
+    try {
+      return await fetchGoogleEvents(accessToken, startDate.toISOString(), endDate.toISOString());
+    } catch (error: any) {
+      // Gestion du refresh token si nécessaire
+      if (error.message?.includes('401') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
+        if (credentials.googleCalendarRefreshToken) {
+          console.log('🔄 Access token expired, refreshing...');
+          const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
+          await updateGoogleCalendarAccessToken(lawyerId, newAccessToken);
+
+          // Retry
+          return await fetchGoogleEvents(newAccessToken, startDate.toISOString(), endDate.toISOString());
+        }
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('❌ Error in getGoogleCalendarEvents wrapper:', error);
+    return [];
+  }
+};
+
+// --- TASK MANAGEMENT (LAWYER WORKSTATION) ---
+
+export interface Task {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export const getTasks = async (userId: string): Promise<Task[]> => {
+  try {
+    const tasksRef = ref(database, `tasks/${userId}`);
+    const snapshot = await get(tasksRef);
+    if (!snapshot.exists()) return [];
+
+    const tasksObj = snapshot.val();
+    return Object.keys(tasksObj).map(key => ({
+      ...tasksObj[key],
+      id: key
+    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (error) {
+    console.error('❌ Error getting tasks:', error);
+    return [];
+  }
+};
+
+export const addTask = async (userId: string, text: string): Promise<Task> => {
+  try {
+    const tasksRef = ref(database, `tasks/${userId}`);
+    const newTaskRef = push(tasksRef);
+    const newTask: Task = {
+      id: newTaskRef.key!,
+      text,
+      completed: false,
+      createdAt: new Date().toISOString()
+    };
+
+    await set(newTaskRef, {
+      text: newTask.text,
+      completed: newTask.completed,
+      createdAt: newTask.createdAt
+    });
+
+    return newTask;
+  } catch (error) {
+    console.error('❌ Error adding task:', error);
+    throw error;
+  }
+};
+
+export const updateTask = async (userId: string, taskId: string, updates: Partial<Task>): Promise<void> => {
+  try {
+    const taskRef = ref(database, `tasks/${userId}/${taskId}`);
+    await update(taskRef, updates);
+  } catch (error) {
+    console.error('❌ Error updating task:', error);
+    throw error;
+  }
+};
+
+export const deleteTask = async (userId: string, taskId: string): Promise<void> => {
+  try {
+    const taskRef = ref(database, `tasks/${userId}/${taskId}`);
+    await remove(taskRef);
+  } catch (error) {
+    console.error('❌ Error deleting task:', error);
     throw error;
   }
 };

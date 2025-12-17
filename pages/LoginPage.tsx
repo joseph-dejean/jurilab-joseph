@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../store/store';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { UserRole } from '../types';
 import { Button } from '../components/Button';
 import { getAuthErrorMessage } from '../services/firebaseService';
+import { 
+  Mail, Lock, User, ArrowRight, Scale, Sparkles, ChevronLeft, 
+  Eye, EyeOff, CheckCircle2, AlertCircle, UserCircle, Briefcase 
+} from 'lucide-react';
 
 // Google Icon SVG
 const GoogleIcon = () => (
@@ -15,42 +19,71 @@ const GoogleIcon = () => (
   </svg>
 );
 
+type AuthMode = 'signin' | 'signup-choice' | 'signup-client';
+
 export const LoginPage: React.FC = () => {
   const { login, loginGoogle, register, t } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const isRegister = searchParams.get('register') === 'true';
+  const registerParam = searchParams.get('register') === 'true';
 
+  // Auth mode: signin, signup-choice (choose role), signup-client (client form)
+  const [authMode, setAuthMode] = useState<AuthMode>(registerParam ? 'signup-choice' : 'signin');
+  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>(UserRole.CLIENT);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Validation
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!email.trim()) {
+      newErrors.email = 'L\'email est requis';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = 'Email invalide';
+    }
+
+    if (!password) {
+      newErrors.password = 'Le mot de passe est requis';
+    } else if (authMode === 'signup-client' && password.length < 8) {
+      newErrors.password = 'Minimum 8 caractères requis';
+    }
+
+    if (authMode === 'signup-client') {
+      if (!name.trim()) {
+        newErrors.name = 'Le nom est requis';
+      }
+      if (password !== confirmPassword) {
+        newErrors.confirmPassword = 'Les mots de passe ne correspondent pas';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
-    
-    if (isRegister && !name) {
-        alert("Veuillez entrer votre nom.");
-        return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
     try {
-      if (isRegister) {
-        if (role === UserRole.LAWYER) {
-           navigate('/register-lawyer');
-           return;
-        }
-        await register(email, password, role, name);
+      if (authMode === 'signup-client') {
+        await register(email, password, UserRole.CLIENT, name);
+        navigate('/dashboard');
       } else {
         await login(email, password);
+        navigate('/dashboard');
       }
-      navigate('/dashboard');
     } catch (error: any) {
       console.error(error);
-      alert("Erreur: " + getAuthErrorMessage(error));
+      setErrors({ form: getAuthErrorMessage(error) });
     } finally {
       setIsLoading(false);
     }
@@ -59,146 +92,481 @@ export const LoginPage: React.FC = () => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-        // Pass the currently selected role. If user exists, this is ignored.
-        // If user is new, this role is used to create the profile.
-        await loginGoogle(role);
-        navigate('/dashboard');
+      await loginGoogle(UserRole.CLIENT);
+      navigate('/dashboard');
     } catch (error: any) {
-        console.error(error);
-        // auth/popup-closed-by-user is common, we can ignore or show a small toast
-        if (error.code !== 'auth/popup-closed-by-user') {
-             alert("Erreur Google: " + getAuthErrorMessage(error));
-        }
+      console.error(error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        setErrors({ form: getAuthErrorMessage(error) });
+      }
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-slate-100/50 dark:bg-navy/50 p-4">
-      <div className="bg-white dark:bg-navy-dark p-8 rounded-xl shadow-subtle-lg border w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-serif text-navy dark:text-white mb-2">
-            {isRegister ? t.auth.create : t.auth.welcome}
-          </h1>
-          <p className="text-slate-500">
-            {isRegister ? t.auth.registerSubtitle : t.auth.loginSubtitle}
-          </p>
-        </div>
+  const clearForm = () => {
+    setName('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setErrors({});
+  };
 
-        <div className="space-y-6">
-            {/* Role Selection - Moved up so it applies to Google Sign In too for new users */}
-            {isRegister && (
-             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t.auth.iam}</label>
-              <div className="grid grid-cols-2 gap-3">
-                 <button
-                   type="button"
-                   onClick={() => setRole(UserRole.CLIENT)}
-                   className={`py-3 rounded-lg border text-sm font-semibold transition-colors ${role === UserRole.CLIENT ? 'bg-brand-light/50 dark:bg-brand/10 border-brand/50 text-brand-dark dark:text-brand' : 'bg-slate-50 dark:bg-navy hover:bg-slate-100 dark:hover:bg-navy-light'}`}
-                 >
-                   {t.auth.client}
-                 </button>
-                 <button
-                   type="button"
-                   onClick={() => setRole(UserRole.LAWYER)}
-                   className={`py-3 rounded-lg border text-sm font-semibold transition-colors ${role === UserRole.LAWYER ? 'bg-brand-light/50 dark:bg-brand/10 border-brand/50 text-brand-dark dark:text-brand' : 'bg-slate-50 dark:bg-navy hover:bg-slate-100 dark:hover:bg-navy-light'}`}
-                 >
-                   {t.auth.lawyer}
-                 </button>
-              </div>
-              {role === UserRole.LAWYER && isRegister && (
-                  <p className="text-xs text-amber-600 mt-2">
-                      Note: Pour les avocats, l'inscription complète via le formulaire dédié est recommandée.
-                  </p>
-              )}
-             </div>
-          )}
+  const switchToSignIn = () => {
+    clearForm();
+    setAuthMode('signin');
+  };
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-            {isRegister && role === UserRole.CLIENT && (
-                <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Nom complet</label>
-                <input 
-                    type="text" 
-                    required 
-                    className="w-full px-4 py-3 rounded-lg border focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none bg-white dark:bg-navy"
-                    placeholder="Jean Dupont"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                />
-                </div>
-            )}
+  const switchToSignUp = () => {
+    clearForm();
+    setAuthMode('signup-choice');
+  };
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t.auth.email}</label>
-            <input 
-              type="email" 
-              required 
-              className="w-full px-4 py-3 rounded-lg border focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none bg-white dark:bg-navy"
-              placeholder="nom@exemple.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+  // Render role choice for signup
+  const renderSignUpChoice = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h2 className="text-xl sm:text-2xl font-serif font-bold text-deep-900 dark:text-surface-100 mb-2">
+          Choisissez votre profil
+        </h2>
+        <p className="text-deep-600 dark:text-surface-400">
+          Comment souhaitez-vous utiliser Jurilab ?
+        </p>
+      </div>
+
+      {/* Client Option */}
+      <button
+        onClick={() => setAuthMode('signup-client')}
+        className="w-full group relative overflow-hidden rounded-2xl border-2 border-surface-200 dark:border-deep-700 bg-white dark:bg-deep-900 p-6 text-left transition-all duration-300 hover:border-primary-400 dark:hover:border-primary-500 hover:shadow-lg"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary-100 to-primary-50 dark:from-primary-900/30 dark:to-primary-950/20 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="relative flex items-start gap-4">
+          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-50 dark:from-primary-900/50 dark:to-primary-950/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <UserCircle className="w-7 h-7 text-primary-600 dark:text-primary-400" />
           </div>
-          
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t.auth.password}</label>
-            <input 
-              type="password" 
-              required 
-              className="w-full px-4 py-3 rounded-lg border focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none bg-white dark:bg-navy"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-            <Button type="submit" className="w-full !mt-2" size="lg" disabled={isLoading}>
-                {isLoading ? 'Chargement...' : (isRegister ? t.auth.create : t.auth.signIn)}
-          </Button>
-        </form>
-
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white dark:bg-navy-dark text-slate-500">OU</span>
-                </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-deep-900 dark:text-surface-100 mb-1 flex items-center gap-2">
+              Je suis un Client
+              <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+            </h3>
+            <p className="text-sm text-deep-600 dark:text-surface-400">
+              Recherchez des avocats, prenez rendez-vous et gérez vos consultations juridiques
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-2 py-1 rounded-full">
+                <CheckCircle2 className="w-3 h-3" />
+                Inscription gratuite
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 rounded-full">
+                <CheckCircle2 className="w-3 h-3" />
+                Accès immédiat
+              </span>
             </div>
-
-            <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-navy"
-            >
-                <GoogleIcon />
-                {t.auth.google}
-            </button>
-
-        <div className="mt-8 text-center text-sm text-slate-500">
-          {isRegister ? t.auth.haveAccount : t.auth.dontHaveAccount}
-          <button 
-            onClick={() => navigate(isRegister ? '/login' : '/login?register=true')}
-            className="ml-1 text-brand-dark dark:text-brand font-semibold hover:underline"
-          >
-            {isRegister ? t.nav.login : t.nav.signup}
-          </button>
           </div>
         </div>
-        
-        {!isRegister && (
-             <div className="text-center mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+      </button>
+
+      {/* Lawyer Option */}
+      <button
+        onClick={() => navigate('/register-lawyer')}
+        className="w-full group relative overflow-hidden rounded-2xl border-2 border-surface-200 dark:border-deep-700 bg-white dark:bg-deep-900 p-6 text-left transition-all duration-300 hover:border-accent-400 dark:hover:border-accent-500 hover:shadow-lg"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-accent-100 to-accent-50 dark:from-accent-900/30 dark:to-accent-950/20 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="relative flex items-start gap-4">
+          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-100 to-accent-50 dark:from-accent-900/50 dark:to-accent-950/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Scale className="w-7 h-7 text-accent-600 dark:text-accent-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-deep-900 dark:text-surface-100 mb-1 flex items-center gap-2">
+              Je suis un Avocat
+              <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+            </h3>
+            <p className="text-sm text-deep-600 dark:text-surface-400">
+              Créez votre profil professionnel, gérez vos disponibilités et développez votre clientèle
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded-full">
+                <Sparkles className="w-3 h-3" />
+                Profil vérifié
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30 px-2 py-1 rounded-full">
+                <Briefcase className="w-3 h-3" />
+                Formulaire dédié
+              </span>
+            </div>
+          </div>
+        </div>
+      </button>
+
+      {/* Back to Sign In */}
+      <p className="text-center text-sm text-deep-600 dark:text-surface-400 pt-4">
+        Déjà un compte ?{' '}
+        <button
+          onClick={switchToSignIn}
+          className="text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+        >
+          Se connecter
+        </button>
+      </p>
+    </div>
+  );
+
+  // Render sign in or client sign up form
+  const renderForm = () => (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Form Error */}
+      {errors.form && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <p className="text-sm text-red-700 dark:text-red-300">{errors.form}</p>
+        </div>
+      )}
+
+      {/* Name (only for signup) */}
+      {authMode === 'signup-client' && (
+        <div>
+          <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+            Nom complet
+          </label>
+          <div className="relative">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+            <input
+              type="text"
+              className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
+                errors.name 
+                  ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
+                  : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+              placeholder="Jean Dupont"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) setErrors({ ...errors, name: '' });
+              }}
+              style={{ fontSize: '16px' }}
+            />
+          </div>
+          {errors.name && (
+            <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {errors.name}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Email */}
+      <div>
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          {t.auth.email}
+        </label>
+        <div className="relative">
+          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+          <input
+            type="email"
+            className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
+              errors.email 
+                ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
+                : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+            } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+            placeholder="nom@exemple.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors({ ...errors, email: '' });
+            }}
+            style={{ fontSize: '16px' }}
+          />
+        </div>
+        {errors.email && (
+          <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.email}
+          </p>
+        )}
+      </div>
+
+      {/* Password */}
+      <div>
+        <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+          {t.auth.password}
+          {authMode === 'signup-client' && (
+            <span className="font-normal text-deep-500 dark:text-surface-500 ml-1">(min. 8 caractères)</span>
+          )}
+        </label>
+        <div className="relative">
+          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+          <input
+            type={showPassword ? 'text' : 'password'}
+            className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
+              errors.password 
+                ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
+                : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+            } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors({ ...errors, password: '' });
+            }}
+            style={{ fontSize: '16px' }}
+          />
           <button
-            onClick={() => navigate('/register-lawyer')}
-            className="text-sm font-semibold text-brand-dark dark:text-brand hover:underline"
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-deep-400 dark:text-surface-500 hover:text-deep-600 dark:hover:text-surface-300 transition-colors"
           >
-            Inscrivez-vous en tant qu'avocat →
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
         </div>
+        {errors.password && (
+          <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.password}
+          </p>
         )}
+      </div>
+
+      {/* Confirm Password (only for signup) */}
+      {authMode === 'signup-client' && (
+        <div>
+          <label className="block text-sm font-semibold text-deep-700 dark:text-surface-300 mb-2">
+            Confirmer le mot de passe
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
+                errors.confirmPassword 
+                  ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
+                  : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
+              }}
+              style={{ fontSize: '16px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-deep-400 dark:text-surface-500 hover:text-deep-600 dark:hover:text-surface-300 transition-colors"
+            >
+              {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+          </div>
+          {errors.confirmPassword && (
+            <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {errors.confirmPassword}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Submit Button */}
+      <Button 
+        type="submit" 
+        className="w-full" 
+        size="lg" 
+        isLoading={isLoading}
+      >
+        {authMode === 'signup-client' ? 'Créer mon compte' : t.auth.signIn}
+        <ArrowRight className="w-5 h-5 ml-2" />
+      </Button>
+    </form>
+  );
+
+  return (
+    <div className="min-h-[calc(100vh-80px)] flex flex-col lg:flex-row">
+      {/* Left side - Form */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 sm:py-12 bg-surface-50 dark:bg-deep-950 safe-area-bottom">
+        <div className="w-full max-w-md">
+          {/* Back button */}
+          <button 
+            onClick={() => {
+              if (authMode === 'signup-client') {
+                setAuthMode('signup-choice');
+              } else if (authMode === 'signup-choice') {
+                setAuthMode('signin');
+              } else {
+                navigate(-1);
+              }
+            }}
+            className="flex items-center gap-2 text-deep-500 hover:text-deep-700 dark:hover:text-surface-300 mb-6 -ml-1 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            {authMode === 'signup-client' ? 'Retour au choix' : authMode === 'signup-choice' ? 'Retour à la connexion' : 'Retour'}
+          </button>
+
+          {/* Logo and Title */}
+          <div className="text-center mb-8 sm:mb-10">
+            <Link to="/" className="inline-flex items-center gap-2 sm:gap-3 mb-6 sm:mb-8">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center shadow-glow">
+                <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </div>
+              <span className="font-serif text-xl sm:text-2xl font-bold text-deep-900 dark:text-surface-100">
+                Jurilab
+              </span>
+            </Link>
+            
+            {authMode === 'signin' && (
+              <>
+                <h1 className="text-2xl sm:text-display-sm font-serif text-deep-900 dark:text-surface-100 mb-2">
+                  {t.auth.welcome}
+                </h1>
+                <p className="text-sm sm:text-base text-deep-600 dark:text-surface-400">
+                  {t.auth.loginSubtitle}
+                </p>
+              </>
+            )}
+            
+            {authMode === 'signup-client' && (
+              <>
+                <h1 className="text-2xl sm:text-display-sm font-serif text-deep-900 dark:text-surface-100 mb-2">
+                  Créer un compte Client
+                </h1>
+                <p className="text-sm sm:text-base text-deep-600 dark:text-surface-400">
+                  Rejoignez des milliers de clients qui trouvent leur avocat sur Jurilab
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Form Card */}
+          <div className="glass rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-glass-lg">
+            {authMode === 'signup-choice' ? renderSignUpChoice() : (
+              <>
+                {renderForm()}
+
+                {/* Divider */}
+                <div className="relative my-5 sm:my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-surface-200 dark:border-deep-700" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-4 bg-white/70 dark:bg-deep-900/70 text-sm text-deep-500 dark:text-surface-500">
+                      OU
+                    </span>
+                  </div>
+                </div>
+
+                {/* Google Login */}
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-white dark:bg-deep-900 border-2 border-surface-200 dark:border-deep-700 rounded-xl hover:bg-surface-50 dark:hover:bg-deep-800 hover:border-surface-300 dark:hover:border-deep-600 transition-all duration-200 font-medium text-deep-700 dark:text-surface-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <GoogleIcon />
+                  {authMode === 'signup-client' ? 'S\'inscrire avec Google' : t.auth.google}
+                </button>
+
+                {/* Switch between login/register */}
+                <p className="text-center text-sm text-deep-600 dark:text-surface-400 mt-5 sm:mt-6">
+                  {authMode === 'signup-client' ? t.auth.haveAccount : t.auth.dontHaveAccount}
+                  <button
+                    onClick={authMode === 'signup-client' ? switchToSignIn : switchToSignUp}
+                    className="ml-1 text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                  >
+                    {authMode === 'signup-client' ? t.nav.login : t.nav.signup}
+                  </button>
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Lawyer registration link (only on sign in) */}
+          {authMode === 'signin' && (
+            <div className="text-center mt-6 sm:mt-8">
+              <button
+                onClick={() => navigate('/register-lawyer')}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-accent-600 dark:text-accent-400 hover:underline group"
+              >
+                <Scale className="w-4 h-4" />
+                Vous êtes avocat ? Inscrivez-vous ici
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right side - Visual (Hidden on mobile) */}
+      <div className="hidden lg:flex flex-1 relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 dark:from-primary-800 dark:via-primary-900 dark:to-deep-950">
+        {/* Pattern overlay */}
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }} />
+        
+        {/* Decorative shapes */}
+        <div className="absolute top-20 right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-40 left-20 w-48 h-48 bg-accent-400/20 rounded-full blur-3xl" />
+        
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center p-12 text-center">
+          <div className="max-w-md">
+            <div className="w-20 h-20 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-8">
+              <Scale className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-3xl font-serif font-bold text-white mb-4">
+              L'excellence juridique à portée de main
+            </h2>
+            <p className="text-primary-100 text-lg leading-relaxed mb-8">
+              Rejoignez une communauté de milliers d'utilisateurs qui font confiance à Jurilab pour leurs besoins juridiques.
+            </p>
+            
+            {/* Features */}
+            <div className="grid gap-4 text-left mb-8">
+              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">Avocats vérifiés</p>
+                  <p className="text-primary-200 text-xs">Profils validés par notre équipe</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">Réservation en ligne</p>
+                  <p className="text-primary-200 text-xs">Prenez RDV 24h/24, 7j/7</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">Tarifs transparents</p>
+                  <p className="text-primary-200 text-xs">Pas de mauvaises surprises</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Testimonial */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-left">
+              <p className="text-white/90 italic mb-4">
+                "Grâce à Jurilab, j'ai trouvé un avocat compétent en moins de 24h. Le processus était simple et transparent."
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold">
+                  MD
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">Marie Dubois</p>
+                  <p className="text-primary-200 text-xs">Paris, France</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

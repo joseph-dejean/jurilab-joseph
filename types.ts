@@ -47,6 +47,8 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
+  /** If true, user can still sign-in to Firebase Auth but app access is blocked and rules can deny writes. */
+  disabled?: boolean;
 }
 
 /**
@@ -181,4 +183,29 @@ export interface GoogleCalendarEvent {
   end: { dateTime: string; timeZone: string };
   description?: string;
   location?: string;
+}
+
+/**
+ * Types for Document Sharing
+ */
+export type DocumentFileType = 'PDF' | 'DOC' | 'DOCX' | 'TXT' | 'IMAGE';
+
+export interface Document {
+  id: string;
+  name: string;                    // Display name
+  fileName: string;                // Original file name
+  fileUrl: string;                 // Firebase Storage URL
+  fileType: DocumentFileType;
+  fileSize: number;                // Size in bytes
+  uploadedAt: string;              // ISO timestamp
+  uploadedBy: string;              // User ID (lawyer or client)
+  uploadedByRole: UserRole;        // Who uploaded it
+  lawyerId: string;                // Associated lawyer
+  clientId: string;                // Associated client
+  appointmentId?: string;          // Optional link to appointment
+  description?: string;            // Optional description
+  aiSummary?: string;              // AI-generated summary (cached)
+  sharedWithClient: boolean;       // Visibility flag
+  lawyerNote?: string;             // Private note from lawyer
+  lawyerNoteUpdatedAt?: string;    // When the note was last updated
 }

@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../store/store';
 import { streamLegalChat } from '../services/geminiService';
-import { MessageSquare, X, Send, AlertTriangle, Globe, ExternalLink, RefreshCw } from 'lucide-react';
+import { MessageSquare, X, Send, AlertTriangle, Globe, ExternalLink, Scale } from 'lucide-react';
 import { ChatMessage } from '../types';
-import { Button } from './Button';
 
 export const LegalChatbot: React.FC = () => {
   const { isChatOpen, toggleChat, t } = useApp();
@@ -11,6 +10,7 @@ export const LegalChatbot: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Initialize with welcome message if empty
   useEffect(() => {
@@ -27,6 +27,25 @@ export const LegalChatbot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Focus input when chat opens
+  useEffect(() => {
+    if (isChatOpen && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isChatOpen]);
+
+  // Prevent body scroll when chat is open on mobile
+  useEffect(() => {
+    if (isChatOpen && window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isChatOpen]);
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -42,8 +61,6 @@ export const LegalChatbot: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
-    // The history sent to the API must start with a user message.
-    // We find the first user message and slice the array from there.
     const firstUserMessageIndex = messages.findIndex(m => m.role === 'user');
     const historyMessages = firstUserMessageIndex === -1 ? [] : messages.slice(firstUserMessageIndex);
 
@@ -92,114 +109,147 @@ export const LegalChatbot: React.FC = () => {
 
   return (
     <>
-      {/* Trigger Button */}
-      <button
-        onClick={toggleChat}
-        className={`fixed bottom-6 right-6 z-40 p-4 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center hover:scale-105 ${isChatOpen ? 'bg-slate-200 text-slate-600 rotate-90 dark:bg-slate-800 dark:text-slate-300' : 'bg-primary-600 text-white'}`}
-      >
-        {isChatOpen ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-      </button>
+      {/* Trigger Button - Hidden when chat is open */}
+      {!isChatOpen && (
+        <button
+          onClick={toggleChat}
+          className="fixed z-50 bottom-24 sm:bottom-8 right-4 sm:right-6 p-3 sm:p-4 rounded-2xl shadow-glass-lg transition-all duration-300 ease-smooth group bg-gradient-to-br from-primary-500 to-primary-600 text-white hover:shadow-glow hover:scale-105"
+        >
+          <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-500 rounded-full animate-pulse" />
+        </button>
+      )}
 
       {/* Chat Window */}
       {isChatOpen && (
-        <div className="fixed bottom-24 right-6 z-40 w-96 max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-8rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-fade-in-up">
-          
-          {/* Header */}
-          <div className="bg-primary-600 p-4 flex items-center gap-3 text-white">
-             <div className="bg-white/20 p-2 rounded-full">
-               <RefreshCw className="h-5 w-5" />
-             </div>
-             <div>
-               <h3 className="font-bold text-sm">{t.chatbot.title}</h3>
-               <p className="text-xs opacity-80 flex items-center gap-1">
-                 <span className="w-2 h-2 bg-green-400 rounded-full inline-block animate-pulse"></span>
-                 Online • Gemini 1.5
-               </p>
-             </div>
-             <button onClick={toggleChat} className="ml-auto hover:bg-white/20 p-1 rounded">
-               <X className="h-5 w-5" />
-             </button>
-          </div>
-
-          {/* Disclaimer Banner */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 p-3 border-b border-amber-100 dark:border-amber-800/30 flex gap-2 items-start">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-[10px] leading-tight text-amber-800 dark:text-amber-200 font-medium">
-              {t.chatbot.disclaimer}
-            </p>
-          </div>
-
-          {/* Messages Area */}
-          <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-950/50">
-            {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div 
-                  className={`max-w-[85%] rounded-2xl p-3 text-sm shadow-sm 
-                    ${msg.role === 'user' 
-                      ? 'bg-primary-600 text-white rounded-tr-none' 
-                      : msg.isError
-                      ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800/30 rounded-tl-none'
-                      : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-tl-none'
-                    }`}
-                >
-                  {msg.text}
-                  {msg.isStreaming && <span className="inline-block w-1 h-4 ml-1 bg-primary-400 animate-pulse align-middle">|</span>}
-                  
-                  {/* Sources Display */}
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                      <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
-                        <Globe className="h-3 w-3" /> {t.chatbot.sources}
-                      </p>
-                      <ul className="space-y-1">
-                        {msg.sources.map((src, idx) => (
-                          <li key={idx}>
-                            <a 
-                              href={src.uri} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 truncate"
-                            >
-                              <ExternalLink className="h-3 w-3" /> {src.title || src.uri}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+        <>
+          {/* Mobile: Drawer from bottom / Desktop: Compact floating window */}
+          <div className="fixed z-50 
+            inset-x-0 bottom-0 h-[85vh] max-h-[700px]
+            sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[500px] sm:w-[380px] 
+            lg:h-[550px] lg:w-[400px]
+            bg-white dark:bg-deep-900 
+            rounded-t-3xl sm:rounded-3xl 
+            shadow-2xl 
+            border border-surface-200/50 dark:border-deep-700/50 
+            flex flex-col overflow-hidden animate-slide-up sm:animate-scale-in"
+          >
+            
+            {/* Header with prominent close button */}
+            <div className="bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-700 dark:to-primary-800 px-4 py-3 sm:p-4 flex items-center gap-3 shrink-0">
+              {/* Mobile drag indicator */}
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/30 rounded-full sm:hidden" />
+              
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-            ))}
-            <div ref={messagesEndRef} />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-white text-sm truncate">{t.chatbot.title}</h3>
+                <p className="text-xs text-primary-100 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                  Online
+                </p>
+              </div>
+              {/* Large, visible close button */}
+              <button 
+                onClick={toggleChat} 
+                className="p-2.5 -mr-1 rounded-xl bg-white/20 hover:bg-white/30 active:bg-white/40 transition-colors"
+                aria-label="Fermer le chat"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Compact Disclaimer Banner */}
+            <div className="bg-accent-50 dark:bg-accent-950/30 px-3 py-2 border-b border-accent-100 dark:border-accent-900/30 flex gap-2 items-center shrink-0">
+              <AlertTriangle className="w-3.5 h-3.5 text-accent-600 dark:text-accent-400 flex-shrink-0" />
+              <p className="text-[10px] sm:text-xs leading-tight text-accent-700 dark:text-accent-300 line-clamp-2">
+                {t.chatbot.disclaimer}
+              </p>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-surface-50 dark:bg-deep-900/50 scrollbar-thin">
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div 
+                    className={`max-w-[90%] sm:max-w-[85%] rounded-2xl p-3 sm:p-4 text-sm leading-relaxed
+                      ${msg.role === 'user' 
+                        ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-tr-md shadow-md' 
+                        : msg.isError
+                        ? 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-900/30 rounded-tl-md'
+                        : 'bg-white dark:bg-deep-800 text-deep-700 dark:text-surface-200 border border-surface-200 dark:border-deep-700 rounded-tl-md shadow-card'
+                      }`}
+                  >
+                    {msg.text}
+                    {msg.isStreaming && (
+                      <span className="inline-block w-2 h-4 ml-1 bg-primary-400 rounded-sm animate-pulse align-middle" />
+                    )}
+                    
+                    {/* Sources Display */}
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-surface-100 dark:border-deep-700">
+                        <p className="text-xs font-semibold text-deep-400 dark:text-surface-500 mb-2 flex items-center gap-1">
+                          <Globe className="w-3 h-3" /> {t.chatbot.sources}
+                        </p>
+                        <ul className="space-y-1">
+                          {msg.sources.map((src, idx) => (
+                            <li key={idx}>
+                              <a 
+                                href={src.uri} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 truncate"
+                              >
+                                <ExternalLink className="w-3 h-3 flex-shrink-0" /> 
+                                {src.title || src.uri}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Compact Input Area */}
+            <div className="p-3 pb-4 sm:pb-3 bg-white dark:bg-deep-900 border-t border-surface-200 dark:border-deep-800 shrink-0">
+              <div className="relative flex items-center gap-2">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder={t.chatbot.placeholder}
+                  className="flex-1 pr-12 pl-3 py-2.5 rounded-xl border border-surface-200 dark:border-deep-700 bg-surface-50 dark:bg-deep-800 text-sm input-focus outline-none resize-none max-h-24 text-deep-800 dark:text-surface-200"
+                  rows={1}
+                  style={{ fontSize: '16px' }} // Prevent iOS zoom
+                />
+                <button 
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-lg hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Input Area */}
-          <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-             <div className="relative">
-               <textarea
-                 value={input}
-                 onChange={(e) => setInput(e.target.value)}
-                 onKeyDown={(e) => {
-                   if (e.key === 'Enter' && !e.shiftKey) {
-                     e.preventDefault();
-                     handleSend();
-                   }
-                 }}
-                 placeholder={t.chatbot.placeholder}
-                 className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none max-h-32"
-                 rows={1}
-               />
-               <button 
-                 onClick={handleSend}
-                 disabled={!input.trim() || isLoading}
-                 className="absolute right-2 top-2 p-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-               >
-                 <Send className="h-4 w-4" />
-               </button>
-             </div>
-          </div>
-
-        </div>
+          {/* Backdrop for mobile */}
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 sm:hidden"
+            onClick={toggleChat}
+          />
+        </>
       )}
     </>
   );
