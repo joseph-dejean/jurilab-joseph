@@ -101,6 +101,15 @@ export interface Lawyer extends User {
   googleCalendarLastSyncAt?: string; // ISO timestamp de la dernière synchronisation
   // Heures de disponibilité
   availabilityHours?: AvailabilityHours; // Heures de disponibilité hebdomadaires
+  // Additional fields from registration
+  postalCode?: string;
+  phone?: string;
+  barNumber?: string;
+  education?: any[];
+  certifications?: any[];
+  cases?: { total: number; won: number; settled: number };
+  verified?: boolean;
+  responseTime?: string;
 }
 
 export interface Client extends User {

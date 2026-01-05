@@ -35,12 +35,17 @@ type SettingsTab = "profile" | "notifications" | "appearance" | "privacy" | "acc
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { currentUser, darkMode, toggleDarkMode, language, setLanguage, logout, t } = useApp();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
-  
+
   // Profile settings state
   const [profileName, setProfileName] = useState(currentUser?.name || "");
   const [profileEmail, setProfileEmail] = useState(currentUser?.email || "");
   const [profileSaved, setProfileSaved] = useState(false);
-  
+  const { updateProfile } = useApp();
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   // Notification settings state
   const [notifications, setNotifications] = useState({
     emailAppointments: true,
@@ -50,14 +55,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     pushMessages: false,
     soundEnabled: true,
   });
-  
+
   // Privacy settings state
   const [privacy, setPrivacy] = useState({
     profileVisible: true,
     showOnlineStatus: true,
     allowMessagesFromAll: false,
   });
-  
+
   // Account settings state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -77,10 +82,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     { id: "account" as SettingsTab, icon: Lock, label: "Compte" },
   ];
 
-  const handleSaveProfile = () => {
-    // Here you would save to Firebase
-    setProfileSaved(true);
-    setTimeout(() => setProfileSaved(false), 2000);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setIsUploading(true);
+    try {
+      let avatarUrl = currentUser?.avatarUrl;
+
+      if (selectedFile && currentUser) {
+        const { uploadFileToStorage } = await import("../services/firebaseService");
+        const path = `avatars/${currentUser.id}_${Date.now()}`;
+        avatarUrl = await uploadFileToStorage(selectedFile, path);
+      }
+
+      await updateProfile({
+        name: profileName,
+        email: profileEmail,
+        avatarUrl
+      });
+
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2000);
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+      alert("Erreur lors de l'enregistrement du profil");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handlePasswordChange = () => {
@@ -117,12 +157,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       {/* Avatar Section */}
       <div className="flex items-center gap-6">
         <div className="relative">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
           <img
-            src={currentUser?.avatarUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(currentUser?.name || "User")}
+            src={previewUrl || currentUser?.avatarUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(currentUser?.name || "User")}
             alt="Avatar"
             className="w-24 h-24 rounded-2xl object-cover ring-4 ring-surface-100 dark:ring-deep-800"
           />
-          <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg hover:bg-primary-600 transition-colors">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg hover:bg-primary-600 transition-colors"
+          >
             <Camera className="w-5 h-5 text-white" />
           </button>
         </div>
@@ -152,7 +202,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             className="w-full px-4 py-3 rounded-xl border border-surface-200 dark:border-deep-700 bg-white dark:bg-deep-800 text-deep-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-deep-700 dark:text-surface-300 mb-2">
             Adresse email
@@ -168,14 +218,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         {currentUser?.role === UserRole.LAWYER && (
           <div className="p-4 bg-primary-50 dark:bg-primary-950/30 rounded-xl">
             <p className="text-sm text-primary-700 dark:text-primary-300">
-              💼 Pour modifier vos informations professionnelles (spécialités, tarifs, etc.), 
+              💼 Pour modifier vos informations professionnelles (spécialités, tarifs, etc.),
               utilisez l'éditeur de profil avocat depuis votre tableau de bord.
             </p>
           </div>
         )}
-        
-        <Button variant="primary" onClick={handleSaveProfile} className="w-full">
-          {profileSaved ? (
+
+        <Button variant="primary" onClick={handleSaveProfile} className="w-full" disabled={isUploading}>
+          {isUploading ? (
+            "Enregistrement..."
+          ) : profileSaved ? (
             <>
               <Check className="w-4 h-4 mr-2" />
               Enregistré !
@@ -266,25 +318,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         <div className="grid grid-cols-2 gap-4">
           <button
             onClick={() => darkMode && toggleDarkMode()}
-            className={`p-4 rounded-2xl border-2 transition-all ${
-              !darkMode
+            className={`p-4 rounded-2xl border-2 transition-all ${!darkMode
                 ? "border-primary-500 bg-primary-50 dark:bg-primary-950/30"
                 : "border-surface-200 dark:border-deep-700 hover:border-surface-300 dark:hover:border-deep-600"
-            }`}
+              }`}
           >
             <div className="w-full h-24 rounded-xl bg-gradient-to-br from-white to-surface-100 border border-surface-200 mb-3 flex items-center justify-center">
               <Sun className="w-8 h-8 text-amber-500" />
             </div>
             <p className="font-medium text-deep-900 dark:text-surface-100">Clair</p>
           </button>
-          
+
           <button
             onClick={() => !darkMode && toggleDarkMode()}
-            className={`p-4 rounded-2xl border-2 transition-all ${
-              darkMode
+            className={`p-4 rounded-2xl border-2 transition-all ${darkMode
                 ? "border-primary-500 bg-primary-50 dark:bg-primary-950/30"
                 : "border-surface-200 dark:border-deep-700 hover:border-surface-300 dark:hover:border-deep-600"
-            }`}
+              }`}
           >
             <div className="w-full h-24 rounded-xl bg-gradient-to-br from-deep-800 to-deep-950 border border-deep-700 mb-3 flex items-center justify-center">
               <Moon className="w-8 h-8 text-indigo-400" />
@@ -303,24 +353,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setLanguage("fr")}
-            className={`p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
-              language === "fr"
+            className={`p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${language === "fr"
                 ? "border-primary-500 bg-primary-50 dark:bg-primary-950/30"
                 : "border-surface-200 dark:border-deep-700 hover:border-surface-300 dark:hover:border-deep-600"
-            }`}
+              }`}
           >
             <span className="text-2xl">🇫🇷</span>
             <span className="font-medium text-deep-900 dark:text-surface-100">Français</span>
             {language === "fr" && <Check className="w-5 h-5 text-primary-500 ml-auto" />}
           </button>
-          
+
           <button
             onClick={() => setLanguage("en")}
-            className={`p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
-              language === "en"
+            className={`p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${language === "en"
                 ? "border-primary-500 bg-primary-50 dark:bg-primary-950/30"
                 : "border-surface-200 dark:border-deep-700 hover:border-surface-300 dark:hover:border-deep-600"
-            }`}
+              }`}
           >
             <span className="text-2xl">🇬🇧</span>
             <span className="font-medium text-deep-900 dark:text-surface-100">English</span>
@@ -340,7 +388,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         <div className="space-y-3">
           <SettingsToggle
             label="Profil public"
-            description={currentUser?.role === UserRole.LAWYER 
+            description={currentUser?.role === UserRole.LAWYER
               ? "Votre profil apparaît dans les résultats de recherche"
               : "Les avocats peuvent voir votre profil"
             }
@@ -362,7 +410,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </h3>
         <SettingsToggle
           label="Recevoir des messages de tous"
-          description={currentUser?.role === UserRole.LAWYER 
+          description={currentUser?.role === UserRole.LAWYER
             ? "Permettre aux clients de vous contacter sans rendez-vous"
             : "Permettre aux avocats de vous contacter directement"
           }
@@ -408,7 +456,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             {showPasswordChange ? "Annuler" : "Modifier"}
           </Button>
         </div>
-        
+
         {showPasswordChange && (
           <div className="space-y-3 mt-4 pt-4 border-t border-surface-200 dark:border-deep-700">
             <div className="relative">
@@ -427,7 +475,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             <div className="relative">
               <input
                 type={showNewPassword ? "text" : "password"}
@@ -444,7 +492,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             <input
               type="password"
               placeholder="Confirmer le nouveau mot de passe"
@@ -452,7 +500,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-surface-200 dark:border-deep-700 bg-white dark:bg-deep-900 text-deep-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
-            
+
             <Button variant="primary" onClick={handlePasswordChange} className="w-full">
               Mettre à jour le mot de passe
             </Button>
@@ -504,7 +552,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <p className="text-sm text-red-600 dark:text-red-400 mb-3">
               La suppression de votre compte est irréversible. Toutes vos données seront perdues.
             </p>
-            
+
             {!showDeleteConfirm ? (
               <Button
                 variant="danger"
@@ -550,7 +598,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         className="absolute inset-0 bg-deep-900/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       {/* Modal */}
       <div className="relative w-full max-w-3xl max-h-[90vh] bg-white dark:bg-deep-900 rounded-3xl shadow-2xl overflow-hidden flex">
         {/* Sidebar */}
@@ -560,17 +608,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               {t.dashboard.settings}
             </h2>
           </div>
-          
+
           <nav className="flex-1 p-3 space-y-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  activeTab === tab.id
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id
                     ? "bg-primary-500 text-white shadow-md"
                     : "text-deep-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-deep-800"
-                }`}
+                  }`}
               >
                 <tab.icon className="w-5 h-5" />
                 <span className="font-medium">{tab.label}</span>
@@ -578,7 +625,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             ))}
           </nav>
         </div>
-        
+
         {/* Content */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
@@ -593,7 +640,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <X className="w-5 h-5 text-deep-500" />
             </button>
           </div>
-          
+
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-6">
             {activeTab === "profile" && renderProfileTab()}
@@ -629,14 +676,12 @@ const SettingsToggle: React.FC<SettingsToggleProps> = ({
     </div>
     <button
       onClick={() => onChange(!checked)}
-      className={`relative w-12 h-7 rounded-full transition-colors ${
-        checked ? "bg-primary-500" : "bg-surface-300 dark:bg-deep-600"
-      }`}
+      className={`relative w-12 h-7 rounded-full transition-colors ${checked ? "bg-primary-500" : "bg-surface-300 dark:bg-deep-600"
+        }`}
     >
       <span
-        className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-          checked ? "left-6" : "left-1"
-        }`}
+        className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${checked ? "left-6" : "left-1"
+          }`}
       />
     </button>
   </div>

@@ -36,7 +36,7 @@ export const HomePage: React.FC = () => {
       navigate('/search');
       return;
     }
-    
+
     setIsSearching(true);
     try {
       // Pre-analyze with AI and pass the specialty to the search page
@@ -65,7 +65,7 @@ export const HomePage: React.FC = () => {
     [LegalSpecialty.REAL_ESTATE]: '🏠',
     [LegalSpecialty.LABOR]: '💼',
     [LegalSpecialty.IMMIGRATION]: '🌍',
-    [LegalSpecialty.INTELLECTUAL_PROPERTY]: '💡',
+    [LegalSpecialty.IP]: '💡',
     [LegalSpecialty.TAX]: '📊',
   };
 
@@ -84,25 +84,15 @@ export const HomePage: React.FC = () => {
         {/* Background Elements */}
         <div className="absolute inset-0 hero-gradient dark:hero-gradient-dark" />
         <div className="absolute inset-0 pattern-dots dark:pattern-dots-dark opacity-40" />
-        
+
         {/* Floating decorative elements - Hidden on mobile for performance */}
         <div className="hidden sm:block absolute top-20 right-[15%] w-64 h-64 bg-primary-200/30 dark:bg-primary-800/20 rounded-full blur-3xl animate-float" />
         <div className="hidden sm:block absolute bottom-20 left-[10%] w-48 h-48 bg-accent-200/30 dark:bg-accent-800/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-        
+
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            {/* Badge */}
-            <div 
-              className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 mb-6 sm:mb-8 bg-white/60 dark:bg-deep-900/60 backdrop-blur-sm rounded-full border border-primary-200/50 dark:border-primary-800/50 shadow-glass opacity-0 animate-fade-in-up"
-            >
-              <Sparkles className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-              <span className="text-xs sm:text-sm font-medium text-primary-700 dark:text-primary-300">
-                Plateforme Juridique de Confiance
-              </span>
-            </div>
-
             {/* Main Headline */}
-            <h1 
+            <h1
               className="text-3xl sm:text-4xl md:text-display-md lg:text-display-lg font-serif text-deep-900 dark:text-surface-100 mb-4 sm:mb-6 opacity-0 animate-fade-in-up delay-100 leading-tight"
             >
               {t.hero.title1}
@@ -111,14 +101,14 @@ export const HomePage: React.FC = () => {
             </h1>
 
             {/* Subtitle */}
-            <p 
+            <p
               className="text-base sm:text-lg md:text-xl text-deep-600 dark:text-surface-400 mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed opacity-0 animate-fade-in-up delay-200 px-2"
             >
               {t.hero.subtitle}
             </p>
 
             {/* Search Box */}
-            <div 
+            <div
               className="max-w-2xl mx-auto opacity-0 animate-fade-in-up delay-300"
             >
               <form onSubmit={handleAISearch} className="relative">
@@ -128,16 +118,16 @@ export const HomePage: React.FC = () => {
                       <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-500" />
                       <input
                         type="text"
-                        placeholder={t.hero.aiSearchPlaceholder || "Décrivez votre situation juridique..."}
+                        placeholder={t.hero.searchPlaceholder}
                         className="w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-xl bg-white dark:bg-deep-900 border-2 border-transparent focus:border-primary-500 focus:ring-0 outline-none text-base transition-colors duration-200"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       variant="primary"
-                      size="lg" 
+                      size="lg"
                       className="w-full sm:w-auto px-6 sm:px-8 rounded-xl shadow-glow"
                       isLoading={isSearching}
                       disabled={isSearching}
@@ -169,8 +159,8 @@ export const HomePage: React.FC = () => {
         {/* Bottom wave decoration */}
         <div className="absolute bottom-0 left-0 right-0">
           <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-            <path 
-              d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" 
+            <path
+              d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z"
               className="fill-white dark:fill-deep-900"
             />
           </svg>
@@ -183,7 +173,7 @@ export const HomePage: React.FC = () => {
           {/* Horizontal scroll on mobile, grid on larger screens */}
           <div className="flex sm:grid sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 md:gap-8 overflow-x-auto no-scrollbar pb-4 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
             {stats.map((stat, index) => (
-              <div 
+              <div
                 key={index}
                 className="flex-shrink-0 w-[200px] sm:w-auto text-center p-4 sm:p-6 rounded-2xl bg-surface-50 dark:bg-deep-800 border border-surface-100 dark:border-deep-700 opacity-0 animate-fade-in-up"
                 style={{ animationDelay: `${400 + index * 100}ms` }}
@@ -203,119 +193,6 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 sm:py-24 bg-white dark:bg-deep-900">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10 sm:mb-16">
-            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full">
-              Pourquoi nous choisir
-            </span>
-            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-deep-900 dark:text-surface-100 mb-3 sm:mb-4">
-              {t.hero.whyTitle}
-            </h2>
-            <p className="text-base sm:text-lg text-deep-600 dark:text-surface-400 max-w-2xl mx-auto px-4">
-              Une plateforme conçue pour simplifier votre recherche juridique
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-            {[
-              { 
-                icon: Shield, 
-                color: 'primary',
-                ...t.hero.features.vetted 
-              },
-              { 
-                icon: Clock, 
-                color: 'accent',
-                ...t.hero.features.time 
-              },
-              { 
-                icon: Award, 
-                color: 'primary',
-                ...t.hero.features.rated 
-              },
-            ].map((feature, index) => (
-              <div 
-                key={index}
-                className="group relative p-6 sm:p-8 rounded-2xl sm:rounded-3xl bg-surface-50 dark:bg-deep-800 border border-surface-100 dark:border-deep-700 transition-all duration-500 hover:shadow-elevated hover:-translate-y-2 active:scale-[0.98]"
-              >
-                {/* Gradient overlay on hover */}
-                <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
-                <div className={`relative inline-flex items-center justify-center w-12 sm:w-16 h-12 sm:h-16 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 ${
-                  feature.color === 'accent' 
-                    ? 'bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400' 
-                    : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                }`}>
-                  <feature.icon className="w-6 sm:w-8 h-6 sm:h-8" />
-                </div>
-                
-                <h3 className="relative text-lg sm:text-xl font-bold text-deep-900 dark:text-surface-100 mb-2 sm:mb-3">
-                  {feature.title}
-                </h3>
-                <p className="relative text-sm sm:text-base text-deep-600 dark:text-surface-400 leading-relaxed">
-                  {feature.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Specialties Section */}
-      <section className="py-16 sm:py-24 bg-surface-50 dark:bg-deep-950">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10 sm:mb-16">
-            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full">
-              Domaines d'expertise
-            </span>
-            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-deep-900 dark:text-surface-100 mb-3 sm:mb-4">
-              {t.hero.browseTitle}
-            </h2>
-            <p className="text-base sm:text-lg text-deep-600 dark:text-surface-400 max-w-2xl mx-auto px-4">
-              {t.hero.browseSubtitle}
-            </p>
-          </div>
-          
-          {/* 2 columns on mobile, 4 on desktop */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-            {Object.values(LegalSpecialty).slice(0, 8).map((specialty, index) => (
-              <button 
-                key={specialty}
-                onClick={() => navigate(`/search?specialty=${specialty}`)}
-                className="group relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-white dark:bg-deep-900 border border-surface-100 dark:border-deep-800 transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1 hover:border-primary-200 dark:hover:border-primary-800 text-left active:scale-[0.98]"
-              >
-                <div className="text-2xl sm:text-3xl mb-2 sm:mb-3">
-                  {specialtyIcons[specialty] || '⚖️'}
-                </div>
-                <h3 className="font-semibold text-sm sm:text-base text-deep-900 dark:text-surface-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors mb-1 sm:mb-2 line-clamp-2">
-                  {translateSpecialty(specialty)}
-                </h3>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs sm:text-sm text-deep-500 dark:text-surface-500">
-                    120+ avocats
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-deep-400 dark:text-surface-600 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="text-center mt-8 sm:mt-12">
-            <Button 
-              variant="secondary" 
-              size="lg"
-              onClick={() => navigate('/search')}
-              className="w-full sm:w-auto"
-            >
-              Voir toutes les spécialités
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
       {/* How It Works Section */}
       <section className="py-16 sm:py-24 bg-white dark:bg-deep-900">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -331,7 +208,7 @@ export const HomePage: React.FC = () => {
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 sm:gap-6 md:gap-8 relative">
             {/* Connection line - Hidden on mobile */}
             <div className="hidden md:block absolute top-24 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-primary-200 via-primary-400 to-primary-200 dark:from-primary-900 dark:via-primary-700 dark:to-primary-900" />
-            
+
             {[
               {
                 step: '01',
@@ -370,13 +247,125 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div className="text-center mt-12 sm:mt-16">
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               size="xl"
               onClick={() => navigate('/search')}
               className="w-full sm:w-auto shadow-glow"
             >
               Commencer maintenant
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-16 sm:py-24 bg-surface-50 dark:bg-deep-950">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10 sm:mb-16">
+            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full">
+              Pourquoi nous choisir
+            </span>
+            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-deep-900 dark:text-surface-100 mb-3 sm:mb-4">
+              {t.hero.whyTitle}
+            </h2>
+            <p className="text-base sm:text-lg text-deep-600 dark:text-surface-400 max-w-2xl mx-auto px-4">
+              Une plateforme conçue pour simplifier votre recherche juridique
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+            {[
+              {
+                icon: Shield,
+                color: 'primary',
+                ...t.hero.features.vetted
+              },
+              {
+                icon: Clock,
+                color: 'accent',
+                ...t.hero.features.time
+              },
+              {
+                icon: Award,
+                color: 'primary',
+                ...t.hero.features.rated
+              },
+            ].map((feature, index) => (
+              <div
+                key={index}
+                className="group relative p-6 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-deep-800 border border-surface-100 dark:border-deep-700 transition-all duration-500 hover:shadow-elevated hover:-translate-y-2 active:scale-[0.98]"
+              >
+                {/* Gradient overlay on hover */}
+                <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className={`relative inline-flex items-center justify-center w-12 sm:w-16 h-12 sm:h-16 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 ${feature.color === 'accent'
+                    ? 'bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400'
+                    : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                  }`}>
+                  <feature.icon className="w-6 sm:w-8 h-6 sm:h-8" />
+                </div>
+
+                <h3 className="relative text-lg sm:text-xl font-bold text-deep-900 dark:text-surface-100 mb-2 sm:mb-3">
+                  {feature.title}
+                </h3>
+                <p className="relative text-sm sm:text-base text-deep-600 dark:text-surface-400 leading-relaxed">
+                  {feature.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Specialties Section */}
+      <section className="py-16 sm:py-24 bg-white dark:bg-deep-900">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10 sm:mb-16">
+            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full">
+              Domaines d'expertise
+            </span>
+            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-deep-900 dark:text-surface-100 mb-3 sm:mb-4">
+              {t.hero.browseTitle}
+            </h2>
+            <p className="text-base sm:text-lg text-deep-600 dark:text-surface-400 max-w-2xl mx-auto px-4">
+              {t.hero.browseSubtitle}
+            </p>
+          </div>
+
+          {/* 2 columns on mobile, 4 on desktop */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+            {Object.values(LegalSpecialty).slice(0, 8).map((specialty, index) => (
+              <button
+                key={specialty}
+                onClick={() => navigate(`/search?specialty=${specialty}`)}
+                className="group relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-surface-50 dark:bg-deep-900 border border-surface-100 dark:border-deep-800 transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1 hover:border-primary-200 dark:hover:border-primary-800 text-left active:scale-[0.98]"
+              >
+                <div className="text-2xl sm:text-3xl mb-2 sm:mb-3">
+                  {specialtyIcons[specialty] || '⚖️'}
+                </div>
+                <h3 className="font-semibold text-sm sm:text-base text-deep-900 dark:text-surface-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors mb-1 sm:mb-2 line-clamp-2">
+                  {translateSpecialty(specialty)}
+                </h3>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs sm:text-sm text-deep-500 dark:text-surface-500">
+                    120+ avocats
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-deep-400 dark:text-surface-600 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="text-center mt-8 sm:mt-12">
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => navigate('/search')}
+              className="w-full sm:w-auto"
+            >
+              Voir toutes les spécialités
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </div>
@@ -400,8 +389,8 @@ export const HomePage: React.FC = () => {
               Rejoignez des milliers de clients satisfaits qui ont trouvé leur avocat idéal sur Jurilab.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 sm:px-0">
-              <Button 
-                variant="accent" 
+              <Button
+                variant="accent"
                 size="xl"
                 onClick={() => navigate('/search')}
                 className="w-full sm:w-auto"
@@ -409,8 +398,8 @@ export const HomePage: React.FC = () => {
                 Trouver un avocat
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="xl"
                 onClick={() => navigate('/register-lawyer')}
                 className="w-full sm:w-auto border-white/30 text-white hover:bg-white/10"

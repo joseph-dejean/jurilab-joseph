@@ -29,3 +29,5 @@ export const database = getDatabase(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+import { OAuthProvider } from "firebase/auth";
+export const microsoftProvider = new OAuthProvider('microsoft.com');

@@ -1,7 +1,7 @@
 import { ref, get, set, onValue, push, update, remove } from 'firebase/database';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { database, auth, storage, googleProvider } from '../firebaseConfig';
+import { database, auth, storage, googleProvider, microsoftProvider } from '../firebaseConfig';
 import { Lawyer, Client, UserRole, Appointment, User, ProfileBlock, GoogleCalendarCredentials, AvailabilityHours } from '../types';
 import { encryptToken, decryptToken, getGoogleCalendarEvents as fetchGoogleEvents, refreshGoogleAccessToken } from './googleCalendarService';
 
@@ -235,6 +235,37 @@ export const getUserByEmail = async (email: string): Promise<User | Lawyer | nul
   }
 };
 
+// --- USER UPDATES ---
+
+/**
+ * Update a user's profile (works for Client and Lawyer)
+ * Updates the 'users' node and, if applicable, the 'lawyers' node
+ */
+export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<void> => {
+  try {
+    console.log(`📝 Updating user profile for ${userId}...`, data);
+
+    // 1. Update 'users' node (source of truth for basic info)
+    const userRef = ref(database, `users/${userId}`);
+    await update(userRef, data);
+
+    // 2. If it's a lawyer, also update the 'lawyers' node to keep it in sync
+    // We can check the role from the data or just try to update if the node exists
+    const lawyerRef = ref(database, `lawyers/${userId}`);
+    const lawyerSnapshot = await get(lawyerRef);
+
+    if (lawyerSnapshot.exists()) {
+      console.log('🔄 Syncing update to lawyers node...');
+      await update(lawyerRef, data);
+    }
+
+    console.log('✅ User profile updated successfully');
+  } catch (error) {
+    console.error('❌ Error updating user profile:', error);
+    throw error;
+  }
+};
+
 // --- AUTHENTICATION ---
 
 export const registerUser = async (email: string, password: string, role: UserRole, name: string): Promise<FirebaseUser> => {
@@ -268,17 +299,7 @@ export const registerLawyer = async (email: string, password: string, lawyerData
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
 
-  const newLawyer: Lawyer = {
-    ...lawyerData,
-    id: user.uid,
-    email: email,
-  };
-
-  await addLawyerToFirebase(newLawyer);
-
-  // Also save a basic user record for auth lookups if needed, or just rely on lawyers node
-  // For simplicity, we might want to keep all "users" in users node too, but for now let's keep them separate to match existing structure
-  // or duplicate the basic info. Let's duplicate basic info to users node for easier login role check
+  // Create user profile in 'users' node first (source of truth for auth)
   const userRef = ref(database, `users/${user.uid}`);
   const basicUser: User = {
     id: user.uid,
@@ -288,7 +309,32 @@ export const registerLawyer = async (email: string, password: string, lawyerData
     avatarUrl: `https://ui-avatars.com/api/?name=${lawyerData.name}`,
     disabled: false,
   };
-  await set(userRef, basicUser);
+
+  try {
+    // 1. Write to users node
+    await set(userRef, basicUser);
+    console.log('✅ Basic user profile created in users node');
+
+    // 2. Write to lawyers node
+    const newLawyer: Lawyer = {
+      ...lawyerData,
+      id: user.uid,
+      email: email,
+    };
+    await addLawyerToFirebase(newLawyer);
+    console.log('✅ Full lawyer profile created in lawyers node');
+
+  } catch (error) {
+    console.error('❌ Error creating user profiles in DB:', error);
+    // Cleanup: delete the auth user if DB write fails to maintain consistency
+    try {
+      await user.delete();
+      console.log('⚠️ Rolled back (deleted) Auth user because DB write failed.');
+    } catch (deleteError) {
+      console.error('❌ Failed to rollback Auth user:', deleteError);
+    }
+    throw error;
+  }
 
   return user;
 };
@@ -297,19 +343,25 @@ export const loginUser = async (email: string, password: string) => {
   return await signInWithEmailAndPassword(auth, email, password);
 };
 
-export const loginWithGoogle = async (defaultRole: UserRole = UserRole.CLIENT): Promise<FirebaseUser> => {
-  const result = await signInWithPopup(auth, googleProvider);
+export const loginWithMicrosoft = async (defaultRole: UserRole = UserRole.CLIENT): Promise<FirebaseUser> => {
+  const result = await signInWithPopup(auth, microsoftProvider);
   const user = result.user;
+  await ensureUserProfileExists(user, defaultRole, 'Microsoft');
+  return user;
+};
 
+// Helper to ensure profile exists after social login
+const ensureUserProfileExists = async (user: FirebaseUser, defaultRole: UserRole, providerName: string) => {
   // Check if user exists in DB
   const userRef = ref(database, `users/${user.uid}`);
   const snapshot = await get(userRef);
 
   if (!snapshot.exists()) {
+    console.log(`✨ Creating new profile for ${providerName} user: ${user.uid}`);
     // New user - create default profile
     const userData: Partial<User> = {
       id: user.uid,
-      name: user.displayName || 'Utilisateur Google',
+      name: user.displayName || `Utilisateur ${providerName}`,
       email: user.email || '',
       role: defaultRole,
       avatarUrl: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}`,
@@ -323,11 +375,17 @@ export const loginWithGoogle = async (defaultRole: UserRole = UserRole.CLIENT): 
       };
       await set(userRef, clientData);
     } else {
-      // For lawyers, we create a basic entry but they might need to complete profile later
-      // For now, just save basic user info
+      // For lawyers, we create a basic entry
       await set(userRef, userData);
     }
   }
+};
+
+export const loginWithGoogle = async (defaultRole: UserRole = UserRole.CLIENT): Promise<FirebaseUser> => {
+  const result = await signInWithPopup(auth, googleProvider);
+  const user = result.user;
+
+  await ensureUserProfileExists(user, defaultRole, 'Google');
 
   return user;
 };

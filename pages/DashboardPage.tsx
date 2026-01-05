@@ -35,6 +35,9 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { updateProfile } = useApp();
 
   // Redirect to login if not authenticated
   React.useEffect(() => {
@@ -132,11 +135,30 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && currentUser) {
+      setIsAvatarUploading(true);
+      try {
+        const { uploadFileToStorage } = await import("../services/firebaseService");
+        const path = `avatars/${currentUser.id}_${Date.now()}`;
+        const newUrl = await uploadFileToStorage(file, path);
+        await updateProfile({ avatarUrl: newUrl });
+      } catch (error) {
+        console.error("Failed to update avatar:", error);
+        alert("Erreur lors de la mise à jour de la photo");
+      } finally {
+        setIsAvatarUploading(false);
+      }
+    }
+  };
+
   const isLawyer = currentUser.role === UserRole.LAWYER;
 
   const menuItems = [
     { path: "/my-appointments", icon: Calendar, label: t.dashboard.appointments },
     { path: "/messages", icon: MessageSquare, label: t.dashboard.messages, badge: unreadMessagesCount },
+    { path: "/portfolio", icon: Briefcase, label: t.dashboard.portfolio },
     { path: "/documents", icon: FileText, label: t.dashboard.documents },
     { path: "#settings", icon: Settings, label: t.dashboard.settings },
   ];
@@ -160,14 +182,29 @@ export const DashboardPage: React.FC = () => {
             {/* Profile Card */}
             <div className="glass rounded-2xl p-6 text-center">
               <div className="relative inline-block">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleAvatarChange}
+                  accept="image/*"
+                  className="hidden"
+                />
                 <img
                   src={currentUser.avatarUrl}
                   alt="Profile"
-                  className="w-24 h-24 rounded-2xl object-cover ring-4 ring-white dark:ring-deep-800 shadow-card mx-auto"
+                  className={`w-24 h-24 rounded-2xl object-cover ring-4 ring-white dark:ring-deep-800 shadow-card mx-auto transition-opacity ${isAvatarUploading ? 'opacity-50' : ''}`}
                 />
-                <span className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center shadow-glow">
-                  <User className="w-4 h-4 text-white" />
-                </span>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isAvatarUploading}
+                  className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center shadow-glow hover:bg-primary-600 transition-colors"
+                >
+                  {isAvatarUploading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <User className="w-4 h-4 text-white" />
+                  )}
+                </button>
               </div>
               <h2 className="font-semibold text-lg text-deep-900 dark:text-surface-100 mt-4">
                 {currentUser.name}
@@ -175,7 +212,7 @@ export const DashboardPage: React.FC = () => {
               <p className="text-sm text-deep-500 dark:text-surface-500 capitalize mb-4">
                 {currentUser.role === UserRole.LAWYER ? "Avocat" : "Client"}
               </p>
-              
+
               {isLawyer && (
                 <Button
                   variant="primary"
@@ -187,7 +224,7 @@ export const DashboardPage: React.FC = () => {
                   Éditer mon profil
                 </Button>
               )}
-              
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -210,11 +247,10 @@ export const DashboardPage: React.FC = () => {
                       navigate(item.path);
                     }
                   }}
-                  className={`w-full flex items-center justify-between px-5 py-4 transition-all duration-200 ${
-                    location.pathname === item.path
-                      ? "bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 border-l-4 border-primary-500"
-                      : "text-deep-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-deep-800"
-                  } ${index !== menuItems.length - 1 ? "border-b border-surface-100 dark:border-deep-800" : ""}`}
+                  className={`w-full flex items-center justify-between px-5 py-4 transition-all duration-200 ${location.pathname === item.path
+                    ? "bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 border-l-4 border-primary-500"
+                    : "text-deep-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-deep-800"
+                    } ${index !== menuItems.length - 1 ? "border-b border-surface-100 dark:border-deep-800" : ""}`}
                 >
                   <span className="flex items-center gap-3">
                     <item.icon className="w-5 h-5" />
@@ -421,9 +457,9 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Settings Modal */}
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );

@@ -1,0 +1,86 @@
+# ==============================================================================
+# FRAMEWORK & CORE
+# ==============================================================================
+python-dotenv>=1.0.0          # Gestion des variables d'environnement
+loguru>=0.7.0                 # Logging avancé et élégant
+pydantic>=2.5.0               # Validation de données
+pydantic-settings>=2.1.0      # Gestion de configuration
+
+# ==============================================================================
+# INGESTION - API LÉGIFRANCE
+# ==============================================================================
+pylegifrance>=1.2.1b2         # Wrapper Python pour l'API PISTE (version beta)
+requests>=2.31.0              # Requêtes HTTP
+httpx>=0.26.0                 # Client HTTP asynchrone
+
+# ==============================================================================
+# INGESTION - HUGGING FACE
+# ==============================================================================
+datasets>=2.16.0              # Chargement datasets Hugging Face
+huggingface-hub>=0.20.0       # Authentification et téléchargement
+
+# ==============================================================================
+# INGESTION - DILA / data.gouv.fr
+# ==============================================================================
+lxml>=5.0.0                   # Parser XML performant (pour DILA LEGI)
+beautifulsoup4>=4.12.0        # Parsing HTML/XML (pour scraping)
+datagouv-client>=0.1.0        # Client API data.gouv.fr (optionnel)
+
+# ==============================================================================
+# TRAITEMENT NLP & JURIDIQUE
+# ==============================================================================
+# legal-doc-processing>=0.1.0   # Theolex - À installer manuellement si disponible
+
+# ==============================================================================
+# GOOGLE CLOUD - VERTEX AI
+# ==============================================================================
+google-cloud-aiplatform>=1.38.0       # Vertex AI SDK
+google-cloud-discoveryengine>=0.11.0  # Vertex AI Search & Conversation
+google-auth>=2.25.0                   # Authentification GCP
+
+# ==============================================================================
+# MODÈLES GEMINI
+# ==============================================================================
+google-generativeai>=0.3.0    # API Gemini
+
+# ==============================================================================
+# EXTRACTION ET GÉNÉRATION DE DOCUMENTS
+# ==============================================================================
+pymupdf>=1.23.0               # PyMuPDF - Extraction PDF haute précision
+python-docx>=1.1.0            # Extraction DOCX
+reportlab>=4.0.0              # Génération PDF professionnelle
+pillow>=10.0.0                # Traitement d'images (logos)
+
+# ==============================================================================
+# TRAITEMENT DE DONNÉES
+# ==============================================================================
+pandas>=2.1.0                 # Manipulation de données
+numpy>=1.26.0                 # Calculs numériques
+
+# ==============================================================================
+# API REST
+# ==============================================================================
+fastapi>=0.109.0              # Framework API REST moderne
+uvicorn>=0.27.0               # Serveur ASGI pour FastAPI
+python-multipart>=0.0.6       # Support upload de fichiers
+aiofiles>=23.2.0              # Opérations fichiers asynchrones
+
+# ==============================================================================
+# UTILITAIRES
+# ==============================================================================
+tqdm>=4.66.0                  # Barres de progression
+python-dateutil>=2.8.0        # Manipulation de dates
+tenacity>=8.2.0               # Retry logic avec backoff
+
+# ==============================================================================
+# TESTS (OPTIONNEL - À DÉCOMMENTER POUR DEV)
+# ==============================================================================
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# pytest-cov>=4.1.0
+
+# ==============================================================================
+# MCP (MODEL CONTEXT PROTOCOL)
+# ==============================================================================
+# mcp>=0.1.0  # À installer quand disponible
+

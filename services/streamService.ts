@@ -74,7 +74,7 @@ export const initializeStreamClient = async (
 const generateStreamToken = async (userId: string): Promise<string> => {
   // IMPORTANT: En production, cette fonction doit être remplacée par un appel à votre backend
   // Le backend doit utiliser STREAM_API_SECRET pour générer un token sécurisé
-  
+
   if (!STREAM_API_SECRET) {
     console.warn('⚠️ STREAM_API_SECRET not set. Cannot generate valid token.');
     throw new Error('STREAM_API_SECRET is required to generate tokens. Please set it in your .env file.');
@@ -83,15 +83,15 @@ const generateStreamToken = async (userId: string): Promise<string> => {
   try {
     // Utiliser la bibliothèque jose pour générer un JWT valide
     const { SignJWT } = await import('jose');
-    
+
     // Convertir la clé secrète en format Uint8Array pour jose
     const secretKey = new TextEncoder().encode(STREAM_API_SECRET);
-    
+
     // Créer le token JWT selon la spécification GetStream
     // GetStream attend : user_id dans le payload, iat et exp dans les claims
     // Note: GetStream peut être strict sur le timing, donc on utilise le timestamp actuel
     const now = Math.floor(Date.now() / 1000);
-    
+
     const token = await new SignJWT({
       user_id: userId,
     })
@@ -99,7 +99,7 @@ const generateStreamToken = async (userId: string): Promise<string> => {
       .setIssuedAt(now - 5) // iat : 5 secondes dans le passé pour éviter les problèmes de timing
       .setExpirationTime(now + 3600) // exp : expire dans 1 heure
       .sign(secretKey);
-    
+
     console.log('✅ Token generated successfully for user:', userId);
     return token;
   } catch (error) {
@@ -195,10 +195,10 @@ export const createOrGetChatChannel = async (
       console.log('✅ Existing channel found:', channelId);
     } else {
       // Déterminer le nom du channel (seulement le nom de l'interlocuteur)
-      const otherUserName = currentUserId === lawyerId 
+      const otherUserName = currentUserId === lawyerId
         ? (clientProfile?.name || 'Client')
         : (lawyerProfile?.name || 'Avocat');
-      
+
       // Créer le channel SANS membres d'abord (pour éviter l'erreur)
       channel = streamClient.channel(channelType, channelId, {
         name: otherUserName, // Seulement le nom de l'interlocuteur
@@ -207,13 +207,13 @@ export const createOrGetChatChannel = async (
         lawyerId,
         clientId,
         clientCanMessage: true, // Par défaut, le client peut envoyer des messages
-      });
+      } as any);
 
       await channel.create();
-      
+
       // Ajouter les membres APRÈS la création (GetStream créera les utilisateurs automatiquement)
       await channel.addMembers([lawyerId, clientId]);
-      
+
       // Initialiser la permission dans Firebase (par défaut, le client peut envoyer des messages)
       try {
         const { ref, set } = await import('firebase/database');
@@ -229,7 +229,7 @@ export const createOrGetChatChannel = async (
       } catch (firebaseError) {
         console.warn('⚠️ Error initializing chat permission in Firebase (non-blocking):', firebaseError);
       }
-      
+
       console.log('✅ New channel created:', channelId);
     }
 
@@ -261,13 +261,13 @@ export const getUserChannels = async (userId: string): Promise<Channel[]> => {
     channels.sort((a, b) => {
       const aLastMessage = a.state.messages[a.state.messages.length - 1];
       const bLastMessage = b.state.messages[b.state.messages.length - 1];
-      
+
       if (!aLastMessage && !bLastMessage) return 0;
       if (!aLastMessage) return 1;
       if (!bLastMessage) return -1;
-      
-      return new Date(bLastMessage.created_at || 0).getTime() - 
-             new Date(aLastMessage.created_at || 0).getTime();
+
+      return new Date(bLastMessage.created_at || 0).getTime() -
+        new Date(aLastMessage.created_at || 0).getTime();
     });
 
     return channels;
@@ -339,24 +339,24 @@ export const toggleClientMessagePermission = async (
   try {
     const { ref, get, set } = await import('firebase/database');
     const { database } = await import('../firebaseConfig');
-    
+
     // Récupérer le channel pour obtenir lawyerId et clientId
     const channel = await getChannelById(channelId);
     if (!channel) {
       throw new Error('Channel not found');
     }
-    
-    const lawyerId = channel.data?.lawyerId as string;
-    const clientId = channel.data?.clientId as string;
-    
+
+    const lawyerId = (channel.data as any)?.lawyerId as string;
+    const clientId = (channel.data as any)?.clientId as string;
+
     if (!lawyerId || !clientId) {
       throw new Error('Channel missing lawyerId or clientId');
     }
-    
+
     // Vérifier si la permission existe déjà
     const permissionRef = ref(database, `chatPermissions/${channelId}`);
     const snapshot = await get(permissionRef);
-    
+
     if (snapshot.exists()) {
       // Mettre à jour seulement clientCanMessage
       const { update } = await import('firebase/database');
@@ -370,7 +370,7 @@ export const toggleClientMessagePermission = async (
         channelId,
       });
     }
-    
+
     console.log(`✅ Client message permission ${clientCanMessage ? 'enabled' : 'disabled'}`);
   } catch (error) {
     console.error('❌ Error toggling client message permission:', error);
@@ -389,14 +389,14 @@ export const getClientMessagePermission = async (
   try {
     const { ref, get } = await import('firebase/database');
     const { database } = await import('../firebaseConfig');
-    
+
     const permissionRef = ref(database, `chatPermissions/${channelId}/clientCanMessage`);
     const snapshot = await get(permissionRef);
-    
+
     if (snapshot.exists()) {
       return snapshot.val() as boolean;
     }
-    
+
     // Par défaut, le client peut envoyer des messages
     return true;
   } catch (error) {

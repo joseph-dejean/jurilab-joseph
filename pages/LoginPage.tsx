@@ -4,9 +4,9 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { UserRole } from '../types';
 import { Button } from '../components/Button';
 import { getAuthErrorMessage } from '../services/firebaseService';
-import { 
-  Mail, Lock, User, ArrowRight, Scale, Sparkles, ChevronLeft, 
-  Eye, EyeOff, CheckCircle2, AlertCircle, UserCircle, Briefcase 
+import {
+  Mail, Lock, User, ArrowRight, Scale, Sparkles, ChevronLeft,
+  Eye, EyeOff, CheckCircle2, AlertCircle, UserCircle, Briefcase
 } from 'lucide-react';
 
 // Google Icon SVG
@@ -22,14 +22,14 @@ const GoogleIcon = () => (
 type AuthMode = 'signin' | 'signup-choice' | 'signup-client';
 
 export const LoginPage: React.FC = () => {
-  const { login, loginGoogle, register, t } = useApp();
+  const { login, loginGoogle, loginMicrosoft, register, t } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const registerParam = searchParams.get('register') === 'true';
 
   // Auth mode: signin, signup-choice (choose role), signup-client (client form)
   const [authMode, setAuthMode] = useState<AuthMode>(registerParam ? 'signup-choice' : 'signin');
-  
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -93,6 +93,21 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     try {
       await loginGoogle(UserRole.CLIENT);
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error(error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        setErrors({ form: getAuthErrorMessage(error) });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMicrosoftLogin = async () => {
+    setIsLoading(true);
+    try {
+      await loginMicrosoft(UserRole.CLIENT);
       navigate('/dashboard');
     } catch (error: any) {
       console.error(error);
@@ -232,11 +247,10 @@ export const LoginPage: React.FC = () => {
             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
             <input
               type="text"
-              className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
-                errors.name 
-                  ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
-                  : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
-              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+              className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.name
+                ? 'border-red-300 dark:border-red-800 focus:border-red-500'
+                : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+                } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
               placeholder="Jean Dupont"
               value={name}
               onChange={(e) => {
@@ -264,11 +278,10 @@ export const LoginPage: React.FC = () => {
           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
           <input
             type="email"
-            className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
-              errors.email 
-                ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
-                : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
-            } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+            className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.email
+              ? 'border-red-300 dark:border-red-800 focus:border-red-500'
+              : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
             placeholder="nom@exemple.com"
             value={email}
             onChange={(e) => {
@@ -298,11 +311,10 @@ export const LoginPage: React.FC = () => {
           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
           <input
             type={showPassword ? 'text' : 'password'}
-            className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
-              errors.password 
-                ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
-                : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
-            } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+            className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.password
+              ? 'border-red-300 dark:border-red-800 focus:border-red-500'
+              : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
             placeholder="••••••••"
             value={password}
             onChange={(e) => {
@@ -337,11 +349,10 @@ export const LoginPage: React.FC = () => {
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-deep-400 dark:text-surface-500" />
             <input
               type={showConfirmPassword ? 'text' : 'password'}
-              className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${
-                errors.confirmPassword 
-                  ? 'border-red-300 dark:border-red-800 focus:border-red-500' 
-                  : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
-              } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
+              className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.confirmPassword
+                ? 'border-red-300 dark:border-red-800 focus:border-red-500'
+                : 'border-surface-200 dark:border-deep-700 focus:border-primary-500 dark:focus:border-primary-400'
+                } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => {
@@ -368,10 +379,10 @@ export const LoginPage: React.FC = () => {
       )}
 
       {/* Submit Button */}
-      <Button 
-        type="submit" 
-        className="w-full" 
-        size="lg" 
+      <Button
+        type="submit"
+        className="w-full"
+        size="lg"
         isLoading={isLoading}
       >
         {authMode === 'signup-client' ? 'Créer mon compte' : t.auth.signIn}
@@ -386,7 +397,7 @@ export const LoginPage: React.FC = () => {
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 sm:py-12 bg-surface-50 dark:bg-deep-950 safe-area-bottom">
         <div className="w-full max-w-md">
           {/* Back button */}
-          <button 
+          <button
             onClick={() => {
               if (authMode === 'signup-client') {
                 setAuthMode('signup-choice');
@@ -405,14 +416,16 @@ export const LoginPage: React.FC = () => {
           {/* Logo and Title */}
           <div className="text-center mb-8 sm:mb-10">
             <Link to="/" className="inline-flex items-center gap-2 sm:gap-3 mb-6 sm:mb-8">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center shadow-glow">
-                <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-              </div>
+              <img
+                src="/logo.png"
+                alt="Jurilab Logo"
+                className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+              />
               <span className="font-serif text-xl sm:text-2xl font-bold text-deep-900 dark:text-surface-100">
                 Jurilab
               </span>
             </Link>
-            
+
             {authMode === 'signin' && (
               <>
                 <h1 className="text-2xl sm:text-display-sm font-serif text-deep-900 dark:text-surface-100 mb-2">
@@ -423,7 +436,7 @@ export const LoginPage: React.FC = () => {
                 </p>
               </>
             )}
-            
+
             {authMode === 'signup-client' && (
               <>
                 <h1 className="text-2xl sm:text-display-sm font-serif text-deep-900 dark:text-surface-100 mb-2">
@@ -465,6 +478,22 @@ export const LoginPage: React.FC = () => {
                   {authMode === 'signup-client' ? 'S\'inscrire avec Google' : t.auth.google}
                 </button>
 
+                {/* Microsoft Login */}
+                <button
+                  type="button"
+                  onClick={handleMicrosoftLogin}
+                  disabled={isLoading}
+                  className="w-full mt-3 flex items-center justify-center gap-3 px-4 py-3.5 bg-white dark:bg-deep-900 border-2 border-surface-200 dark:border-deep-700 rounded-xl hover:bg-surface-50 dark:hover:bg-deep-800 hover:border-surface-300 dark:hover:border-deep-600 transition-all duration-200 font-medium text-deep-700 dark:text-surface-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 23 23" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#f35325" d="M1 1h10v10H1z" />
+                    <path fill="#81bc06" d="M12 1h10v10H12z" />
+                    <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                    <path fill="#ffba08" d="M12 12h10v10H12z" />
+                  </svg>
+                  {authMode === 'signup-client' ? 'S\'inscrire avec Microsoft' : 'Continuer avec Microsoft'}
+                </button>
+
                 {/* Switch between login/register */}
                 <p className="text-center text-sm text-deep-600 dark:text-surface-400 mt-5 sm:mt-6">
                   {authMode === 'signup-client' ? t.auth.haveAccount : t.auth.dontHaveAccount}
@@ -501,16 +530,16 @@ export const LoginPage: React.FC = () => {
         <div className="absolute inset-0 opacity-10" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }} />
-        
+
         {/* Decorative shapes */}
         <div className="absolute top-20 right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-40 left-20 w-48 h-48 bg-accent-400/20 rounded-full blur-3xl" />
-        
+
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center p-12 text-center">
           <div className="max-w-md">
-            <div className="w-20 h-20 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-8">
-              <Scale className="w-10 h-10 text-white" />
+            <div className="w-32 h-32 flex items-center justify-center mx-auto mb-8 p-4">
+              <img src="/logo.png" alt="Jurilab Logo" className="w-full h-full object-contain" />
             </div>
             <h2 className="text-3xl font-serif font-bold text-white mb-4">
               L'excellence juridique à portée de main
@@ -518,7 +547,7 @@ export const LoginPage: React.FC = () => {
             <p className="text-primary-100 text-lg leading-relaxed mb-8">
               Rejoignez une communauté de milliers d'utilisateurs qui font confiance à Jurilab pour leurs besoins juridiques.
             </p>
-            
+
             {/* Features */}
             <div className="grid gap-4 text-left mb-8">
               <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl p-4">
@@ -549,7 +578,7 @@ export const LoginPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Testimonial */}
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-left">
               <p className="text-white/90 italic mb-4">

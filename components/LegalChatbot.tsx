@@ -1,8 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../store/store';
 import { streamLegalChat } from '../services/geminiService';
-import { MessageSquare, X, Send, AlertTriangle, Globe, ExternalLink, Scale } from 'lucide-react';
+import { MessageSquare, X, Send, AlertTriangle, Scale, ExternalLink } from 'lucide-react';
 import { ChatMessage } from '../types';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+// Components for Markdown rendering
+const MarkdownComponents = {
+  // Custom link renderer to add icons and styling
+  a: ({ node, ...props }: any) => (
+    <a
+      {...props}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 font-medium hover:underline hover:text-primary-700 dark:hover:text-primary-300 transition-colors bg-primary-50 dark:bg-primary-900/30 px-1 rounded mx-0.5"
+      title="Ouvrir sur Légifrance"
+    >
+      {props.children}
+      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+    </a>
+  ),
+  // Headers
+  h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold mt-4 mb-2 text-deep-900 dark:text-surface-100" {...props} />,
+  h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold mt-3 mb-2 text-deep-800 dark:text-surface-200" {...props} />,
+  h3: ({ node, ...props }: any) => <h3 className="text-base font-semibold mt-2 mb-1 text-deep-700 dark:text-surface-300" {...props} />,
+  // Lists
+  ul: ({ node, ...props }: any) => <ul className="list-disc w-full ml-4 my-2 space-y-1" {...props} />,
+  ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 my-2 space-y-1" {...props} />,
+  li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
+  // Blockquotes
+  blockquote: ({ node, ...props }: any) => (
+    <blockquote className="border-l-4 border-primary-300 dark:border-primary-700 pl-4 py-1 my-2 bg-surface-50 dark:bg-deep-800 italic rounded-r" {...props} />
+  ),
+  // Paragraphs
+  p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
+};
 
 export const LegalChatbot: React.FC = () => {
   const { isChatOpen, toggleChat, t } = useApp();
@@ -51,7 +84,7 @@ export const LegalChatbot: React.FC = () => {
 
     const userText = input.trim();
     setInput('');
-    
+
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -74,7 +107,7 @@ export const LegalChatbot: React.FC = () => {
       setMessages(prev => [...prev, { id: modelMsgId, role: 'model', text: '', isStreaming: true }]);
 
       const stream = streamLegalChat(history, userText);
-      
+
       let fullText = '';
 
       for await (const chunk of stream) {
@@ -82,14 +115,14 @@ export const LegalChatbot: React.FC = () => {
           fullText += chunk.text;
         }
 
-        setMessages(prev => prev.map(m => 
-          m.id === modelMsgId 
-            ? { ...m, text: fullText } 
+        setMessages(prev => prev.map(m =>
+          m.id === modelMsgId
+            ? { ...m, text: fullText }
             : m
         ));
       }
-      
-      setMessages(prev => prev.map(m => 
+
+      setMessages(prev => prev.map(m =>
         m.id === modelMsgId ? { ...m, isStreaming: false } : m
       ));
 
@@ -134,12 +167,12 @@ export const LegalChatbot: React.FC = () => {
             border border-surface-200/50 dark:border-deep-700/50 
             flex flex-col overflow-hidden animate-slide-up sm:animate-scale-in"
           >
-            
+
             {/* Header with prominent close button */}
             <div className="bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-700 dark:to-primary-800 px-4 py-3 sm:p-4 flex items-center gap-3 shrink-0">
               {/* Mobile drag indicator */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/30 rounded-full sm:hidden" />
-              
+
               <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                 <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
@@ -151,8 +184,8 @@ export const LegalChatbot: React.FC = () => {
                 </p>
               </div>
               {/* Large, visible close button */}
-              <button 
-                onClick={toggleChat} 
+              <button
+                onClick={toggleChat}
                 className="p-2.5 -mr-1 rounded-xl bg-white/20 hover:bg-white/30 active:bg-white/40 transition-colors"
                 aria-label="Fermer le chat"
               >
@@ -172,42 +205,29 @@ export const LegalChatbot: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-surface-50 dark:bg-deep-900/50 scrollbar-thin">
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div 
+                  <div
                     className={`max-w-[90%] sm:max-w-[85%] rounded-2xl p-3 sm:p-4 text-sm leading-relaxed
-                      ${msg.role === 'user' 
-                        ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-tr-md shadow-md' 
+                      ${msg.role === 'user'
+                        ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-tr-md shadow-md'
                         : msg.isError
-                        ? 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-900/30 rounded-tl-md'
-                        : 'bg-white dark:bg-deep-800 text-deep-700 dark:text-surface-200 border border-surface-200 dark:border-deep-700 rounded-tl-md shadow-card'
+                          ? 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-900/30 rounded-tl-md'
+                          : 'bg-white dark:bg-deep-800 text-deep-700 dark:text-surface-200 border border-surface-200 dark:border-deep-700 rounded-tl-md shadow-card'
                       }`}
                   >
-                    {msg.text}
+                    {msg.role === 'model' ? (
+                      <div className="markdown-body">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={MarkdownComponents}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    )}
                     {msg.isStreaming && (
                       <span className="inline-block w-2 h-4 ml-1 bg-primary-400 rounded-sm animate-pulse align-middle" />
-                    )}
-                    
-                    {/* Sources Display */}
-                    {msg.sources && msg.sources.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-surface-100 dark:border-deep-700">
-                        <p className="text-xs font-semibold text-deep-400 dark:text-surface-500 mb-2 flex items-center gap-1">
-                          <Globe className="w-3 h-3" /> {t.chatbot.sources}
-                        </p>
-                        <ul className="space-y-1">
-                          {msg.sources.map((src, idx) => (
-                            <li key={idx}>
-                              <a 
-                                href={src.uri} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 truncate"
-                              >
-                                <ExternalLink className="w-3 h-3 flex-shrink-0" /> 
-                                {src.title || src.uri}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
                     )}
                   </div>
                 </div>
@@ -233,7 +253,7 @@ export const LegalChatbot: React.FC = () => {
                   rows={1}
                   style={{ fontSize: '16px' }} // Prevent iOS zoom
                 />
-                <button 
+                <button
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-lg hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -245,7 +265,7 @@ export const LegalChatbot: React.FC = () => {
           </div>
 
           {/* Backdrop for mobile */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 sm:hidden"
             onClick={toggleChat}
           />

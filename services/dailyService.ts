@@ -50,7 +50,7 @@ export const createRoom = async (
 
   try {
     const roomName = `jurilab-${appointmentId}-${Date.now()}`;
-    
+
     // Calculer l'expiration (maintenant + durée du RDV + 1h de marge)
     const expirationTime = Math.floor(Date.now() / 1000) + (durationMinutes * 60) + 3600;
 
@@ -81,9 +81,9 @@ export const createRoom = async (
     }
 
     const room: DailyRoom = await response.json();
-    
+
     console.log(`✅ Daily.co room created: ${room.id}`);
-    
+
     return {
       roomUrl: room.url,
       roomId: room.id,
@@ -124,6 +124,8 @@ export const generateToken = async (
           user_name: userName,
           is_owner: isOwner,
           exp: expirationTime,
+          // Auto-start transcription if owner joins
+          ...(isOwner ? { start_transcription: true } : {}),
         },
       }),
     });
@@ -135,9 +137,9 @@ export const generateToken = async (
     }
 
     const tokenData: DailyToken = await response.json();
-    
+
     console.log(`✅ Daily.co token generated for user: ${userName}`);
-    
+
     return tokenData.token;
   } catch (error) {
     console.error('❌ Error generating Daily.co token:', error);
@@ -158,7 +160,7 @@ export const generateToken = async (
  * - Ne considère que les sessions où les deux participants sont présents
  */
 export const getRoomTranscript = async (
-  roomId: string, 
+  roomId: string,
   appointmentDate?: string, // Date ISO du RDV pour filtrer
   durationMinutes?: number // Durée du RDV en minutes
 ): Promise<string> => {
@@ -168,7 +170,7 @@ export const getRoomTranscript = async (
 
   try {
     console.log(`📝 Fetching transcript for room: ${roomId} (transcription only, no recording)`);
-    
+
     // Récupérer les transcripts depuis l'API de transcription de Daily.co
     const transcriptResponse = await fetch(`${DAILY_API_BASE_URL}/transcript?room_name=${roomId}`, {
       method: 'GET',
@@ -189,7 +191,7 @@ export const getRoomTranscript = async (
     }
 
     const transcriptData = await transcriptResponse.json();
-    
+
     if (!transcriptData.data || transcriptData.data.length === 0) {
       console.warn('⚠️ No transcripts found in API response');
       return '';
@@ -199,19 +201,19 @@ export const getRoomTranscript = async (
 
     // Filtrer les transcripts pertinents si une date de RDV est fournie
     let relevantTranscripts = transcriptData.data;
-    
+
     if (appointmentDate && durationMinutes) {
       const appointmentStart = new Date(appointmentDate);
       // Fenêtre : 15 minutes avant → durée du RDV + 1h après
       const windowStart = new Date(appointmentStart.getTime() - 15 * 60 * 1000);
       const windowEnd = new Date(appointmentStart.getTime() + (durationMinutes * 60 * 1000) + (60 * 60 * 1000));
-      
+
       relevantTranscripts = transcriptData.data.filter((transcript: any) => {
         if (!transcript.start_ts) return false;
         const transcriptStart = new Date(transcript.start_ts * 1000);
         return transcriptStart >= windowStart && transcriptStart <= windowEnd;
       });
-      
+
       console.log(`📅 Filtered to ${relevantTranscripts.length} transcript(s) within appointment window`);
     }
 
@@ -223,18 +225,18 @@ export const getRoomTranscript = async (
     // Filtrer les transcripts où les DEUX participants sont présents
     // Daily.co stocke généralement le nombre de participants dans les métadonnées
     const transcriptsWithBothParticipants: any[] = [];
-    
+
     for (const transcript of relevantTranscripts) {
-      const participantCount = transcript.participants_count || 
-                               (transcript.participants && transcript.participants.length) || 
-                               0;
-      
+      const participantCount = transcript.participants_count ||
+        (transcript.participants && transcript.participants.length) ||
+        0;
+
       const duration = transcript.duration || 0; // en secondes
-      
+
       // Critères : au moins 2 participants OU durée significative (> 30s)
       const hasMultipleParticipants = participantCount >= 2;
       const hasSignificantDuration = duration > 30;
-      
+
       if (hasMultipleParticipants || hasSignificantDuration) {
         transcriptsWithBothParticipants.push(transcript);
         console.log(`✅ Transcript ${transcript.id}: ${participantCount} participant(s), ${duration}s duration - INCLUDED`);
@@ -259,11 +261,11 @@ export const getRoomTranscript = async (
 
     // Extraire et combiner tous les transcripts
     const combinedTranscripts: string[] = [];
-    
+
     for (const transcript of transcriptsWithBothParticipants) {
       // Le transcript peut être dans différents formats selon l'API Daily.co
       let transcriptText = '';
-      
+
       if (transcript.transcript) {
         // Format texte direct
         transcriptText = transcript.transcript;
@@ -275,13 +277,13 @@ export const getRoomTranscript = async (
         console.warn(`⚠️ Transcript ${transcript.id} is in WebVTT format (${transcript.vtt_url}), skipping for now`);
         continue;
       }
-      
+
       if (transcriptText && transcriptText.trim().length > 0) {
         // Ajouter un séparateur avec timestamp si disponible
-        const timestamp = transcript.start_ts 
+        const timestamp = transcript.start_ts
           ? new Date(transcript.start_ts * 1000).toLocaleString('fr-FR')
           : 'Session';
-        
+
         combinedTranscripts.push(`\n--- ${timestamp} ---\n${transcriptText}`);
       }
     }
@@ -294,7 +296,7 @@ export const getRoomTranscript = async (
     // Combiner tous les transcripts
     const combinedTranscript = combinedTranscripts.join('\n\n');
     console.log(`✅ Combined transcript from ${combinedTranscripts.length} session(s) (${combinedTranscript.length} characters)`);
-    
+
     return combinedTranscript;
   } catch (error) {
     console.error('❌ Error getting Daily.co transcript:', error);

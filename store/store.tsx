@@ -17,6 +17,7 @@ import {
   loadLawyersFromFirebase,
   loginUser,
   loginWithGoogle,
+  loginWithMicrosoft,
   logoutUser,
   registerUser,
   subscribeToAppointments,
@@ -92,6 +93,7 @@ const TRANSLATIONS = {
       unread: "Unread Messages",
       inboxClear: "Inbox clear",
       sharedFiles: "Shared files",
+      portfolio: "Portfolio",
       myAppointments: "My Appointments",
       viewAll: "View All",
       noAppts: "You have no upcoming appointments.",
@@ -163,7 +165,7 @@ const TRANSLATIONS = {
       title2: "avocat",
       title3: ",\nau bon moment.",
       subtitle:
-        "Trouvez et réservez les meilleurs avocats de votre région. Du conseil spécialisé à la représentation complète, Jurilab vous connecte instantanément.",
+        "Besoin d’un avocat ? Trouvez le bon et réservez tout de suite.\n\nDes avocats près de vous, disponibles, et une réservation de rendez-vous en quelques minutes.",
       searchPlaceholder: "Décrivez votre problème ou cherchez par nom...",
       searchBtn: "Rechercher",
       new: "Nouveau",
@@ -216,6 +218,7 @@ const TRANSLATIONS = {
       unread: "Messages Non Lus",
       inboxClear: "Boîte vide",
       sharedFiles: "Fichiers partagés",
+      portfolio: "Portfolio Clients",
       myAppointments: "Mes Rendez-vous",
       viewAll: "Voir Tout",
       noAppts: "Vous n'avez aucun rendez-vous à venir.",
@@ -316,6 +319,7 @@ interface AppState {
   setLanguage: (lang: Language) => void;
   login: (email: string, password: string) => Promise<void>;
   loginGoogle: (role?: UserRole) => Promise<void>;
+  loginMicrosoft: (role?: UserRole) => Promise<void>;
   register: (
     email: string,
     password: string,
@@ -333,6 +337,7 @@ interface AppState {
   ) => Promise<void>;
   acceptAppointment: (appointmentId: string) => Promise<void>;
   cancelAppointment: (appointmentId: string) => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -555,6 +560,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   const loginGoogle = async (role?: UserRole) => {
     await loginWithGoogle(role);
+  };
+
+  const loginMicrosoft = async (role?: UserRole) => {
+    await loginWithMicrosoft(role);
   };
 
   const register = async (
@@ -793,96 +802,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         const eventId = await syncAppointmentToGoogleCalendar(
           updatedAppointment
         );
-        if (eventId) {
-          console.log(
-            "✅ Appointment synced to Google Calendar, event ID:",
-            eventId
-          );
-        } else {
-          console.log(
-            "⚠️ Google Calendar sync returned null (calendar not connected?)"
-          );
-        }
-      } catch (calError) {
-        console.error(
-          "⚠️ Error syncing to Google Calendar (non-blocking):",
-          calError
-        );
+        console.log("✅ Appointment synced to Google Calendar:", eventId);
+      } catch (error) {
+        console.error("⚠️ Error syncing to Google Calendar (non-blocking):", error);
       }
-
-      console.log("✅ Appointment accepted successfully");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error accepting appointment:", error);
-      alert(error.message || "Erreur lors de l'acceptation du rendez-vous");
       throw error;
     }
   };
 
   const cancelAppointment = async (appointmentId: string) => {
-    if (!currentUser) {
-      throw new Error("Vous devez être connecté pour annuler un rendez-vous");
-    }
-
     try {
-      // Vérifier que l'utilisateur peut annuler ce RDV
-      const { getAllAppointments } = await import(
-        "../services/firebaseService"
-      );
-      const allAppointments = await getAllAppointments();
-      const appointment = allAppointments.find((a) => a.id === appointmentId);
+      const { cancelAppointment: cancelService } = await import("../services/firebaseService");
+      await cancelService(appointmentId);
 
-      if (!appointment) {
-        throw new Error("Appointment not found");
-      }
-
-      if (
-        appointment.clientId !== currentUser.id &&
-        appointment.lawyerId !== currentUser.id
-      ) {
-        throw new Error("Vous ne pouvez annuler que vos propres rendez-vous");
-      }
-
-      // Vérifier qu'on est à plus de 24h avant le RDV
-      const aptDate = new Date(appointment.date);
-      const now = new Date();
-      const hoursUntilAppointment =
-        (aptDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-      if (hoursUntilAppointment < 24) {
-        throw new Error(
-          "Impossible d'annuler un rendez-vous moins de 24 heures avant l'heure prévue"
-        );
-      }
-
-      await cancelAppointmentService(appointmentId);
-
-      // Synchroniser avec Google Calendar (non-bloquant)
-      try {
-        const { deleteGoogleCalendarEvent } = await import(
-          "../services/firebaseService"
-        );
-        await deleteGoogleCalendarEvent(appointment);
-        console.log("✅ Google Calendar event deleted");
-      } catch (calError) {
-        console.error(
-          "⚠️ Error deleting Google Calendar event (non-blocking):",
-          calError
-        );
-      }
-
-      console.log("✅ Appointment cancelled successfully");
-    } catch (error: any) {
+      // Mettre à jour l'état local
+      setAppointments(prev => prev.map(a =>
+        a.id === appointmentId ? { ...a, status: 'CANCELLED' } : a
+      ));
+    } catch (error) {
       console.error("Error cancelling appointment:", error);
-      alert(error.message || "Erreur lors de l'annulation du rendez-vous");
       throw error;
     }
   };
 
-  const translateSpecialty = (s: LegalSpecialty) => {
-    if (!s || !SPECIALTY_TRANSLATIONS[s]) {
-      return s || 'Non spécifié';
+  const updateProfile = async (data: Partial<User>) => {
+    if (!currentUser) return;
+    try {
+      const { updateUserProfile } = await import("../services/firebaseService");
+      await updateUserProfile(currentUser.id, data);
+
+      // Update local state immediately for responsiveness
+      setCurrentUser(prev => prev ? { ...prev, ...data } : null);
+
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      throw error;
     }
-    return SPECIALTY_TRANSLATIONS[s][language];
   };
 
   return (
@@ -894,21 +851,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         appointments,
         darkMode,
         language,
-        setLanguage,
+        isLoadingLawyers,
         t: TRANSLATIONS[language],
-        translateSpecialty,
         isChatOpen,
         toggleChat,
-        isLoadingLawyers,
         unreadMessagesCount,
+        translateSpecialty: (s) => SPECIALTY_TRANSLATIONS[s]?.[language] || s,
+        setLanguage,
         login,
         loginGoogle,
+        loginMicrosoft,
         register,
         logout,
         toggleDarkMode,
         bookAppointment,
         acceptAppointment,
         cancelAppointment,
+        updateProfile
       }}
     >
       {children}
@@ -918,6 +877,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error("useApp must be used within AppProvider");
+  if (context === undefined) {
+    throw new Error("useApp must be used within an AppProvider");
+  }
   return context;
 };

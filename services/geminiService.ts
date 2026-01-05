@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+// import { PisteSearchResult } from "./pisteService";
 
 // Load API key from environment variable (from parent .env file)
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
@@ -6,10 +7,10 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 const generationConfig = {
-  temperature: 0.7,
-  topK: 1,
-  topP: 1,
-  maxOutputTokens: 2048,
+  temperature: 0.3, // Low temperature for high precision and adherence to facts
+  topK: 20,
+  topP: 0.8,
+  maxOutputTokens: 4096,
 };
 
 const safetySettings = [
@@ -37,8 +38,28 @@ const model = genAI.getGenerativeModel({
   generationConfig,
 });
 
+// System instruction for the expert lawyer persona (Base)
+const SYSTEM_INSTRUCTION_BASE = `
+Tu es un Avocat Senior au Barreau de Paris, reconnu pour ton excellence juridique et ta pédagogie.
+RÈGLES FONDAMENTALES :
+1. **Persona** : Profesionnel, confraternel, objectif.
+2. **Méthodologie** : Syllogisme (Faits -> Problème -> Majeure -> Mineure -> Conclusion).
+3. **Formatage** : Markdown riche (Titres ###, **Gras**, Listes).
+4. **Citations & Liens (CRITIQUE)** :
+   - Pour CHAQUE citation juridique, tu DOIS générer un lien hypertexte Markdown menant vers Légifrance.
+   - Format : \`[Texte](https://www.legifrance.gouv.fr/recherche/recherche-rapide?q=REQUETE_URL_ENCODEE)\`
+   - Ex: \`[Article 1240](https://www.legifrance.gouv.fr/recherche/recherche-rapide?q=Article+1240+Code+civil)\`
+`;
+
 export async function* streamLegalChat(history: any[], userMessage: string) {
-  const chat = model.startChat({
+  const modelWithSystem = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    safetySettings,
+    generationConfig,
+    systemInstruction: SYSTEM_INSTRUCTION_BASE,
+  });
+
+  const chat = modelWithSystem.startChat({
     history: history,
   });
 
@@ -47,35 +68,75 @@ export async function* streamLegalChat(history: any[], userMessage: string) {
   for await (const chunk of result.stream) {
     try {
       const chunkText = chunk.text();
-      // Ensure we only yield non-empty strings
-      if (chunkText) {
-        yield { text: chunkText };
-      }
+      if (chunkText) yield { text: chunkText };
     } catch (error) {
       console.error("Error processing stream chunk:", error);
-      // Optionally yield an error object or handle it gracefully
       yield { error: "Failed to process a part of the response." };
+    }
+  }
+}
+
+/**
+ * Service de chat avancé pour l'Assistant Workspace
+ * Intègre le contexte administratif (RDV, Profil) dans le prompt système
+ */
+export async function* streamWorkspaceChat(
+  history: any[],
+  userMessage: string,
+  contextData: {
+    userName: string;
+    currentTime: string;
+    appointments: any[];
+  }
+) {
+  // Construire un contexte riche à partir des données réelles
+  const contextString = `
+  CONTEXTE ADMINISTRATIF (Données Réelles du Cabinet) :
+  - Avocat connecté : ${contextData.userName}
+  - Date et Heure actuelles : ${contextData.currentTime}
+  
+  AGENDA (Prochains Rendez-vous) :
+  ${contextData.appointments.length > 0 ? JSON.stringify(contextData.appointments, null, 2) : "Aucun rendez-vous prévu."}
+  
+  INSTRUCTIONS SPÉCIFIQUES "ASSISTANT EXÉCUTIF" :
+  - Tu as accès à l'agenda réel de l'avocat ci-dessus.
+  - Si l'utilisateur demande "mon prochain rdv", utilise les données JSON pour répondre précisément (Nom, Date, Notes).
+  - Si l'utilisateur demande un résumé d'un rdv spécifique, analyse les notes et détails disponibles.
+  - Tu restes AUSSI un expert juridique capable de répondre aux questions de droit avec des liens Légifrance.
+  `;
+
+  // Combiner l'instruction de base juridique avec le contexte administratif
+  const fullSystemInstruction = `${SYSTEM_INSTRUCTION_BASE}\n\n${contextString}`;
+
+  const modelWithSystem = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    safetySettings,
+    generationConfig,
+    systemInstruction: fullSystemInstruction,
+  });
+
+  const chat = modelWithSystem.startChat({
+    history: history,
+  });
+
+  const result = await chat.sendMessageStream(userMessage);
+
+  for await (const chunk of result.stream) {
+    try {
+      const chunkText = chunk.text();
+      if (chunkText) yield { text: chunkText };
+    } catch (error) {
+      console.error("Error stream workspace chat:", error);
+      yield { error: "Erreur de traitement." };
     }
   }
 }
 
 export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: string; summary: string }> {
   const specialties = [
-    'Criminal Law', 'Family Law', 'Corporate Law', 'Real Estate', 
+    'Criminal Law', 'Family Law', 'Corporate Law', 'Real Estate',
     'Labor Law', 'Intellectual Property', 'Immigration', 'Tax Law', 'General Practice'
   ];
-
-  const specialtyDescriptions: Record<string, string> = {
-    'Criminal Law': 'droit pénal (infractions, délits, crimes)',
-    'Family Law': 'droit de la famille (divorce, garde d\'enfants, succession)',
-    'Corporate Law': 'droit des affaires et des sociétés',
-    'Real Estate': 'droit immobilier (achat, vente, litiges de propriété)',
-    'Labor Law': 'droit du travail (licenciement, contrat de travail, harcèlement)',
-    'Intellectual Property': 'propriété intellectuelle (brevets, marques, droits d\'auteur)',
-    'Immigration': 'droit de l\'immigration (visa, naturalisation, régularisation)',
-    'Tax Law': 'droit fiscal (impôts, contrôle fiscal, optimisation)',
-    'General Practice': 'droit général'
-  };
 
   const prompt = `
     Tu es un assistant juridique expert. Analyse la requête suivante d'un utilisateur cherchant un avocat.
@@ -94,7 +155,7 @@ export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: 
        - Fasse entre 15 et 30 mots
     3. Sur une nouvelle ligne, écris UNIQUEMENT la spécialité choisie (en anglais, exactement comme dans la liste).
 
-  `; 
+  `;
 
   try {
     const result = await model.generateContent(prompt);
@@ -109,11 +170,10 @@ export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: 
     const summary = lines[0].trim();
     const specialty = lines[lines.length - 1].trim();
 
-    if (!specialties.includes(specialty)) {
-      throw new Error(`AI returned an invalid specialty: ${specialty}`);
-    }
+    // Relaxed check: find the specialty in the string instead of exact match
+    const foundSpecialty = specialties.find(s => specialty.includes(s)) || 'General Practice';
 
-    return { summary, specialty };
+    return { summary, specialty: foundSpecialty };
   } catch (error) {
     console.error("Error analyzing legal case:", error);
     throw new Error("Failed to analyze the legal case with the AI.");
@@ -178,10 +238,11 @@ Génère uniquement le résumé, sans introduction ni conclusion supplémentaire
     }
 
     console.log(`✅ Meeting summary generated successfully (${summary.length} characters)`);
-    
+
     return summary.trim();
   } catch (error) {
     console.error("❌ Error generating meeting summary:", error);
     throw new Error("Failed to generate meeting summary with Gemini AI.");
   }
 }
+// End of service

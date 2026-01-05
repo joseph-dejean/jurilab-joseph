@@ -4,13 +4,14 @@ import { useApp } from '../store/store';
 import { generateToken } from '../services/dailyService';
 import { processCompletedMeeting } from '../services/meetingProcessor';
 import { getLawyerById } from '../services/firebaseService';
+import { UserRole } from '../types';
 import { X, Video, VideoOff, Mic, MicOff, Monitor, LogOut } from 'lucide-react';
 
 const VideoCallPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentUser } = useApp();
-  
+
   const roomUrl = searchParams.get('roomUrl');
   const appointmentId = searchParams.get('appointmentId');
   const [token, setToken] = useState<string | null>(null);
@@ -20,7 +21,7 @@ const VideoCallPage: React.FC = () => {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [meetingEnded, setMeetingEnded] = useState(false);
-  
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -33,11 +34,11 @@ const VideoCallPage: React.FC = () => {
     const initializeMeeting = async () => {
       try {
         setIsLoading(true);
-        
+
         // Extraire le roomId depuis l'URL Daily.co
         // Format: https://domain.daily.co/room-name
         const roomId = roomUrl.split('/').pop()?.split('?')[0];
-        
+
         if (!roomId) {
           throw new Error('Impossible d\'extraire l\'ID de la salle');
         }
@@ -47,7 +48,7 @@ const VideoCallPage: React.FC = () => {
           roomId,
           currentUser.id,
           currentUser.name || 'Utilisateur',
-          false // isOwner (pourrait être déterminé selon le rôle)
+          currentUser.role === UserRole.LAWYER // isOwner
         );
 
         setToken(userToken);
@@ -71,13 +72,13 @@ const VideoCallPage: React.FC = () => {
       }
 
       const data = event.data;
-      
+
       // Gérer les événements Daily.co
       if (data.type === 'participant-left' && data.participant?.local) {
         // L'utilisateur local a quitté
         handleMeetingEnd();
       }
-      
+
       if (data.type === 'meeting-ended') {
         handleMeetingEnd();
       }
@@ -89,9 +90,9 @@ const VideoCallPage: React.FC = () => {
 
   const handleMeetingEnd = async () => {
     if (meetingEnded) return; // Éviter les appels multiples
-    
+
     setMeetingEnded(true);
-    
+
     // Traiter le transcript et générer le résumé si appointmentId est présent
     if (appointmentId && currentUser) {
       try {
@@ -99,12 +100,12 @@ const VideoCallPage: React.FC = () => {
         const { getAllAppointments } = await import('../services/firebaseService');
         const appointments = await getAllAppointments();
         const appointment = appointments.find(a => a.id === appointmentId);
-        
+
         if (appointment && appointment.dailyRoomId) {
           // Récupérer les noms de l'avocat et du client
           const lawyer = await getLawyerById(appointment.lawyerId);
           const lawyerName = lawyer?.name || 'Avocat';
-          
+
           // Pour le client, on utilise currentUser si c'est le client, sinon on récupère depuis Firebase
           let clientName = 'Client';
           if (currentUser.id === appointment.clientId) {
@@ -113,12 +114,12 @@ const VideoCallPage: React.FC = () => {
             // TODO: Récupérer le nom du client depuis Firebase si nécessaire
             clientName = 'Client';
           }
-          
+
           // Lancer le traitement en arrière-plan (ne pas bloquer la redirection)
           // Passer les IDs pour vérifier la présence des deux participants
           processCompletedMeeting(
-            appointment, 
-            lawyerName, 
+            appointment,
+            lawyerName,
             clientName,
             appointment.lawyerId,
             appointment.clientId
@@ -136,7 +137,7 @@ const VideoCallPage: React.FC = () => {
         // Ne pas bloquer l'utilisateur
       }
     }
-    
+
     // Rediriger vers la page des rendez-vous après un court délai
     setTimeout(() => {
       navigate('/my-appointments');
@@ -232,9 +233,9 @@ const VideoCallPage: React.FC = () => {
   }
 
   // Construire l'URL Daily.co avec le token
-  const dailyIframeUrl = token 
-    ? `${roomUrl}?t=${token}&enableTranscription=true&enableRecording=true`
-    : roomUrl;
+  const dailyIframeUrl = token
+    ? `${roomUrl}?t=${token}&lang=fr&enable_transcription=true`
+    : `${roomUrl}?lang=fr&enable_transcription=true`;
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
@@ -271,11 +272,10 @@ const VideoCallPage: React.FC = () => {
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={toggleMute}
-            className={`p-3 rounded-full transition-colors ${
-              isMuted
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-white'
-            }`}
+            className={`p-3 rounded-full transition-colors ${isMuted
+              ? 'bg-red-600 hover:bg-red-700 text-white'
+              : 'bg-slate-700 hover:bg-slate-600 text-white'
+              }`}
             title={isMuted ? 'Activer le micro' : 'Désactiver le micro'}
           >
             {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -283,11 +283,10 @@ const VideoCallPage: React.FC = () => {
 
           <button
             onClick={toggleVideo}
-            className={`p-3 rounded-full transition-colors ${
-              isVideoOff
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-white'
-            }`}
+            className={`p-3 rounded-full transition-colors ${isVideoOff
+              ? 'bg-red-600 hover:bg-red-700 text-white'
+              : 'bg-slate-700 hover:bg-slate-600 text-white'
+              }`}
             title={isVideoOff ? 'Activer la caméra' : 'Désactiver la caméra'}
           >
             {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
@@ -295,11 +294,10 @@ const VideoCallPage: React.FC = () => {
 
           <button
             onClick={toggleScreenShare}
-            className={`p-3 rounded-full transition-colors ${
-              isScreenSharing
-                ? 'bg-brand-DEFAULT hover:bg-brand-dark text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-white'
-            }`}
+            className={`p-3 rounded-full transition-colors ${isScreenSharing
+              ? 'bg-brand-DEFAULT hover:bg-brand-dark text-white'
+              : 'bg-slate-700 hover:bg-slate-600 text-white'
+              }`}
             title={isScreenSharing ? 'Arrêter le partage d\'écran' : 'Partager l\'écran'}
           >
             <Monitor className="w-5 h-5" />

@@ -1,0 +1,264 @@
+# Commandes d'import pour Google Cloud SDK Shell
+# Copier-coller chaque commande une par une
+
+# [1/87] CODE_CIVIL_enrichi.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/CODE_CIVIL_enrichi.jsonl --project=jurilab-481600
+
+# [2/87] LEGITEXT000005634379_code_de_commerce_20251219_163939.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000005634379_code_de_commerce_20251219_163939.jsonl --project=jurilab-481600
+
+# [3/87] LEGITEXT000006069414_legitext000006069414_20251219_163943.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069414_legitext000006069414_20251219_163943.jsonl --project=jurilab-481600
+
+# [4/87] LEGITEXT000006069565_legitext000006069565_20251219_163948.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069565_legitext000006069565_20251219_163948.jsonl --project=jurilab-481600
+
+# [5/87] LEGITEXT000006069568_legitext000006069568_20251219_163949.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069568_legitext000006069568_20251219_163949.jsonl --project=jurilab-481600
+
+# [6/87] LEGITEXT000006069569_legitext000006069569_20251219_163951.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069569_legitext000006069569_20251219_163951.jsonl --project=jurilab-481600
+
+# [7/87] LEGITEXT000006069574_legitext000006069574_20251219_163956.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069574_legitext000006069574_20251219_163956.jsonl --project=jurilab-481600
+
+# [8/87] LEGITEXT000006069576_legitext000006069576_20251219_163958.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069576_legitext000006069576_20251219_163958.jsonl --project=jurilab-481600
+
+# [9/87] LEGITEXT000006069577_legitext000006069577_20251219_164020.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069577_legitext000006069577_20251219_164020.jsonl --project=jurilab-481600
+
+# [10/87] LEGITEXT000006069583_legitext000006069583_20251219_164023.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006069583_legitext000006069583_20251219_164023.jsonl --project=jurilab-481600
+
+# [11/87] LEGITEXT000006070158_legitext000006070158_20251219_164029.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070158_legitext000006070158_20251219_164029.jsonl --project=jurilab-481600
+
+# [12/87] LEGITEXT000006070162_legitext000006070162_20251219_164033.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070162_legitext000006070162_20251219_164033.jsonl --project=jurilab-481600
+
+# [13/87] LEGITEXT000006070208_legitext000006070208_20251219_164034.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070208_legitext000006070208_20251219_164034.jsonl --project=jurilab-481600
+
+# [14/87] LEGITEXT000006070239_legitext000006070239_20251219_164037.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070239_legitext000006070239_20251219_164037.jsonl --project=jurilab-481600
+
+# [15/87] LEGITEXT000006070249_legitext000006070249_20251219_164041.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070249_legitext000006070249_20251219_164041.jsonl --project=jurilab-481600
+
+# [16/87] LEGITEXT000006070299_legitext000006070299_20251219_164042.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070299_legitext000006070299_20251219_164042.jsonl --project=jurilab-481600
+
+# [17/87] LEGITEXT000006070300_legitext000006070300_20251219_164043.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070300_legitext000006070300_20251219_164043.jsonl --project=jurilab-481600
+
+# [18/87] LEGITEXT000006070302_legitext000006070302_20251219_164044.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070302_legitext000006070302_20251219_164044.jsonl --project=jurilab-481600
+
+# [19/87] LEGITEXT000006070633_legitext000006070633_20251219_164103.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070633_legitext000006070633_20251219_164103.jsonl --project=jurilab-481600
+
+# [20/87] LEGITEXT000006070666_legitext000006070666_20251219_164103.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070666_legitext000006070666_20251219_164103.jsonl --project=jurilab-481600
+
+# [21/87] LEGITEXT000006070667_legitext000006070667_20251219_164104.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070667_legitext000006070667_20251219_164104.jsonl --project=jurilab-481600
+
+# [22/87] LEGITEXT000006070716_code_pénal_20251219_164108.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070716_code_pénal_20251219_164108.jsonl --project=jurilab-481600
+
+# [23/87] LEGITEXT000006070719_legitext000006070719_20251219_164111.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070719_legitext000006070719_20251219_164111.jsonl --project=jurilab-481600
+
+# [24/87] LEGITEXT000006070721_civil_20251219_111548.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_civil_20251219_111548.jsonl --project=jurilab-481600
+
+# [25/87] LEGITEXT000006070721_civil_20251219_111824.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_civil_20251219_111824.jsonl --project=jurilab-481600
+
+# [26/87] LEGITEXT000006070721_civil_20251219_112819.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_civil_20251219_112819.jsonl --project=jurilab-481600
+
+# [27/87] LEGITEXT000006070721_civil_20251219_113735.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_civil_20251219_113735.jsonl --project=jurilab-481600
+
+# [28/87] LEGITEXT000006070721_civil_20251219_150158.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_civil_20251219_150158.jsonl --project=jurilab-481600
+
+# [29/87] LEGITEXT000006070721_code_civil_20251219_161545.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_code_civil_20251219_161545.jsonl --project=jurilab-481600
+
+# [30/87] LEGITEXT000006070721_code_civil_20251219_162457.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_code_civil_20251219_162457.jsonl --project=jurilab-481600
+
+# [31/87] LEGITEXT000006070721_code_civil_20251219_164116.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_code_civil_20251219_164116.jsonl --project=jurilab-481600
+
+# [32/87] LEGITEXT000006070721_test_vertex.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070721_test_vertex.jsonl --project=jurilab-481600
+
+# [33/87] LEGITEXT000006070933_legitext000006070933_20251219_164118.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070933_legitext000006070933_20251219_164118.jsonl --project=jurilab-481600
+
+# [34/87] LEGITEXT000006070987_legitext000006070987_20251219_164122.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006070987_legitext000006070987_20251219_164122.jsonl --project=jurilab-481600
+
+# [35/87] LEGITEXT000006071007_legitext000006071007_20251219_164122.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071007_legitext000006071007_20251219_164122.jsonl --project=jurilab-481600
+
+# [36/87] LEGITEXT000006071154_legitext000006071154_20251219_164134.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071154_legitext000006071154_20251219_164134.jsonl --project=jurilab-481600
+
+# [37/87] LEGITEXT000006071164_code_de_procédure_civile_20251219_164139.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071164_code_de_procédure_civile_20251219_164139.jsonl --project=jurilab-481600
+
+# [38/87] LEGITEXT000006071188_legitext000006071188_20251219_164139.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071188_legitext000006071188_20251219_164139.jsonl --project=jurilab-481600
+
+# [39/87] LEGITEXT000006071190_legitext000006071190_20251219_164140.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071190_legitext000006071190_20251219_164140.jsonl --project=jurilab-481600
+
+# [40/87] LEGITEXT000006071191_legitext000006071191_20251219_164152.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071191_legitext000006071191_20251219_164152.jsonl --project=jurilab-481600
+
+# [41/87] LEGITEXT000006071307_legitext000006071307_20251219_164159.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071307_legitext000006071307_20251219_164159.jsonl --project=jurilab-481600
+
+# [42/87] LEGITEXT000006071318_legitext000006071318_20251219_164204.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071318_legitext000006071318_20251219_164204.jsonl --project=jurilab-481600
+
+# [43/87] LEGITEXT000006071335_legitext000006071335_20251219_164205.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071335_legitext000006071335_20251219_164205.jsonl --project=jurilab-481600
+
+# [44/87] LEGITEXT000006071360_legitext000006071360_20251219_164206.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071360_legitext000006071360_20251219_164206.jsonl --project=jurilab-481600
+
+# [45/87] LEGITEXT000006071366_legitext000006071366_20251219_164208.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071366_legitext000006071366_20251219_164208.jsonl --project=jurilab-481600
+
+# [46/87] LEGITEXT000006071367_legitext000006071367_20251219_164237.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071367_legitext000006071367_20251219_164237.jsonl --project=jurilab-481600
+
+# [47/87] LEGITEXT000006071570_legitext000006071570_20251219_164239.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071570_legitext000006071570_20251219_164239.jsonl --project=jurilab-481600
+
+# [48/87] LEGITEXT000006071645_legitext000006071645_20251219_164239.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071645_legitext000006071645_20251219_164239.jsonl --project=jurilab-481600
+
+# [49/87] LEGITEXT000006071785_legitext000006071785_20251219_164240.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006071785_legitext000006071785_20251219_164240.jsonl --project=jurilab-481600
+
+# [50/87] LEGITEXT000006072026_legitext000006072026_20251219_164259.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006072026_legitext000006072026_20251219_164259.jsonl --project=jurilab-481600
+
+# [51/87] LEGITEXT000006072050_code_du_travail_20251219_164339.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006072050_code_du_travail_20251219_164339.jsonl --project=jurilab-481600
+
+# [52/87] LEGITEXT000006072051_legitext000006072051_20251219_164340.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006072051_legitext000006072051_20251219_164340.jsonl --project=jurilab-481600
+
+# [53/87] LEGITEXT000006072052_legitext000006072052_20251219_164341.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006072052_legitext000006072052_20251219_164341.jsonl --project=jurilab-481600
+
+# [54/87] LEGITEXT000006072637_legitext000006072637_20251219_164342.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006072637_legitext000006072637_20251219_164342.jsonl --project=jurilab-481600
+
+# [55/87] LEGITEXT000006072665_legitext000006072665_20251219_164424.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006072665_legitext000006072665_20251219_164424.jsonl --project=jurilab-481600
+
+# [56/87] LEGITEXT000006073189_code_de_la_sécurité_sociale_20251219_164459.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006073189_code_de_la_sécurité_sociale_20251219_164459.jsonl --project=jurilab-481600
+
+# [57/87] LEGITEXT000006073984_legitext000006073984_20251219_164508.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006073984_legitext000006073984_20251219_164508.jsonl --project=jurilab-481600
+
+# [58/87] LEGITEXT000006074066_legitext000006074066_20251219_164508.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074066_legitext000006074066_20251219_164508.jsonl --project=jurilab-481600
+
+# [59/87] LEGITEXT000006074067_legitext000006074067_20251219_164510.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074067_legitext000006074067_20251219_164510.jsonl --project=jurilab-481600
+
+# [60/87] LEGITEXT000006074068_legitext000006074068_20251219_164514.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074068_legitext000006074068_20251219_164514.jsonl --project=jurilab-481600
+
+# [61/87] LEGITEXT000006074069_legitext000006074069_20251219_164523.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074069_legitext000006074069_20251219_164523.jsonl --project=jurilab-481600
+
+# [62/87] LEGITEXT000006074073_legitext000006074073_20251219_164525.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074073_legitext000006074073_20251219_164525.jsonl --project=jurilab-481600
+
+# [63/87] LEGITEXT000006074075_legitext000006074075_20251219_164534.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074075_legitext000006074075_20251219_164534.jsonl --project=jurilab-481600
+
+# [64/87] LEGITEXT000006074096_legitext000006074096_20251219_164546.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074096_legitext000006074096_20251219_164546.jsonl --project=jurilab-481600
+
+# [65/87] LEGITEXT000006074220_legitext000006074220_20251219_164604.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074220_legitext000006074220_20251219_164604.jsonl --project=jurilab-481600
+
+# [66/87] LEGITEXT000006074224_legitext000006074224_20251219_164605.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074224_legitext000006074224_20251219_164605.jsonl --project=jurilab-481600
+
+# [67/87] LEGITEXT000006074228_legitext000006074228_20251219_164607.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074228_legitext000006074228_20251219_164607.jsonl --project=jurilab-481600
+
+# [68/87] LEGITEXT000006074232_legitext000006074232_20251219_164607.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074232_legitext000006074232_20251219_164607.jsonl --project=jurilab-481600
+
+# [69/87] LEGITEXT000006074233_legitext000006074233_20251219_164608.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074233_legitext000006074233_20251219_164608.jsonl --project=jurilab-481600
+
+# [70/87] LEGITEXT000006074234_legitext000006074234_20251219_164610.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074234_legitext000006074234_20251219_164610.jsonl --project=jurilab-481600
+
+# [71/87] LEGITEXT000006074235_legitext000006074235_20251219_164610.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074235_legitext000006074235_20251219_164610.jsonl --project=jurilab-481600
+
+# [72/87] LEGITEXT000006074236_legitext000006074236_20251219_164613.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074236_legitext000006074236_20251219_164613.jsonl --project=jurilab-481600
+
+# [73/87] LEGITEXT000006074237_legitext000006074237_20251219_164613.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006074237_legitext000006074237_20251219_164613.jsonl --project=jurilab-481600
+
+# [74/87] LEGITEXT000006075116_legitext000006075116_20251219_164614.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000006075116_legitext000006075116_20251219_164614.jsonl --project=jurilab-481600
+
+# [75/87] LEGITEXT000020908868_legitext000020908868_20251219_164619.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000020908868_legitext000020908868_20251219_164619.jsonl --project=jurilab-481600
+
+# [76/87] LEGITEXT000023086525_legitext000023086525_20251219_164631.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000023086525_legitext000023086525_20251219_164631.jsonl --project=jurilab-481600
+
+# [77/87] LEGITEXT000023501962_legitext000023501962_20251219_164632.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000023501962_legitext000023501962_20251219_164632.jsonl --project=jurilab-481600
+
+# [78/87] LEGITEXT000023983208_legitext000023983208_20251219_164637.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000023983208_legitext000023983208_20251219_164637.jsonl --project=jurilab-481600
+
+# [79/87] LEGITEXT000025024948_legitext000025024948_20251219_164638.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000025024948_legitext000025024948_20251219_164638.jsonl --project=jurilab-481600
+
+# [80/87] LEGITEXT000025244092_legitext000025244092_20251219_164640.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000025244092_legitext000025244092_20251219_164640.jsonl --project=jurilab-481600
+
+# [81/87] LEGITEXT000025503132_legitext000025503132_20251219_164646.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000025503132_legitext000025503132_20251219_164646.jsonl --project=jurilab-481600
+
+# [82/87] LEGITEXT000031366350_legitext000031366350_20251219_164647.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000031366350_legitext000031366350_20251219_164647.jsonl --project=jurilab-481600
+
+# [83/87] LEGITEXT000037701019_legitext000037701019_20251219_164649.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000037701019_legitext000037701019_20251219_164649.jsonl --project=jurilab-481600
+
+# [84/87] LEGITEXT000039086952_legitext000039086952_20251219_164650.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000039086952_legitext000039086952_20251219_164650.jsonl --project=jurilab-481600
+
+# [85/87] LEGITEXT000044416551_legitext000044416551_20251219_164652.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000044416551_legitext000044416551_20251219_164652.jsonl --project=jurilab-481600
+
+# [86/87] LEGITEXT000044595989_legitext000044595989_20251219_164654.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000044595989_legitext000044595989_20251219_164654.jsonl --project=jurilab-481600
+
+# [87/87] LEGITEXT000045476241_legitext000045476241_20251219_164656.jsonl
+gcloud alpha discovery-engine documents import --datastore=datastorerag_1766055384992 --location=global --gcs-uri=gs://legal-rag-data-sofia-2025/LEGITEXT000045476241_legitext000045476241_20251219_164656.jsonl --project=jurilab-481600
+

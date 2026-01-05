@@ -67,7 +67,7 @@
     content: '';
     position: absolute;
     inset: -2px;
-    background: linear-gradient(135deg, rgba(34, 197, 99, 0.4), rgba(34, 197, 99, 0.1));
+    background: linear-gradient(135deg, rgba(119, 7, 34, 0.4), rgba(119, 7, 34, 0.1));
     border-radius: inherit;
     opacity: 0;
     transition: opacity 0.3s ease;

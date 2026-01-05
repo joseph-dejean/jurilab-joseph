@@ -7,7 +7,7 @@ import { registerLawyer, getAuthErrorMessage } from '../services/firebaseService
 import {
   User, Briefcase, MapPin, DollarSign, Languages,
   FileText, Upload, Check, ChevronRight, ChevronLeft,
-  Scale, Eye, EyeOff, AlertCircle, Phone, Mail, Lock,
+  Eye, EyeOff, AlertCircle, Phone, Mail, Lock,
   Building, Award, GraduationCap, Globe
 } from 'lucide-react';
 
@@ -98,8 +98,8 @@ const InputField = ({
         value={value}
         onChange={onChange}
         className={`w-full ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${error
-            ? 'border-red-300 dark:border-red-800'
-            : 'border-surface-200 dark:border-deep-700 focus:border-accent-500 dark:focus:border-accent-400'
+          ? 'border-red-300 dark:border-red-800'
+          : 'border-surface-200 dark:border-deep-700 focus:border-accent-500 dark:focus:border-accent-400'
           } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
         placeholder={placeholder}
         style={{ fontSize: '16px' }}
@@ -207,42 +207,69 @@ export const LawyerRegistrationPage: React.FC = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const getCityCoordinates = (city: string): { lat: number; lng: number } => {
-    const cityCoords: Record<string, { lat: number; lng: number }> = {
-      'PARIS': { lat: 48.8566, lng: 2.3522 },
-      'MARSEILLE': { lat: 43.2965, lng: 5.3698 },
-      'LYON': { lat: 45.7640, lng: 4.8357 },
-      'TOULOUSE': { lat: 43.6047, lng: 1.4442 },
-      'NICE': { lat: 43.7102, lng: 7.2620 },
-      'NANTES': { lat: 47.2184, lng: -1.5536 },
-      'STRASBOURG': { lat: 48.5734, lng: 7.7521 },
-      'MONTPELLIER': { lat: 43.6108, lng: 3.8767 },
-      'BORDEAUX': { lat: 44.8378, lng: -0.5792 },
-      'LILLE': { lat: 50.6292, lng: 3.0573 },
-      'RENNES': { lat: 48.1173, lng: -1.6778 },
-      'REIMS': { lat: 49.2583, lng: 4.0317 },
-      'SAINT-ÉTIENNE': { lat: 45.4397, lng: 4.3872 },
-      'LE HAVRE': { lat: 49.4944, lng: 0.1079 },
-      'TOULON': { lat: 43.1242, lng: 5.9280 },
-      'GRENOBLE': { lat: 45.1885, lng: 5.7245 },
-      'DIJON': { lat: 47.3220, lng: 5.0415 },
-      'ANGERS': { lat: 47.4784, lng: -0.5632 },
-      'NÎMES': { lat: 43.8367, lng: 4.3601 },
-      'VILLEURBANNE': { lat: 45.7660, lng: 4.8795 }
-    };
+  // Geocoding function using Nominatim (OpenStreetMap)
+  const geocodeAddress = async (address: string, city: string, postalCode: string): Promise<{ lat: number; lng: number }> => {
+    try {
+      const query = `${address}, ${postalCode} ${city}, France`;
+      const encodedQuery = encodeURIComponent(query);
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&limit=1`;
 
-    const normalizedCity = city.toUpperCase().trim();
-    return cityCoords[normalizedCity] || { lat: 46.2276, lng: 2.2137 };
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Jurilab/1.0 (contact@jurilab.fr)' // Nominatim requires a User-Agent
+        }
+      });
+
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon)
+        };
+      }
+
+      // Fallback: try just city
+      const cityQuery = encodeURIComponent(`${city}, France`);
+      const cityUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${cityQuery}&limit=1`;
+      const cityResponse = await fetch(cityUrl, {
+        headers: { 'User-Agent': 'Jurilab/1.0' }
+      });
+      const cityData = await cityResponse.json();
+
+      if (cityData && cityData.length > 0) {
+        return {
+          lat: parseFloat(cityData[0].lat),
+          lng: parseFloat(cityData[0].lon)
+        };
+      }
+
+    } catch (error) {
+      console.warn('Geocoding failed:', error);
+    }
+
+    // Default fallback (France center) if everything fails
+    return { lat: 46.2276, lng: 2.2137 };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateStep(currentStep)) return;
+    console.log('🚀 HandleSubmit triggered. Step:', currentStep);
+
+    if (!validateStep(currentStep)) {
+      console.warn('❌ Validation failed for step', currentStep);
+      console.warn('Current errors:', errors);
+      setIsSubmitting(false); // Ensure loading state is cleared if validation fails
+      return;
+    }
 
     setIsSubmitting(true);
+    setErrors({}); // Clear previous errors
 
     try {
-      const coordinates = getCityCoordinates(formData.city);
+      // Get precise coordinates
+      const coordinates = await geocodeAddress(formData.address, formData.city, formData.postalCode);
+      console.log('📍 Geocoded coordinates:', coordinates);
 
       const lawyerData = {
         name: `${formData.firstName} ${formData.lastName}`,
@@ -262,22 +289,34 @@ export const LawyerRegistrationPage: React.FC = () => {
         },
         phone: formData.phone,
         address: formData.address,
+        postalCode: formData.postalCode,
         coordinates,
         verified: false,
         firmName: formData.firmName,
         barNumber: formData.barNumber,
         responseTime: '24h',
-        role: UserRole.LAWYER,
+        role: UserRole.LAWYER as UserRole.LAWYER,
+        profileConfig: [], // Initialize empty profile config
         avatarUrl: `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=7c3aed&color=fff`
       };
 
+      console.log('📝 Submitting lawyer registration:', lawyerData);
       await registerLawyer(formData.email, formData.password, lawyerData);
 
-      alert('✅ Inscription réussie! Votre compte sera activé après vérification de vos documents (24-48h).');
-      navigate('/');
+      console.log('✅ Registration successful, redirecting...');
+      alert('✅ Inscription réussie ! Bienvenue sur Jurilab. Veuillez compléter votre profil.');
+      navigate('/dashboard'); // Direct to dashboard or login
     } catch (error: any) {
       console.error('❌ Error during registration:', error);
-      setErrors({ form: getAuthErrorMessage(error) });
+      let errorMessage = "Une erreur est survenue lors de l'inscription.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Cet email est déjà utilisé.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      setErrors({ form: errorMessage });
+      // Scroll to top to show error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -419,8 +458,8 @@ export const LawyerRegistrationPage: React.FC = () => {
             value={formData.password}
             onChange={(e) => updateField('password', e.target.value)}
             className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.password
-                ? 'border-red-300 dark:border-red-800'
-                : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+              ? 'border-red-300 dark:border-red-800'
+              : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
               } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
             placeholder="••••••••"
             style={{ fontSize: '16px' }}
@@ -453,8 +492,8 @@ export const LawyerRegistrationPage: React.FC = () => {
             value={formData.confirmPassword}
             onChange={(e) => updateField('confirmPassword', e.target.value)}
             className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.confirmPassword
-                ? 'border-red-300 dark:border-red-800'
-                : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+              ? 'border-red-300 dark:border-red-800'
+              : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
               } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
             placeholder="••••••••"
             style={{ fontSize: '16px' }}
@@ -544,8 +583,8 @@ export const LawyerRegistrationPage: React.FC = () => {
           value={formData.yearsExperience}
           onChange={(e) => updateField('yearsExperience', parseInt(e.target.value) || 0)}
           className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.yearsExperience
-              ? 'border-red-300 dark:border-red-800'
-              : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+            ? 'border-red-300 dark:border-red-800'
+            : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
             } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
           style={{ fontSize: '16px' }}
         />
@@ -585,8 +624,8 @@ export const LawyerRegistrationPage: React.FC = () => {
           value={formData.bio}
           onChange={(e) => updateField('bio', e.target.value)}
           className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.bio
-              ? 'border-red-300 dark:border-red-800'
-              : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+            ? 'border-red-300 dark:border-red-800'
+            : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
             } outline-none text-deep-900 dark:text-surface-100 resize-none transition-colors`}
           placeholder="Décrivez votre parcours, vos expertises et votre approche..."
           style={{ fontSize: '16px' }}
@@ -664,8 +703,8 @@ export const LawyerRegistrationPage: React.FC = () => {
             value={formData.hourlyRate}
             onChange={(e) => updateField('hourlyRate', parseInt(e.target.value) || 0)}
             className={`w-full pl-12 pr-20 py-3.5 rounded-xl bg-white dark:bg-deep-900 border-2 ${errors.hourlyRate
-                ? 'border-red-300 dark:border-red-800'
-                : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
+              ? 'border-red-300 dark:border-red-800'
+              : 'border-surface-200 dark:border-deep-700 focus:border-accent-500'
               } outline-none text-deep-900 dark:text-surface-100 transition-colors`}
             style={{ fontSize: '16px' }}
           />
@@ -696,8 +735,8 @@ export const LawyerRegistrationPage: React.FC = () => {
               type="button"
               onClick={() => toggleLanguage(lang)}
               className={`px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${formData.languages.includes(lang)
-                  ? 'bg-accent-50 dark:bg-accent-900/30 border-accent-500 text-accent-700 dark:text-accent-300'
-                  : 'border-surface-200 dark:border-deep-700 text-deep-600 dark:text-surface-400 hover:border-accent-300 dark:hover:border-accent-700'
+                ? 'bg-accent-50 dark:bg-accent-900/30 border-accent-500 text-accent-700 dark:text-accent-300'
+                : 'border-surface-200 dark:border-deep-700 text-deep-600 dark:text-surface-400 hover:border-accent-300 dark:hover:border-accent-700'
                 }`}
             >
               {lang}
@@ -814,10 +853,10 @@ export const LawyerRegistrationPage: React.FC = () => {
 
       {/* Terms */}
       <div className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-colors ${acceptedTerms
-          ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800'
-          : errors.terms
-            ? 'bg-red-50 dark:bg-red-950/20 border-red-300 dark:border-red-800'
-            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+        ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800'
+        : errors.terms
+          ? 'bg-red-50 dark:bg-red-950/20 border-red-300 dark:border-red-800'
+          : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
         }`}>
         <input
           type="checkbox"
@@ -849,9 +888,11 @@ export const LawyerRegistrationPage: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center shadow-lg shadow-accent-500/30">
-              <Scale className="w-6 h-6 text-white" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="Jurilab Logo"
+              className="w-20 h-20 object-contain"
+            />
             <span className="font-serif text-2xl font-bold text-deep-900 dark:text-surface-100">
               Jurilab
             </span>
