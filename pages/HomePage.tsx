@@ -301,8 +301,8 @@ export const HomePage: React.FC = () => {
                 <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className={`relative inline-flex items-center justify-center w-12 sm:w-16 h-12 sm:h-16 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 ${feature.color === 'accent'
-                    ? 'bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400'
-                    : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                  ? 'bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400'
+                  : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
                   }`}>
                   <feature.icon className="w-6 sm:w-8 h-6 sm:h-8" />
                 </div>

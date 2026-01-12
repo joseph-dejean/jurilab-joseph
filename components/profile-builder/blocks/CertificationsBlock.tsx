@@ -25,7 +25,7 @@ export const CertificationsBlock: React.FC<CertificationsBlockProps> = ({ block,
   const certifications = parseCerts();
 
   return (
-    <div className="h-full flex flex-col justify-center bg-gradient-to-br from-navy to-navy-dark dark:from-navy-dark dark:to-navy text-white p-6 rounded-lg">
+    <div className="h-full flex flex-col justify-center bg-gradient-to-br from-primary-900 to-primary-800 dark:from-deep-900 dark:to-primary-950 text-white p-6 rounded-lg">
       <div className="flex items-center gap-2 mb-4">
         <Shield className="w-6 h-6" />
         <h3 className="font-serif font-bold text-lg">
@@ -36,7 +36,7 @@ export const CertificationsBlock: React.FC<CertificationsBlockProps> = ({ block,
         <ul className="space-y-2">
           {certifications.map((cert, index) => (
             <li key={index} className="flex items-center gap-2 text-sm">
-              <Award className="w-4 h-4 text-brand-DEFAULT flex-shrink-0" />
+              <Award className="w-4 h-4 text-accent-500 flex-shrink-0" />
               <span>{cert}</span>
             </li>
           ))}
@@ -45,7 +45,7 @@ export const CertificationsBlock: React.FC<CertificationsBlockProps> = ({ block,
         <div className="space-y-2">
           {certifications.map((cert, index) => (
             <div key={index} className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-brand-DEFAULT flex-shrink-0" />
+              <Award className="w-4 h-4 text-accent-500 flex-shrink-0" />
               <input
                 type="text"
                 value={cert}

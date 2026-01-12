@@ -95,25 +95,14 @@ export const ProfileBuilder: React.FC = () => {
 
       setIsLoading(true);
       try {
-        // Find the lawyer in the list by email (since login uses email)
-        const lawyer = lawyers.find(l => l.email === currentUser.email);
-        
-        if (!lawyer) {
-          console.warn('⚠️ Lawyer profile not found in database');
-          // Start with empty blocks if no profile exists
-          setBlocks([]);
-          setIsLoading(false);
-          return;
-        }
-
-        setLawyerId(lawyer.id);
+        setLawyerId(currentUser.id);
 
         // Load the full lawyer data from Firebase to get profileConfig
-        const fullLawyerData = await getLawyerById(lawyer.id);
-        
+        const fullLawyerData = await getLawyerById(currentUser.id);
+
         if (fullLawyerData) {
           setLawyerData(fullLawyerData);
-          
+
           if (fullLawyerData.profileConfig && fullLawyerData.profileConfig.length > 0) {
             // Load existing profile config
             console.log(`✅ Loaded ${fullLawyerData.profileConfig.length} blocks from profile`);
@@ -170,7 +159,7 @@ export const ProfileBuilder: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-brand-DEFAULT mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-4" />
           <p className="text-slate-600 dark:text-slate-400">Chargement de votre profil...</p>
         </div>
       </div>
@@ -182,7 +171,7 @@ export const ProfileBuilder: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-serif font-bold text-navy dark:text-white">Éditeur de Profil</h1>
+            <h1 className="text-3xl font-serif font-bold text-primary-900 dark:text-white">Éditeur de Profil</h1>
             <p className="text-slate-600 dark:text-slate-400">Construisez votre page avocat modulaire.</p>
           </div>
           <div className="flex gap-3">
@@ -194,16 +183,16 @@ export const ProfileBuilder: React.FC = () => {
               currentBlocks={blocks}
               currentUserEmail={currentUser?.email}
             />
-            <button 
+            <button
               onClick={() => setIsPreviewOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-navy dark:text-white rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 font-medium">
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-primary-900 dark:text-white rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 font-medium">
               <Eye className="w-4 h-4" />
               Aperçu
             </button>
-            <button 
+            <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-2 px-6 py-2 bg-navy dark:bg-brand-DEFAULT text-white rounded-lg hover:bg-navy-light dark:hover:bg-brand-dark font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving ? (
                 <>
@@ -222,13 +211,13 @@ export const ProfileBuilder: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3">
-            <DndContext 
-              sensors={sensors} 
-              collisionDetection={closestCenter} 
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <DraggableGrid 
-                blocks={blocks} 
+              <DraggableGrid
+                blocks={blocks}
                 onRemoveBlock={handleRemoveBlock}
                 onUpdateBlock={handleUpdateBlock}
                 lawyerData={lawyerData ? {
@@ -238,7 +227,7 @@ export const ProfileBuilder: React.FC = () => {
               />
             </DndContext>
           </div>
-          
+
           <div className="lg:col-span-1">
             <Toolbox onAddBlock={handleAddBlock} />
           </div>

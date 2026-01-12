@@ -18,6 +18,7 @@ import {
   FileText,
   MessageSquare,
   ArrowLeft,
+  Trash2,
 } from 'lucide-react';
 import { MeetingSummary } from '../components/MeetingSummary';
 import { UserHistoryModal } from '../components/UserHistoryModal';
@@ -27,7 +28,7 @@ type FilterType = 'all' | 'upcoming' | 'past' | 'cancelled';
 type AppointmentTypeFilter = 'all' | 'VIDEO' | 'IN_PERSON' | 'PHONE';
 
 export const MyAppointmentsPage: React.FC = () => {
-  const { currentUser, appointments, lawyers, t, acceptAppointment, cancelAppointment } = useApp();
+  const { currentUser, appointments, lawyers, t, acceptAppointment, cancelAppointment, deleteAppointment } = useApp();
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState<FilterType>('upcoming');
   const [typeFilter, setTypeFilter] = useState<AppointmentTypeFilter>('all');
@@ -59,7 +60,7 @@ export const MyAppointmentsPage: React.FC = () => {
     const now = new Date();
     return myAppointments.filter((apt) => {
       const aptDate = parseISO(apt.date);
-      
+
       if (filterType === 'cancelled') {
         return apt.status === 'CANCELLED';
       }
@@ -84,7 +85,7 @@ export const MyAppointmentsPage: React.FC = () => {
     return [...filteredAppointments].sort((a, b) => {
       const dateA = parseISO(a.date).getTime();
       const dateB = parseISO(b.date).getTime();
-      
+
       if (filterType === 'past' || filterType === 'all') {
         return dateB - dateA;
       }
@@ -104,25 +105,25 @@ export const MyAppointmentsPage: React.FC = () => {
   // Status badge component
   const StatusBadge = ({ status }: { status: Appointment['status'] }) => {
     const config = {
-      CONFIRMED: { 
-        icon: CheckCircle2, 
-        label: 'Confirmé', 
-        className: 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300' 
+      CONFIRMED: {
+        icon: CheckCircle2,
+        label: 'Confirmé',
+        className: 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
       },
-      PENDING: { 
-        icon: AlertCircle, 
-        label: 'En attente', 
-        className: 'bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300' 
+      PENDING: {
+        icon: AlertCircle,
+        label: 'En attente',
+        className: 'bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300'
       },
-      CANCELLED: { 
-        icon: XCircle, 
-        label: 'Annulé', 
-        className: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' 
+      CANCELLED: {
+        icon: XCircle,
+        label: 'Annulé',
+        className: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
       },
-      COMPLETED: { 
-        icon: CheckCircle2, 
-        label: 'Terminé', 
-        className: 'bg-surface-200 dark:bg-deep-800 text-deep-600 dark:text-surface-400' 
+      COMPLETED: {
+        icon: CheckCircle2,
+        label: 'Terminé',
+        className: 'bg-surface-200 dark:bg-deep-800 text-deep-600 dark:text-surface-400'
       },
     };
 
@@ -196,7 +197,7 @@ export const MyAppointmentsPage: React.FC = () => {
         if (!streamClient || !streamClient.userID) {
           await initializeStreamClient(currentUser.id, currentUser.name, currentUser.role);
           streamClient = getStreamClient();
-          
+
           if (!streamClient || !streamClient.userID) {
             throw new Error('Failed to connect to Stream. Please try again.');
           }
@@ -237,7 +238,7 @@ export const MyAppointmentsPage: React.FC = () => {
       <div className="container mx-auto px-4 max-w-5xl">
         {/* Header */}
         <div className="mb-8">
-          <button 
+          <button
             onClick={() => navigate('/dashboard')}
             className="inline-flex items-center gap-2 text-deep-500 hover:text-deep-700 dark:hover:text-surface-300 mb-4 transition-colors"
           >
@@ -263,11 +264,10 @@ export const MyAppointmentsPage: React.FC = () => {
                   <button
                     key={type}
                     onClick={() => setFilterType(type)}
-                    className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                      filterType === type
+                    className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${filterType === type
                         ? 'bg-primary-500 text-white shadow-sm'
                         : 'bg-surface-100 dark:bg-deep-800 text-deep-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-deep-700'
-                    }`}
+                      }`}
                   >
                     {label}
                   </button>
@@ -281,11 +281,10 @@ export const MyAppointmentsPage: React.FC = () => {
                 <button
                   key={type}
                   onClick={() => setTypeFilter(type)}
-                  className={`px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
-                    typeFilter === type
+                  className={`px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${typeFilter === type
                       ? 'bg-deep-900 dark:bg-surface-100 text-white dark:text-deep-900'
                       : 'bg-surface-100 dark:bg-deep-800 text-deep-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-deep-700'
-                  }`}
+                    }`}
                 >
                   {Icon && <Icon className="w-3.5 h-3.5" />}
                   {label}
@@ -308,10 +307,10 @@ export const MyAppointmentsPage: React.FC = () => {
               {filterType === 'upcoming'
                 ? "Vous n'avez aucun rendez-vous à venir"
                 : filterType === 'past'
-                ? "Vous n'avez aucun rendez-vous passé"
-                : filterType === 'cancelled'
-                ? "Vous n'avez aucun rendez-vous annulé"
-                : "Aucun rendez-vous ne correspond à vos filtres"}
+                  ? "Vous n'avez aucun rendez-vous passé"
+                  : filterType === 'cancelled'
+                    ? "Vous n'avez aucun rendez-vous annulé"
+                    : "Aucun rendez-vous ne correspond à vos filtres"}
             </p>
             {currentUser.role === UserRole.CLIENT && (
               <Button variant="primary" onClick={() => navigate('/search')}>
@@ -406,7 +405,7 @@ export const MyAppointmentsPage: React.FC = () => {
                                 try {
                                   await acceptAppointment(appointment.id);
                                   alert('✅ Rendez-vous accepté avec succès');
-                                } catch (error: any) {}
+                                } catch (error: any) { }
                               }
                             }}
                           >
@@ -416,41 +415,60 @@ export const MyAppointmentsPage: React.FC = () => {
                         )}
 
                         {/* Cancel Button */}
-                        {appointment.status !== 'CANCELLED' && 
-                         appointment.status !== 'COMPLETED' &&
-                         canCancelAppointment(appointment) && (
+                        {appointment.status !== 'CANCELLED' &&
+                          appointment.status !== 'COMPLETED' &&
+                          canCancelAppointment(appointment) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              onClick={async () => {
+                                if (confirm('Voulez-vous vraiment annuler ce rendez-vous ?')) {
+                                  try {
+                                    await cancelAppointment(appointment.id);
+                                    alert('✅ Rendez-vous annulé');
+                                  } catch (error: any) { }
+                                }
+                              }}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </Button>
+                          )}
+
+                        {/* Delete Button (Lawyer only) */}
+                        {currentUser.role === UserRole.LAWYER && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                             onClick={async () => {
-                              if (confirm('Voulez-vous vraiment annuler ce rendez-vous ?')) {
+                              if (window.confirm("Supprimer définitivement ce rendez-vous ?")) {
                                 try {
-                                  await cancelAppointment(appointment.id);
-                                  alert('✅ Rendez-vous annulé');
-                                } catch (error: any) {}
+                                  await deleteAppointment(appointment.id);
+                                  alert('✅ Rendez-vous supprimé');
+                                } catch (error: any) { }
                               }
                             }}
                           >
-                            <XCircle className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
 
                         {/* View Summary Button */}
-                        {appointment.status === 'COMPLETED' && 
-                         currentUser.role === UserRole.LAWYER && 
-                         (appointment.summary || appointment.transcript) && (
-                          <Button
-                            variant="accent"
-                            size="sm"
-                            onClick={() => setSelectedAppointmentForSummary(
-                              selectedAppointmentForSummary === appointment.id ? null : appointment.id
-                            )}
-                          >
-                            <FileText className="w-4 h-4 mr-1" />
-                            {selectedAppointmentForSummary === appointment.id ? 'Masquer' : 'Résumé'}
-                          </Button>
-                        )}
+                        {appointment.status === 'COMPLETED' &&
+                          currentUser.role === UserRole.LAWYER &&
+                          (appointment.summary || appointment.transcript) && (
+                            <Button
+                              variant="accent"
+                              size="sm"
+                              onClick={() => setSelectedAppointmentForSummary(
+                                selectedAppointmentForSummary === appointment.id ? null : appointment.id
+                              )}
+                            >
+                              <FileText className="w-4 h-4 mr-1" />
+                              {selectedAppointmentForSummary === appointment.id ? 'Masquer' : 'Résumé'}
+                            </Button>
+                          )}
 
                         {/* Details Toggle */}
                         <Button
@@ -461,9 +479,8 @@ export const MyAppointmentsPage: React.FC = () => {
                           )}
                         >
                           {selectedAppointmentForSummary === appointment.id ? 'Masquer' : 'Détails'}
-                          <ChevronRight className={`w-4 h-4 ml-1 transition-transform ${
-                            selectedAppointmentForSummary === appointment.id ? 'rotate-90' : ''
-                          }`} />
+                          <ChevronRight className={`w-4 h-4 ml-1 transition-transform ${selectedAppointmentForSummary === appointment.id ? 'rotate-90' : ''
+                            }`} />
                         </Button>
                       </div>
                     </div>
@@ -504,17 +521,17 @@ export const MyAppointmentsPage: React.FC = () => {
                         )}
 
                         {/* Meeting Summary */}
-                        {currentUser.role === UserRole.LAWYER && 
-                         appointment.status === 'COMPLETED' &&
-                         (appointment.summary || appointment.transcript) && (
-                          <MeetingSummary
-                            appointment={appointment}
-                            lawyerName={appointment.lawyerName || 'Avocat'}
-                            clientName={appointment.clientName || 'Client'}
-                            onSummaryShared={() => window.location.reload()}
-                            onSummaryRegenerated={() => window.location.reload()}
-                          />
-                        )}
+                        {currentUser.role === UserRole.LAWYER &&
+                          appointment.status === 'COMPLETED' &&
+                          (appointment.summary || appointment.transcript) && (
+                            <MeetingSummary
+                              appointment={appointment}
+                              lawyerName={appointment.lawyerName || 'Avocat'}
+                              clientName={appointment.clientName || 'Client'}
+                              onSummaryShared={() => window.location.reload()}
+                              onSummaryRegenerated={() => window.location.reload()}
+                            />
+                          )}
                       </div>
                     )}
                   </div>

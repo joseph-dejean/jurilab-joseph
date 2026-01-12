@@ -55,7 +55,7 @@ export const getGoogleCalendarList = async (
       // Inclure tous les calendriers sauf ceux marqués comme "hidden" ou "deleted"
       return cal.accessRole !== 'none' && !cal.deleted;
     });
-    
+
     console.log(`📅 Found ${calendars.length} Google Calendars:`, calendars.map((c: any) => c.summary));
     return calendars.map((cal: any) => ({
       id: cal.id,
@@ -80,7 +80,7 @@ const getEventsFromCalendar = async (
   try {
     const timeMin = new Date(startDate).toISOString();
     const timeMax = new Date(endDate).toISOString();
-    
+
     const response = await fetch(
       `${GOOGLE_CALENDAR_API_URL}/calendars/${encodeURIComponent(calendarId)}/events?` +
       `timeMin=${encodeURIComponent(timeMin)}&` +
@@ -129,9 +129,9 @@ export const getGoogleCalendarEvents = async (
   try {
     const timeMin = new Date(startDate).toISOString();
     const timeMax = new Date(endDate).toISOString();
-    
+
     console.log('📅 Fetching Google Calendar events from', timeMin, 'to', timeMax);
-    
+
     // Récupérer la liste de tous les calendriers
     let calendars: Array<{ id: string; summary: string }>;
     try {
@@ -141,52 +141,52 @@ export const getGoogleCalendarEvents = async (
       console.warn('⚠️ Could not fetch calendar list, using primary calendar only');
       calendars = [{ id: 'primary', summary: 'Primary Calendar' }];
     }
-    
+
     // Récupérer les événements de chaque calendrier avec un délai pour éviter ERR_INSUFFICIENT_RESOURCES
     // On traite les calendriers par batch de 3 pour éviter de surcharger
     const eventsArrays: GoogleCalendarEvent[][] = [];
     const batchSize = 3;
-    
+
     console.log(`📋 Processing ${calendars.length} calendars in batches of ${batchSize}`);
-    
+
     for (let i = 0; i < calendars.length; i += batchSize) {
       const batch = calendars.slice(i, i + batchSize);
       console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1}: ${batch.map(c => c.summary).join(', ')}`);
-      
-      const batchPromises = batch.map(calendar => 
+
+      const batchPromises = batch.map(calendar =>
         getEventsFromCalendar(accessToken, calendar.id, startDate, endDate)
       );
-      
+
       const batchResults = await Promise.all(batchPromises);
       eventsArrays.push(...batchResults);
-      
+
       // Log des résultats du batch
       batchResults.forEach((events, idx) => {
         console.log(`  ✅ ${batch[idx].summary}: ${events.length} events`);
       });
-      
+
       // Petit délai entre les batches pour éviter de surcharger
       if (i + batchSize < calendars.length) {
         await new Promise(resolve => setTimeout(resolve, 100)); // 100ms de délai
       }
     }
-    
+
     // Combiner tous les événements
     const allEvents = eventsArrays.flat();
-    
+
     // Dédupliquer les événements (au cas où un événement serait dans plusieurs calendriers)
     const uniqueEvents = allEvents.filter((event, index, self) =>
       index === self.findIndex(e => e.id === event.id)
     );
-    
-    console.log(`✅ Found ${uniqueEvents.length} total events across ${calendars.length} calendars:`, 
+
+    console.log(`✅ Found ${uniqueEvents.length} total events across ${calendars.length} calendars:`,
       uniqueEvents.map(e => ({
         summary: e.summary,
         start: e.start?.dateTime || e.start?.date,
         end: e.end?.dateTime || e.end?.date
       }))
     );
-    
+
     return uniqueEvents;
   } catch (error) {
     console.error('❌ Error fetching Google Calendar events:', error);
@@ -244,7 +244,7 @@ export const getAvailableSlots = async (
   try {
     // Récupérer les événements occupés
     const events = await getGoogleCalendarEvents(accessToken, startDate, endDate);
-    
+
     // Convertir les événements en plages de temps occupées
     const busySlots = events
       .filter(event => event.start?.dateTime) // Ignorer les événements toute la journée
@@ -261,38 +261,38 @@ export const getAvailableSlots = async (
     const availableSlots: string[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     // Générer des créneaux de 8h à 19h pour chaque jour
     const now = new Date();
-    const minTime = new Date(now.getTime() + 15 * 60 * 1000); // Minimum 15 minutes à l'avance
-    
+    const minTime = now; // Permettre des appels instantanés "maintenant"
+
     // Pour chaque jour dans la plage
     for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
       const targetDay = new Date(start);
       targetDay.setDate(start.getDate() + dayOffset);
-      targetDay.setHours(8, 0, 0, 0); // Commencer à 8h
-      
+      targetDay.setHours(0, 0, 0, 0); // Commencer à minuit
+
       // Générer des créneaux toutes les slotInterval minutes de 8h à 19h
       let currentTime = new Date(targetDay);
       const dayEnd = new Date(targetDay);
-      dayEnd.setHours(19, 0, 0, 0); // Jusqu'à 19h
-      
+      dayEnd.setHours(23, 59, 59, 999); // Jusqu'à la fin de la journée
+
       while (currentTime < dayEnd && currentTime < end) {
         const slotEnd = new Date(currentTime.getTime() + slotDuration * 60 * 1000);
-        
+
         // Vérifier si ce créneau chevauche un événement existant
-        const isBusy = busySlots.some(busy => 
+        const isBusy = busySlots.some(busy =>
           currentTime < busy.end && slotEnd > busy.start
         );
-        
+
         // Vérifier si le créneau est dans les heures de disponibilité
         const isInAvailability = isSlotInAvailabilityHours(currentTime, availabilityHours);
-        
+
         // Vérifier que le créneau n'est pas dans le passé
         if (!isBusy && isInAvailability && currentTime >= minTime && slotEnd <= end && slotEnd <= dayEnd) {
           availableSlots.push(currentTime.toISOString());
         }
-        
+
         // Passer au créneau suivant
         currentTime = new Date(currentTime.getTime() + slotInterval * 60 * 1000);
       }
@@ -332,14 +332,14 @@ export const createGoogleCalendarEvent = async (
       },
       location: location || '',
     };
-    
+
     console.log('📅 Creating Google Calendar event:', {
       summary,
       startTime,
       endTime,
       timeZone,
     });
-    
+
     const response = await fetch(
       `${GOOGLE_CALENDAR_API_URL}/calendars/primary/events`,
       {
@@ -483,7 +483,7 @@ export const refreshGoogleAccessToken = async (
   try {
     // Note: Pour utiliser cette fonction, vous devez avoir configuré un OAuth 2.0 Client ID dans Google Cloud Console
     // et avoir obtenu un refresh token. Firebase Auth gère généralement cela automatiquement.
-    
+
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {

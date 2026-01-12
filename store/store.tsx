@@ -338,6 +338,8 @@ interface AppState {
   acceptAppointment: (appointmentId: string) => Promise<void>;
   cancelAppointment: (appointmentId: string) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  deleteAppointment: (appointmentId: string) => Promise<void>;
+  deleteClientPortfolio: (clientId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -842,6 +844,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  const deleteAppointment = async (appointmentId: string) => {
+    try {
+      const { deleteAppointmentData } = await import("../services/firebaseService");
+      await deleteAppointmentData(appointmentId);
+      // setAppointments is handled by the real-time listener
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      throw error;
+    }
+  };
+
+  const deleteClientPortfolio = async (clientId: string) => {
+    if (!currentUser) return;
+    try {
+      const { deleteAppointmentData } = await import("../services/firebaseService");
+      const appointmentsToDelete = appointments.filter(
+        a => a.lawyerId === currentUser.id && a.clientId === clientId
+      );
+
+      await Promise.all(
+        appointmentsToDelete.map(a => deleteAppointmentData(a.id))
+      );
+      // setAppointments is handled by the real-time listener
+    } catch (error) {
+      console.error("Error deleting client portfolio:", error);
+      throw error;
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -867,7 +898,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         bookAppointment,
         acceptAppointment,
         cancelAppointment,
-        updateProfile
+        updateProfile,
+        deleteAppointment,
+        deleteClientPortfolio
       }}
     >
       {children}

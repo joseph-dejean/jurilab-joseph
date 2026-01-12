@@ -374,8 +374,8 @@ export const CalendarAvailability: React.FC<CalendarAvailabilityProps> = ({ lawy
                         event: "Événement",
                         noEventsInRange: "Aucun événement dans cette période.",
                     }}
-                    min={new Date(0, 0, 0, 7, 0, 0)} // Start at 7am
-                    max={new Date(0, 0, 0, 21, 0, 0)} // End at 9pm
+                    min={new Date(0, 0, 0, 0, 0, 0)}
+                    max={new Date(0, 0, 0, 23, 59, 59)}
                 />
             </div>
 

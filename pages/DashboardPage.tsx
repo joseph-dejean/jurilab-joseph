@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Bell,
   Briefcase,
+  Trash2,
 } from "lucide-react";
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -30,7 +31,7 @@ import { useApp } from "../store/store";
 import { Appointment, UserRole } from "../types";
 
 export const DashboardPage: React.FC = () => {
-  const { currentUser, appointments, lawyers, logout, t, unreadMessagesCount } =
+  const { currentUser, appointments, lawyers, logout, t, unreadMessagesCount, deleteAppointment } =
     useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -432,6 +433,20 @@ export const DashboardPage: React.FC = () => {
                             Détails
                             <ChevronRight className="w-4 h-4 ml-1" />
                           </Button>
+                          {isLawyer && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                              onClick={async () => {
+                                if (window.confirm("Supprimer ce rendez-vous ?")) {
+                                  await deleteAppointment(appt.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );

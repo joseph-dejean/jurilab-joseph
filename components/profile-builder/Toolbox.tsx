@@ -23,7 +23,7 @@ export const Toolbox: React.FC<ToolboxProps> = ({ onAddBlock }) => {
 
   return (
     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-subtle border border-slate-100 dark:border-slate-700 sticky top-4">
-      <h3 className="font-serif font-bold text-navy dark:text-white mb-4 flex items-center gap-2">
+      <h3 className="font-serif font-bold text-primary-900 dark:text-white mb-4 flex items-center gap-2">
         <Plus className="w-4 h-4" />
         Ajouter un bloc
       </h3>
@@ -32,15 +32,15 @@ export const Toolbox: React.FC<ToolboxProps> = ({ onAddBlock }) => {
           <button
             key={tool.type}
             onClick={() => onAddBlock(tool.type)}
-            className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-brand-DEFAULT hover:bg-brand-light/20 dark:hover:bg-brand-dark/20 transition-all group text-center"
+            className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary-600 hover:bg-primary-50/20 dark:hover:bg-primary-900/20 transition-all group text-center"
           >
-            <tool.icon className="w-6 h-6 text-slate-500 dark:text-slate-400 group-hover:text-brand-DEFAULT mb-2" />
-            <span className="text-sm font-medium text-navy dark:text-white">{tool.label}</span>
+            <tool.icon className="w-6 h-6 text-slate-500 dark:text-slate-400 group-hover:text-primary-600 mb-2" />
+            <span className="text-sm font-medium text-primary-900 dark:text-white">{tool.label}</span>
             <span className="text-[10px] text-slate-400 dark:text-slate-500">{tool.desc}</span>
           </button>
         ))}
       </div>
-      
+
       <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg text-xs text-slate-500 dark:text-slate-400">
         <p>💡 Glissez les blocs pour réorganiser votre profil.</p>
       </div>

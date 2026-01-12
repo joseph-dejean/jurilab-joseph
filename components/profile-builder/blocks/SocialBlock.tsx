@@ -43,7 +43,7 @@ export const SocialBlock: React.FC<SocialBlockProps> = ({ block, onChange, readO
 
   return (
     <div className="h-full flex flex-col justify-center bg-slate-50 dark:bg-slate-800 p-6 rounded-lg">
-      <h3 className="font-serif font-bold text-navy dark:text-white mb-4 text-center">
+      <h3 className="font-serif font-bold text-primary-900 dark:text-white mb-4 text-center">
         {block.title || 'Réseaux sociaux'}
       </h3>
       {readOnly ? (
@@ -58,7 +58,7 @@ export const SocialBlock: React.FC<SocialBlockProps> = ({ block, onChange, readO
                 href={url as string}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-full text-slate-600 dark:text-slate-300 hover:bg-brand-DEFAULT hover:text-white transition-colors"
+                className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-full text-slate-600 dark:text-slate-300 hover:bg-primary-600 hover:text-white transition-colors"
               >
                 <Icon className="w-5 h-5" />
               </a>

@@ -13,7 +13,7 @@ export const SearchPage: React.FC = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialQuery = searchParams.get('q') || '';
-  
+
   // AI params from HomePage
   const isAiFromUrl = searchParams.get('ai') === 'true';
   const specialtyFromUrl = searchParams.get('specialty') || '';
@@ -22,7 +22,7 @@ export const SearchPage: React.FC = () => {
   const [query, setQuery] = useState(initialQuery);
   const [filteredLawyers, setFilteredLawyers] = useState<Lawyer[]>(lawyers);
   const [selectedLawyerId, setSelectedLawyerId] = useState<string | null>(null);
-  
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{ summary: string; reasoning: string } | null>(
@@ -37,7 +37,7 @@ export const SearchPage: React.FC = () => {
   // Filters
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>(isAiFromUrl ? specialtyFromUrl : '');
   const [selectedRegion, setSelectedRegion] = useState<string>('');
-  
+
   // City search state
   const [citySearch, setCitySearch] = useState<string>('');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -52,7 +52,7 @@ export const SearchPage: React.FC = () => {
       .filter(c => c && c !== '')
       .sort();
   }, [lawyers]);
-  
+
   // Filter cities based on search input
   const filteredCities = useMemo(() => {
     if (!citySearch) return allCities;
@@ -77,7 +77,7 @@ export const SearchPage: React.FC = () => {
     } else {
       applyFilters();
     }
-  }, []); 
+  }, []);
 
   useEffect(() => {
     if (isAiSearchActive) {
@@ -95,16 +95,16 @@ export const SearchPage: React.FC = () => {
 
     setIsAnalyzing(true);
     setAiSuggestion(null);
-    
+
     try {
       const analysis = await analyzeLegalCase(text);
       setAiSuggestion({ summary: t.search.aiSuggestion, reasoning: analysis.summary });
-      
+
       // Apply filters directly with the new specialty to avoid race conditions
       const newSpecialty = analysis.specialty;
       setSelectedSpecialty(newSpecialty);
       setIsAiSearchActive(true);
-      
+
       // Apply filters immediately with the known values
       let results = [...lawyers];
       if (newSpecialty) {
@@ -115,7 +115,7 @@ export const SearchPage: React.FC = () => {
       }
       results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
       setFilteredLawyers(results);
-      
+
     } catch (error: any) {
       console.error("AI Search failed:", error);
       setAiSuggestion({
@@ -129,9 +129,9 @@ export const SearchPage: React.FC = () => {
     }
   };
 
-  const applyFilters = () => { 
+  const applyFilters = () => {
     let results = [...lawyers];
-    
+
     if (selectedSpecialty) {
       results = results.filter(l => l.specialty === selectedSpecialty);
     }
@@ -142,8 +142,8 @@ export const SearchPage: React.FC = () => {
 
     if (!isAiSearchActive && query) {
       const lowerQ = query.toLowerCase();
-      results = results.filter(l => 
-        l.name?.toLowerCase().includes(lowerQ) || 
+      results = results.filter(l =>
+        l.name?.toLowerCase().includes(lowerQ) ||
         l.location?.toLowerCase().includes(lowerQ) ||
         l.firmName?.toLowerCase().includes(lowerQ)
       );
@@ -153,7 +153,7 @@ export const SearchPage: React.FC = () => {
 
     setFilteredLawyers(results);
   };
-  
+
   const handleManualSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setIsAiSearchActive(false);
@@ -209,7 +209,7 @@ export const SearchPage: React.FC = () => {
                 {/* Search Input */}
                 <div className="relative flex-grow">
                   <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-primary-500" />
-                  <input 
+                  <input
                     type="text"
                     value={query}
                     onChange={(e) => {
@@ -226,11 +226,10 @@ export const SearchPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`lg:hidden p-2.5 sm:p-3 rounded-xl border-2 transition-colors ${
-                    showFilters || hasActiveFilters
+                  className={`lg:hidden p-2.5 sm:p-3 rounded-xl border-2 transition-colors ${showFilters || hasActiveFilters
                       ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/50 text-primary-600'
                       : 'border-surface-200 dark:border-deep-700 text-deep-500'
-                  }`}
+                    }`}
                 >
                   <SlidersHorizontal className="w-5 h-5" />
                   {hasActiveFilters && (
@@ -248,7 +247,7 @@ export const SearchPage: React.FC = () => {
               <div className="hidden lg:flex items-center gap-3">
                 {/* Specialty Dropdown */}
                 <div className="relative">
-                  <select 
+                  <select
                     className="appearance-none pl-4 pr-10 py-2.5 rounded-xl bg-white dark:bg-deep-800 border-2 border-surface-200 dark:border-deep-700 input-focus outline-none text-sm font-medium text-deep-700 dark:text-surface-300 cursor-pointer"
                     value={selectedSpecialty}
                     onChange={(e) => setSelectedSpecialty(e.target.value)}
@@ -290,10 +289,10 @@ export const SearchPage: React.FC = () => {
                       <X className="w-3 h-3 text-deep-400" />
                     </button>
                   )}
-                  
+
                   {showCityDropdown && (
                     <div className="absolute z-50 w-full mt-2 bg-white dark:bg-deep-900 border border-surface-200 dark:border-deep-700 rounded-xl shadow-glass-lg max-h-64 overflow-y-auto">
-                      <button 
+                      <button
                         type="button"
                         onClick={() => {
                           setSelectedRegion('');
@@ -314,9 +313,8 @@ export const SearchPage: React.FC = () => {
                               setCitySearch('');
                               setShowCityDropdown(false);
                             }}
-                            className={`w-full px-4 py-2.5 text-left hover:bg-surface-50 dark:hover:bg-deep-800 text-sm ${
-                              selectedRegion === city ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 font-medium' : ''
-                            }`}
+                            className={`w-full px-4 py-2.5 text-left hover:bg-surface-50 dark:hover:bg-deep-800 text-sm ${selectedRegion === city ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 font-medium' : ''
+                              }`}
                           >
                             {city}
                           </button>
@@ -344,11 +342,11 @@ export const SearchPage: React.FC = () => {
                 <div className="flex-1" />
 
                 {/* AI Search Button */}
-                <Button 
+                <Button
                   type="button"
                   variant="accent"
-                  onClick={() => handleAISearch(query)} 
-                  isLoading={isAnalyzing} 
+                  onClick={() => handleAISearch(query)}
+                  isLoading={isAnalyzing}
                   disabled={!query}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
@@ -359,7 +357,7 @@ export const SearchPage: React.FC = () => {
               {/* Mobile Filters Panel */}
               {showFilters && (
                 <div className="lg:hidden space-y-3 pt-3 border-t border-surface-100 dark:border-deep-800 animate-fade-in">
-                  <select 
+                  <select
                     className="w-full px-4 py-3 rounded-xl bg-surface-50 dark:bg-deep-800 border-2 border-surface-200 dark:border-deep-700 text-sm"
                     value={selectedSpecialty}
                     onChange={(e) => setSelectedSpecialty(e.target.value)}
@@ -387,12 +385,12 @@ export const SearchPage: React.FC = () => {
                     <Button type="submit" variant="primary" className="flex-1">
                       Appliquer
                     </Button>
-                    <Button 
+                    <Button
                       type="button"
                       variant="accent"
                       className="flex-1"
-                      onClick={() => handleAISearch(query)} 
-                      isLoading={isAnalyzing} 
+                      onClick={() => handleAISearch(query)}
+                      isLoading={isAnalyzing}
                       disabled={!query}
                     >
                       <Sparkles className="w-4 h-4 mr-1" />
@@ -423,21 +421,19 @@ export const SearchPage: React.FC = () => {
           <div className="flex gap-1 bg-surface-100 dark:bg-deep-800 rounded-lg p-1">
             <button
               onClick={() => setMobileView('list')}
-              className={`p-2 rounded-md transition-colors ${
-                mobileView === 'list' 
-                  ? 'bg-white dark:bg-deep-700 shadow-sm text-primary-600' 
+              className={`p-2 rounded-md transition-colors ${mobileView === 'list'
+                  ? 'bg-white dark:bg-deep-700 shadow-sm text-primary-600'
                   : 'text-deep-500'
-              }`}
+                }`}
             >
               <List className="w-4 h-4" />
             </button>
             <button
               onClick={() => setMobileView('map')}
-              className={`p-2 rounded-md transition-colors ${
-                mobileView === 'map' 
-                  ? 'bg-white dark:bg-deep-700 shadow-sm text-primary-600' 
+              className={`p-2 rounded-md transition-colors ${mobileView === 'map'
+                  ? 'bg-white dark:bg-deep-700 shadow-sm text-primary-600'
                   : 'text-deep-500'
-              }`}
+                }`}
             >
               <Map className="w-4 h-4" />
             </button>
@@ -447,23 +443,20 @@ export const SearchPage: React.FC = () => {
         {/* Main Content */}
         <div className="flex flex-grow overflow-hidden">
           {/* Results List - Hidden on mobile when map view is active */}
-          <div className={`w-full md:w-1/2 lg:w-5/12 overflow-y-auto scrollbar-thin momentum-scroll ${
-            mobileView === 'map' ? 'hidden md:block' : 'block'
-          }`}>
+          <div className={`w-full md:w-1/2 lg:w-5/12 overflow-y-auto scrollbar-thin momentum-scroll ${mobileView === 'map' ? 'hidden md:block' : 'block'
+            }`}>
             <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20 lg:pb-4">
               {/* AI Suggestion Banner */}
               {aiSuggestion && (
-                <div className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 ${
-                  aiSuggestion.summary.includes('indisponible')
+                <div className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 ${aiSuggestion.summary.includes('indisponible')
                     ? 'bg-accent-50 dark:bg-accent-950/30 border-accent-200 dark:border-accent-800/50'
                     : 'bg-primary-50 dark:bg-primary-950/30 border-primary-200 dark:border-primary-800/50'
-                }`}>
+                  }`}>
                   <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-xl flex-shrink-0 ${
-                      aiSuggestion.summary.includes('indisponible')
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${aiSuggestion.summary.includes('indisponible')
                         ? 'bg-accent-100 dark:bg-accent-900/50 text-accent-600'
                         : 'bg-primary-100 dark:bg-primary-900/50 text-primary-600'
-                    }`}>
+                      }`}>
                       <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -498,21 +491,20 @@ export const SearchPage: React.FC = () => {
                 <>
                   {/* Lawyer Cards */}
                   {filteredLawyers.slice(0, displayLimit).map(lawyer => (
-                    <div 
+                    <div
                       key={lawyer.id}
                       id={`lawyer-card-${lawyer.id}`}
                       onClick={() => handleCardClick(lawyer.id)}
-                      className={`group relative bg-white dark:bg-deep-900 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 cursor-pointer active:scale-[0.98] ${
-                        selectedLawyerId === lawyer.id 
-                          ? 'border-primary-500 shadow-card-hover' 
+                      className={`group relative bg-white dark:bg-deep-900 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 cursor-pointer active:scale-[0.98] ${selectedLawyerId === lawyer.id
+                          ? 'border-primary-500 shadow-card-hover'
                           : 'border-surface-100 dark:border-deep-800 hover:border-primary-200 dark:hover:border-primary-800 hover:shadow-card-hover'
-                      }`}
+                        }`}
                     >
                       <div className="p-4 sm:p-5">
                         <div className="flex gap-3 sm:gap-4">
-                          <img 
-                            src={lawyer.avatarUrl} 
-                            alt={lawyer.name} 
+                          <img
+                            src={lawyer.avatarUrl}
+                            alt={lawyer.name}
                             className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover ring-2 ring-surface-100 dark:ring-deep-700"
                           />
                           <div className="flex-grow min-w-0">
@@ -534,7 +526,7 @@ export const SearchPage: React.FC = () => {
                                 </div>
                               )}
                             </div>
-                            
+
                             <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2 sm:mt-3">
                               <span className="badge badge-primary text-[10px] sm:text-xs">
                                 <Briefcase className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -552,8 +544,8 @@ export const SearchPage: React.FC = () => {
                           <p className="text-xs sm:text-sm text-deep-500 dark:text-surface-500 line-clamp-1 flex-1">
                             {lawyer.bio?.slice(0, 60)}...
                           </p>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="primary"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -573,7 +565,7 @@ export const SearchPage: React.FC = () => {
                   {/* Load More Button */}
                   {filteredLawyers.length > displayLimit && (
                     <div className="text-center py-4">
-                      <Button 
+                      <Button
                         onClick={() => setDisplayLimit(prev => prev + 20)}
                         variant="secondary"
                         className="w-full sm:w-auto"
@@ -598,11 +590,10 @@ export const SearchPage: React.FC = () => {
           </div>
 
           {/* Map View - Hidden on mobile when list view is active */}
-          <div className={`w-full md:w-1/2 lg:w-7/12 h-full relative ${
-            mobileView === 'list' ? 'hidden md:block' : 'block'
-          }`}>
-            <MapComponent 
-              lawyers={filteredLawyers.slice(0, 200)} 
+          <div className={`w-full md:w-1/2 lg:w-7/12 h-full relative ${mobileView === 'list' ? 'hidden md:block' : 'block'
+            }`}>
+            <MapComponent
+              lawyers={filteredLawyers.slice(0, 200)}
               selectedLawyerId={selectedLawyerId || undefined}
               onSelectLawyer={handleCardClick}
             />
@@ -617,7 +608,7 @@ export const SearchPage: React.FC = () => {
 
       {/* Lawyer Profile Modal */}
       {modalLawyer && (
-        <LawyerProfileModal 
+        <LawyerProfileModal
           lawyer={modalLawyer}
           onClose={() => setModalLawyer(null)}
         />

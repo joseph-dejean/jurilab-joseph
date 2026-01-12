@@ -92,8 +92,8 @@ export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, o
   return (
     <div className="h-full w-full flex flex-col bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 p-4 overflow-y-auto">
       <div className="flex items-center gap-2 mb-4">
-        <UserPlus className="w-5 h-5 text-brand-DEFAULT" />
-        <h3 className="font-serif font-bold text-navy dark:text-white text-lg">
+        <UserPlus className="w-5 h-5 text-primary-600" />
+        <h3 className="font-serif font-bold text-primary-900 dark:text-white text-lg">
           {block.title || 'Équipe'}
         </h3>
         {!readOnly && (
@@ -131,13 +131,13 @@ export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, o
                         }}
                       />
                     ) : (
-                      <div className="w-16 h-16 rounded-full bg-brand-light dark:bg-brand-dark flex items-center justify-center text-brand-DEFAULT font-bold text-lg">
+                      <div className="w-16 h-16 rounded-full bg-primary-50 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 font-bold text-lg">
                         {collab.firstName?.[0] || ''}{collab.lastName?.[0] || ''}
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-navy dark:text-white text-sm">
+                    <h4 className="font-semibold text-primary-900 dark:text-white text-sm">
                       {collab.firstName} {collab.lastName}
                     </h4>
                     {collab.role && (
@@ -150,7 +150,7 @@ export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, o
                         {collab.specialties.map((spec, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-brand-light/30 dark:bg-brand-dark/30 text-brand-DEFAULT rounded-full"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-primary-50/30 dark:bg-primary-900/30 text-primary-600 rounded-full"
                           >
                             <Briefcase className="w-3 h-3" />
                             {spec}
@@ -188,7 +188,7 @@ export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, o
                           const url = prompt("URL de la photo:");
                           if (url) updateCollaborator(collab.id, { photo: url });
                         }}
-                        className="absolute -bottom-1 -right-1 w-5 h-5 bg-brand-DEFAULT text-white rounded-full flex items-center justify-center text-xs hover:bg-brand-dark"
+                        className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary-600 text-white rounded-full flex items-center justify-center text-xs hover:bg-primary-700"
                         title="Changer la photo"
                       >
                         ✎
@@ -234,7 +234,7 @@ export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, o
                     {collab.specialties.map((spec, idx) => (
                       <span
                         key={idx}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-brand-light/30 dark:bg-brand-dark/30 text-brand-DEFAULT rounded-full"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-primary-50/30 dark:bg-primary-900/30 text-primary-600 rounded-full"
                       >
                         <Briefcase className="w-3 h-3" />
                         {spec}
@@ -289,10 +289,10 @@ export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, o
               </div>
             </div>
           ))}
-          
+
           <button
             onClick={addCollaborator}
-            className="w-full py-2 px-3 text-sm bg-brand-light/20 dark:bg-brand-dark/20 hover:bg-brand-light/30 dark:hover:bg-brand-dark/30 border border-brand-DEFAULT/30 rounded-lg text-brand-DEFAULT font-medium flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-2 px-3 text-sm bg-primary-50/20 dark:bg-primary-900/20 hover:bg-primary-50/30 dark:hover:bg-primary-700/30 border border-primary-600/30 rounded-lg text-primary-600 font-medium flex items-center justify-center gap-2 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Ajouter un collaborateur

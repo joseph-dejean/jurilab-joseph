@@ -39,7 +39,7 @@ interface ClientPortfolioData {
 
 export const PortfolioPage: React.FC = () => {
     const navigate = useNavigate();
-    const { currentUser, appointments, t } = useApp();
+    const { currentUser, appointments, t, deleteAppointment, deleteClientPortfolio } = useApp();
     const [clients, setClients] = useState<ClientPortfolioData[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -186,8 +186,8 @@ export const PortfolioPage: React.FC = () => {
                                             key={client.id}
                                             onClick={() => setSelectedClientId(client.id)}
                                             className={`w-full text-left p-4 flex items-center gap-4 transition-all border-b border-surface-50 dark:border-deep-800/50 ${selectedClientId === client.id
-                                                    ? 'bg-primary-50 dark:bg-primary-950/30 border-l-4 border-l-primary-500'
-                                                    : 'hover:bg-surface-50 dark:hover:bg-deep-800/40'
+                                                ? 'bg-primary-50 dark:bg-primary-950/30 border-l-4 border-l-primary-500'
+                                                : 'hover:bg-surface-50 dark:hover:bg-deep-800/40'
                                                 }`}
                                         >
                                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/40 dark:to-primary-800/40 flex items-center justify-center overflow-hidden">
@@ -253,6 +253,20 @@ export const PortfolioPage: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                                                onClick={async () => {
+                                                    if (window.confirm(`Supprimer tout le dossier de ${selectedClient.name} ? Cette action est irréversible.`)) {
+                                                        await deleteClientPortfolio(selectedClient.id);
+                                                        setSelectedClientId(null);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                Supprimer le dossier
+                                            </Button>
                                             <Button variant="primary" size="sm" onClick={() => navigate(`/messages?lawyerId=${currentUser.id}&clientId=${selectedClient.id}`)}>
                                                 <MessageSquare className="w-4 h-4 mr-2" />
                                                 Message
@@ -276,8 +290,8 @@ export const PortfolioPage: React.FC = () => {
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id as any)}
                                             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
-                                                    ? 'bg-white dark:bg-deep-800 text-primary-600 dark:text-primary-400 shadow-sm'
-                                                    : 'text-deep-500 hover:text-deep-700 dark:hover:text-surface-200'
+                                                ? 'bg-white dark:bg-deep-800 text-primary-600 dark:text-primary-400 shadow-sm'
+                                                : 'text-deep-500 hover:text-deep-700 dark:hover:text-surface-200'
                                                 }`}
                                         >
                                             <tab.icon className="w-4 h-4" />
@@ -392,16 +406,30 @@ export const PortfolioPage: React.FC = () => {
                                                                 <div className="flex items-center gap-3 text-xs text-deep-500 dark:text-surface-400 mt-1">
                                                                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {format(parseISO(appt.date), 'HH:mm')}</span>
                                                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${appt.status === 'CONFIRMED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30' :
-                                                                            appt.status === 'PENDING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30' :
-                                                                                'bg-surface-200 text-deep-600 dark:bg-deep-800'
+                                                                        appt.status === 'PENDING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30' :
+                                                                            'bg-surface-200 text-deep-600 dark:bg-deep-800'
                                                                         }`}>{appt.status}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <Button variant="ghost" size="sm" onClick={() => navigate('/my-appointments')}>
-                                                            Détails
-                                                            <ChevronRight className="w-4 h-4 ml-1" />
-                                                        </Button>
+                                                        <div className="flex items-center gap-2">
+                                                            <Button variant="ghost" size="sm" onClick={() => navigate('/my-appointments')}>
+                                                                Détails
+                                                                <ChevronRight className="w-4 h-4 ml-1" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                                                                onClick={async () => {
+                                                                    if (window.confirm("Supprimer ce rendez-vous ?")) {
+                                                                        await deleteAppointment(appt.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>

@@ -20,7 +20,7 @@ export const TestimonialsBlock: React.FC<TestimonialsBlockProps> = ({ block, onC
     <div className="h-full flex flex-col justify-center bg-slate-50 dark:bg-slate-800 p-6 rounded-lg">
       {readOnly ? (
         <>
-          <Quote className="w-8 h-8 text-brand-DEFAULT mb-3 opacity-50" />
+          <Quote className="w-8 h-8 text-primary-600 mb-3 opacity-50" />
           <p className="text-sm text-slate-700 dark:text-slate-200 italic mb-4 flex-1">
             "{testimonial.text}"
           </p>
@@ -29,11 +29,10 @@ export const TestimonialsBlock: React.FC<TestimonialsBlockProps> = ({ block, onC
               {[...Array(5)].map((_, i) => (
                 <Star
                   key={i}
-                  className={`w-4 h-4 ${
-                    i < (testimonial.rating || 5)
+                  className={`w-4 h-4 ${i < (testimonial.rating || 5)
                       ? 'text-yellow-400 fill-yellow-400'
                       : 'text-slate-300 dark:text-slate-600'
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -44,7 +43,7 @@ export const TestimonialsBlock: React.FC<TestimonialsBlockProps> = ({ block, onC
         </>
       ) : (
         <>
-          <Quote className="w-6 h-6 text-brand-DEFAULT mb-2" />
+          <Quote className="w-6 h-6 text-primary-600 mb-2" />
           <textarea
             value={testimonial.text || ''}
             onChange={(e) => {
@@ -73,11 +72,10 @@ export const TestimonialsBlock: React.FC<TestimonialsBlockProps> = ({ block, onC
                   const newTestimonial = { ...testimonial, rating };
                   onChange(block.id, { content: JSON.stringify(newTestimonial) });
                 }}
-                className={`w-5 h-5 ${
-                  rating <= (testimonial.rating || 5)
+                className={`w-5 h-5 ${rating <= (testimonial.rating || 5)
                     ? 'text-yellow-400 fill-yellow-400'
                     : 'text-slate-300'
-                }`}
+                  }`}
               >
                 <Star className="w-full h-full" />
               </button>

@@ -28,7 +28,7 @@ export const StatsBlock: React.FC<StatsBlockProps> = ({ block, onChange, readOnl
   const stats = parseStats();
 
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-gradient-to-br from-brand-light to-brand-DEFAULT dark:from-brand-dark dark:to-brand-DEFAULT p-6 text-center">
+    <div className="h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary-600 to-primary-800 dark:from-primary-900 dark:to-primary-800 p-6 text-center">
       {readOnly ? (
         <>
           <div className="grid grid-cols-3 gap-4 w-full">

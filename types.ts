@@ -188,8 +188,8 @@ export interface GoogleCalendarCredentials {
 export interface GoogleCalendarEvent {
   id: string;
   summary: string;
-  start: { dateTime: string; timeZone: string };
-  end: { dateTime: string; timeZone: string };
+  start: { dateTime?: string; date?: string; timeZone?: string };
+  end: { dateTime?: string; date?: string; timeZone?: string };
   description?: string;
   location?: string;
 }
