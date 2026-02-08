@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isLawyer() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'LAWYER';
+    }
+    
+    function isClient() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'CLIENT';
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update, delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Appointments collection
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.clientId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid
+      );
+    }
+
+    // Diligences collection (time tracking)
+    match /diligences/{diligenceId} {
+      // Only lawyers can read/write their own diligences
+      allow read: if isAuthenticated() && (
+        resource.data.lawyerId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && 
+                      request.resource.data.lawyerId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.lawyerId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.lawyerId == request.auth.uid
+      );
+    }
+
+    // Chat channels
+    match /chatChannels/{channelId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Documents collection
+    match /documents/{documentId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        (resource.data.clientId == request.auth.uid && resource.data.sharedWithClient == true)
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        resource.data.uploadedBy == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.lawyerId == request.auth.uid ||
+        resource.data.uploadedBy == request.auth.uid
+      );
+    }
+
+    // Conversations collection (for chat history)
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.lawyerId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && 
+                      request.resource.data.lawyerId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.lawyerId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.lawyerId == request.auth.uid
+      );
+    }
+
+    // Lawyers collection (public profiles)
+    match /lawyers/{lawyerId} {
+      allow read: if true; // Public read access for lawyer profiles
+      allow create, update: if isAuthenticated() && (
+        isAdmin() ||
+        isOwner(lawyerId)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

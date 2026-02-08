@@ -37,12 +37,17 @@ interface DailyTranscript {
 
 /**
  * Crée une salle de visioconférence Daily.co
+ * 
+ * @param maxParticipants - Nombre maximum de participants (défaut: 10)
+ *   - 2: Call privé (avocat + client uniquement)
+ *   - 10+: Meeting avec invités/collaborateurs
  */
 export const createRoom = async (
   appointmentId: string,
   lawyerName: string,
   clientName: string,
-  durationMinutes: number = 60
+  durationMinutes: number = 60,
+  maxParticipants: number = 10 // Augmenté pour permettre les invités
 ): Promise<{ roomUrl: string; roomId: string }> => {
   if (!DAILY_API_KEY) {
     throw new Error('VITE_DAILY_API_KEY is not configured');
@@ -64,12 +69,17 @@ export const createRoom = async (
         name: roomName,
         privacy: 'private',
         properties: {
-          // Transcription uniquement (pas d'enregistrement vidéo/audio)
-          enable_transcription: true, // Transcription en temps réel (pay-as-you-go, 0.0059$/min/participant)
+          // Basic room configuration
           enable_screenshare: true,
           enable_chat: true,
-          exp: expirationTime, // Expiration de la salle
-          max_participants: 2, // Avocat + Client
+          enable_prejoin_ui: false, // Disable prejoin, we handle it ourselves
+          enable_network_ui: true, // Show network quality
+          enable_people_ui: false, // We build custom UI
+          exp: expirationTime, // Room expiration
+          max_participants: maxParticipants, // Configurable (défaut: 10)
+          start_video_off: false,
+          start_audio_off: false,
+          // Note: Transcription is enabled at the account level and started via API
         },
       }),
     });
@@ -124,8 +134,9 @@ export const generateToken = async (
           user_name: userName,
           is_owner: isOwner,
           exp: expirationTime,
-          // Auto-start transcription if owner joins
-          ...(isOwner ? { start_transcription: true } : {}),
+          enable_screenshare: true,
+          enable_recording: false, // No recording, only transcription
+          // Transcription will be started programmatically with language set to French
         },
       }),
     });
@@ -143,6 +154,59 @@ export const generateToken = async (
     return tokenData.token;
   } catch (error) {
     console.error('❌ Error generating Daily.co token:', error);
+    throw error;
+  }
+};
+
+/**
+ * Génère un token INVITÉ pour partager avec des participants externes
+ * Token plus permissif que les tokens utilisateurs authentifiés
+ */
+export const generateGuestToken = async (
+  roomId: string,
+  guestName: string = 'Invité'
+): Promise<string> => {
+  if (!DAILY_API_KEY) {
+    throw new Error('VITE_DAILY_API_KEY is not configured');
+  }
+
+  try {
+    const guestId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const expirationTime = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 24h
+
+    const response = await fetch(`${DAILY_API_BASE_URL}/meeting-tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DAILY_API_KEY}`,
+      },
+      body: JSON.stringify({
+        properties: {
+          room_name: roomId,
+          user_id: guestId,
+          user_name: guestName,
+          is_owner: false,
+          exp: expirationTime,
+          enable_screenshare: true,
+          enable_recording: false,
+          // Guests can participate but can't control transcription
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ Daily.co Guest Token Error:', error);
+      throw new Error(`Failed to generate guest token: ${response.status} ${error}`);
+    }
+
+    const tokenData: DailyToken = await response.json();
+
+    console.log(`✅ Guest token generated for: ${guestName}`);
+
+    return tokenData.token;
+  } catch (error) {
+    console.error('❌ Error generating guest token:', error);
     throw error;
   }
 };

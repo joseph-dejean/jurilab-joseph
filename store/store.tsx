@@ -318,8 +318,8 @@ interface AppState {
   translateSpecialty: (s: LegalSpecialty) => string;
   setLanguage: (lang: Language) => void;
   login: (email: string, password: string) => Promise<void>;
-  loginGoogle: (role?: UserRole) => Promise<void>;
-  loginMicrosoft: (role?: UserRole) => Promise<void>;
+  loginGoogle: (role?: UserRole) => Promise<{ isNewUser: boolean }>;
+  loginMicrosoft: (role?: UserRole) => Promise<{ isNewUser: boolean }>;
   register: (
     email: string,
     password: string,
@@ -367,11 +367,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           "UID:",
           firebaseUser.uid
         );
-        // Charger le profil de manière asynchrone pour ne pas bloquer
-        (async () => {
-          try {
-            const userProfile = await getUserProfile(firebaseUser.uid);
-            if (userProfile) {
+          // Charger le profil de manière asynchrone pour ne pas bloquer
+          (async () => {
+            try {
+              let userProfile = await getUserProfile(firebaseUser.uid);
+
+              // Retry logic for race conditions (registration)
+              if (!userProfile) {
+                console.log("⏳ Profile not found immediately, retrying in 1s...");
+                await new Promise(r => setTimeout(r, 1000));
+                userProfile = await getUserProfile(firebaseUser.uid);
+              }
+              if (!userProfile) {
+                console.log("⏳ Profile still not found, retrying in 2s...");
+                await new Promise(r => setTimeout(r, 2000));
+                userProfile = await getUserProfile(firebaseUser.uid);
+              }
+
+              if (userProfile) {
               // Block disabled accounts (app-level). They can still sign-in to Firebase Auth,
               // but we immediately sign them out and deny access to the UI.
               if ((userProfile as any).disabled === true) {
@@ -510,11 +523,82 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     return () => unsubscribe();
   }, [currentUser]);
 
-  // Load lawyers from Firebase on mount
+  // Load lawyers from Firebase with IndexedDB caching (for large datasets)
   useEffect(() => {
+    const DB_NAME = 'jurilab_cache';
+    const STORE_NAME = 'lawyers';
+    const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes cache
+
+    // IndexedDB helpers for large data caching
+    const openDB = (): Promise<IDBDatabase> => {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+      });
+    };
+
+    const getCachedLawyers = async (): Promise<{ lawyers: Lawyer[]; timestamp: number } | null> => {
+      try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(STORE_NAME, 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.get('data');
+          request.onerror = () => { db.close(); reject(request.error); };
+          request.onsuccess = () => { db.close(); resolve(request.result || null); };
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    const setCachedLawyers = async (lawyers: Lawyer[]): Promise<void> => {
+      try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(STORE_NAME, 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.put({ lawyers, timestamp: Date.now() }, 'data');
+          request.onerror = () => { db.close(); reject(request.error); };
+          request.onsuccess = () => { db.close(); resolve(); };
+        });
+      } catch (error) {
+        console.warn("⚠️ Could not cache lawyers to IndexedDB:", error);
+      }
+    };
+
     const loadLawyers = async () => {
       try {
         setIsLoadingLawyers(true);
+        const now = Date.now();
+        
+        // Try to load from IndexedDB cache first
+        const cached = await getCachedLawyers();
+        
+        if (cached && cached.lawyers && cached.lawyers.length > 0) {
+          const cacheAge = now - cached.timestamp;
+          if (cacheAge < CACHE_DURATION_MS) {
+            console.log(`⚡ Loaded ${cached.lawyers.length} lawyers from IndexedDB cache (${Math.round(cacheAge / 1000)}s old)`);
+            setLawyers(cached.lawyers);
+            setIsLoadingLawyers(false);
+            
+            // Refresh in background if cache is older than 1 minute
+            if (cacheAge > 60 * 1000) {
+              console.log("🔄 Refreshing lawyers in background...");
+              refreshLawyersInBackground();
+            }
+            return;
+          }
+        }
+        
+        // No valid cache, load from Firebase
         console.log("🔥 Loading lawyers from Firebase...");
         const lawyersData = await loadLawyersFromFirebase();
 
@@ -525,11 +609,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         } else {
           setLawyers(lawyersData);
           console.log(`✅ Loaded ${lawyersData.length} lawyers from Firebase`);
+          
+          // Cache the data to IndexedDB (no size limit like localStorage)
+          await setCachedLawyers(lawyersData);
+          console.log("💾 Lawyers data cached to IndexedDB");
         }
       } catch (error) {
         console.error("❌ Failed to load lawyers from Firebase:", error);
+        
+        // Try to use cached data as fallback
+        try {
+          const cached = await getCachedLawyers();
+          if (cached && cached.lawyers && cached.lawyers.length > 0) {
+            console.log(`⚠️ Using stale cache (${cached.lawyers.length} lawyers) due to Firebase error`);
+            setLawyers(cached.lawyers);
+          }
+        } catch (cacheError) {
+          console.error("❌ Cache also failed:", cacheError);
+        }
       } finally {
         setIsLoadingLawyers(false);
+      }
+    };
+
+    const refreshLawyersInBackground = async () => {
+      try {
+        const lawyersData = await loadLawyersFromFirebase();
+        if (lawyersData.length > 0) {
+          setLawyers(lawyersData);
+          await setCachedLawyers(lawyersData);
+          console.log(`✅ Background refresh complete: ${lawyersData.length} lawyers`);
+        }
+      } catch (error) {
+        console.warn("⚠️ Background refresh failed:", error);
       }
     };
 
@@ -560,12 +672,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     await loginUser(email, password);
   };
 
-  const loginGoogle = async (role?: UserRole) => {
-    await loginWithGoogle(role);
+  const loginGoogle = async (role?: UserRole): Promise<{ isNewUser: boolean }> => {
+    const result = await loginWithGoogle(role);
+    return { isNewUser: result.isNewUser };
   };
 
-  const loginMicrosoft = async (role?: UserRole) => {
-    await loginWithMicrosoft(role);
+  const loginMicrosoft = async (role?: UserRole): Promise<{ isNewUser: boolean }> => {
+    const result = await loginWithMicrosoft(role);
+    return { isNewUser: result.isNewUser };
   };
 
   const register = async (

@@ -1,12 +1,33 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { Lawyer, LegalSpecialty } from '../types';
 import { MapComponent } from '../components/MapComponent';
 import { Button } from '../components/Button';
-import { Search, Filter, Sparkles, MapPin, Star, ChevronDown, X, Briefcase, Clock, ArrowRight, Map, List, SlidersHorizontal } from 'lucide-react';
+import { Search, Sparkles, MapPin, Star, X, Briefcase, ArrowRight, Map, List, ChevronDown, Globe, Scale, Building2, Home, Users, Plane, Lightbulb, Calculator, Gavel, Heart, FileText, Shield, Landmark, Car, Stethoscope, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { analyzeLegalCase } from '../services/geminiService';
 import { LawyerProfileModal } from '../components/LawyerProfileModal';
+
+// Specialty icons mapping
+const specialtyIcons: Record<string, React.ReactNode> = {
+  [LegalSpecialty.CRIMINAL]: <Gavel className="w-4 h-4" />,
+  [LegalSpecialty.FAMILY]: <Heart className="w-4 h-4" />,
+  [LegalSpecialty.CORPORATE]: <Building2 className="w-4 h-4" />,
+  [LegalSpecialty.REAL_ESTATE]: <Home className="w-4 h-4" />,
+  [LegalSpecialty.LABOR]: <Users className="w-4 h-4" />,
+  [LegalSpecialty.IMMIGRATION]: <Plane className="w-4 h-4" />,
+  [LegalSpecialty.IP]: <Lightbulb className="w-4 h-4" />,
+  [LegalSpecialty.TAX]: <Calculator className="w-4 h-4" />,
+  [LegalSpecialty.CIVIL]: <FileText className="w-4 h-4" />,
+  [LegalSpecialty.ADMINISTRATIVE]: <Landmark className="w-4 h-4" />,
+  [LegalSpecialty.ENVIRONMENTAL]: <Globe className="w-4 h-4" />,
+  [LegalSpecialty.BANKING]: <Shield className="w-4 h-4" />,
+  [LegalSpecialty.INSURANCE]: <Shield className="w-4 h-4" />,
+  [LegalSpecialty.INTERNATIONAL]: <Globe className="w-4 h-4" />,
+  [LegalSpecialty.SPORTS]: <Users className="w-4 h-4" />,
+  [LegalSpecialty.MEDICAL]: <Stethoscope className="w-4 h-4" />,
+  [LegalSpecialty.TRANSPORT]: <Car className="w-4 h-4" />,
+};
 
 export const SearchPage: React.FC = () => {
   const { lawyers, t, translateSpecialty, isLoadingLawyers } = useApp();
@@ -24,25 +45,24 @@ export const SearchPage: React.FC = () => {
   const [selectedLawyerId, setSelectedLawyerId] = useState<string | null>(null);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{ summary: string; reasoning: string } | null>(
     isAiFromUrl && summaryFromUrl ? { summary: t.search.aiSuggestion, reasoning: summaryFromUrl } : null
   );
   const [isAiSearchActive, setIsAiSearchActive] = useState(isAiFromUrl);
   const [modalLawyer, setModalLawyer] = useState<Lawyer | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
+  const [showAllSpecialties, setShowAllSpecialties] = useState(false);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showMap, setShowMap] = useState(true);
+  const [citySearchInput, setCitySearchInput] = useState('');
 
+  // Refs
+  const cityDropdownRef = useRef<HTMLDivElement>(null);
 
   // Filters
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>(isAiFromUrl ? specialtyFromUrl : '');
-  const [selectedRegion, setSelectedRegion] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
 
-  // City search state
-  const [citySearch, setCitySearch] = useState<string>('');
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-
-  // Extract all unique cities - OPTIMIZED with useMemo
+  // Extract all unique cities
   const allCities = useMemo(() => {
     if (lawyers.length === 0) return [];
     return Array.from(new Set(lawyers.map(l => {
@@ -55,14 +75,41 @@ export const SearchPage: React.FC = () => {
 
   // Filter cities based on search input
   const filteredCities = useMemo(() => {
-    if (!citySearch) return allCities;
-    return allCities.filter(city => city.toLowerCase().startsWith(citySearch.toLowerCase()));
-  }, [citySearch, allCities]);
+    if (!citySearchInput) return allCities.slice(0, 20);
+    return allCities.filter(city => 
+      city.toLowerCase().includes(citySearchInput.toLowerCase())
+    ).slice(0, 20);
+  }, [allCities, citySearchInput]);
 
   // Pagination State
   const [displayLimit, setDisplayLimit] = useState(20);
 
-  // Update filtered lawyers when lawyers data loads from Firebase
+  // Popular specialties to show first
+  const popularSpecialties = [
+    LegalSpecialty.FAMILY,
+    LegalSpecialty.CRIMINAL,
+    LegalSpecialty.REAL_ESTATE,
+    LegalSpecialty.LABOR,
+    LegalSpecialty.CORPORATE,
+    LegalSpecialty.IMMIGRATION,
+  ];
+
+  const otherSpecialties = Object.values(LegalSpecialty).filter(
+    s => !popularSpecialties.includes(s)
+  );
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(event.target as Node)) {
+        setShowCityDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Update filtered lawyers when lawyers data loads
   useEffect(() => {
     if (lawyers.length > 0) {
       applyFilters();
@@ -70,25 +117,25 @@ export const SearchPage: React.FC = () => {
   }, [lawyers]);
 
   useEffect(() => {
-    if (initialQuery) {
-      setIsLoading(true);
-      applyFilters();
-      setIsLoading(false);
-    } else {
-      applyFilters();
-    }
+    applyFilters();
   }, []);
 
   useEffect(() => {
-    if (isAiSearchActive) {
+    const timer = setTimeout(() => {
       applyFilters();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [selectedSpecialty, selectedCity, query]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const wordCount = query.trim().split(/\s+/).length;
+    if (wordCount >= 4 && query.trim()) {
+      await handleAISearch(query);
     } else {
-      const timer = setTimeout(() => {
-        applyFilters();
-      }, 300);
-      return () => clearTimeout(timer);
+      applyFilters();
     }
-  }, [selectedSpecialty, selectedRegion, isAiSearchActive]);
+  };
 
   const handleAISearch = async (text: string) => {
     if (!text.trim()) return;
@@ -98,32 +145,59 @@ export const SearchPage: React.FC = () => {
 
     try {
       const analysis = await analyzeLegalCase(text);
+      
+      // Map specialty string to enum value for filtering
+      const specialtyMap: Record<string, LegalSpecialty> = {
+        'Criminal Law': LegalSpecialty.CRIMINAL,
+        'Family Law': LegalSpecialty.FAMILY,
+        'Corporate Law': LegalSpecialty.CORPORATE,
+        'Real Estate': LegalSpecialty.REAL_ESTATE,
+        'Labor Law': LegalSpecialty.LABOR,
+        'Intellectual Property': LegalSpecialty.IP,
+        'Immigration': LegalSpecialty.IMMIGRATION,
+        'Tax Law': LegalSpecialty.TAX,
+        'General Practice': LegalSpecialty.GENERAL,
+      };
+      
+      const mappedSpecialty = specialtyMap[analysis.specialty] || '';
+      
       setAiSuggestion({ summary: t.search.aiSuggestion, reasoning: analysis.summary });
-
-      // Apply filters directly with the new specialty to avoid race conditions
-      const newSpecialty = analysis.specialty;
-      setSelectedSpecialty(newSpecialty);
+      setSelectedSpecialty(mappedSpecialty);
       setIsAiSearchActive(true);
 
-      // Apply filters immediately with the known values
       let results = [...lawyers];
-      if (newSpecialty) {
-        results = results.filter(l => l.specialty === newSpecialty);
+      if (mappedSpecialty) {
+        results = results.filter(l => l.specialty === mappedSpecialty);
       }
-      if (selectedRegion) {
-        results = results.filter(l => l.location?.includes(selectedRegion));
+      if (selectedCity) {
+        results = results.filter(l => l.location?.includes(selectedCity));
       }
       results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
       setFilteredLawyers(results);
 
     } catch (error: any) {
       console.error("AI Search failed:", error);
+      // Show fallback message and apply text-based search
       setAiSuggestion({
-        summary: "⚠️ Analyse IA indisponible",
-        reasoning: error.message || "Une erreur est survenue. Veuillez utiliser les filtres manuels."
+        summary: "Recherche alternative",
+        reasoning: "Analyse IA temporairement indisponible. Recherche textuelle appliquée."
       });
       setSelectedSpecialty('');
       setIsAiSearchActive(false);
+      
+      // Apply text-based search as fallback
+      const lowerQ = text.toLowerCase();
+      let results = lawyers.filter(l =>
+        l.name?.toLowerCase().includes(lowerQ) ||
+        l.location?.toLowerCase().includes(lowerQ) ||
+        l.firmName?.toLowerCase().includes(lowerQ) ||
+        l.bio?.toLowerCase().includes(lowerQ)
+      );
+      if (selectedCity) {
+        results = results.filter(l => l.location?.includes(selectedCity));
+      }
+      results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      setFilteredLawyers(results);
     } finally {
       setIsAnalyzing(false);
     }
@@ -136,11 +210,11 @@ export const SearchPage: React.FC = () => {
       results = results.filter(l => l.specialty === selectedSpecialty);
     }
 
-    if (selectedRegion) {
-      results = results.filter(l => l.location?.includes(selectedRegion));
+    if (selectedCity) {
+      results = results.filter(l => l.location?.includes(selectedCity));
     }
 
-    if (!isAiSearchActive && query) {
+    if (query && !isAiSearchActive) {
       const lowerQ = query.toLowerCase();
       results = results.filter(l =>
         l.name?.toLowerCase().includes(lowerQ) ||
@@ -150,21 +224,8 @@ export const SearchPage: React.FC = () => {
     }
 
     results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-
     setFilteredLawyers(results);
   };
-
-  const handleManualSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAiSearchActive(false);
-    setAiSuggestion(null);
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      applyFilters();
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }
 
   const handleCardClick = (id: string) => {
     setSelectedLawyerId(id);
@@ -172,134 +233,144 @@ export const SearchPage: React.FC = () => {
     if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const clearFilters = () => {
+  const clearAllFilters = () => {
     setSelectedSpecialty('');
-    setSelectedRegion('');
-    setCitySearch('');
+    setSelectedCity('');
     setQuery('');
+    setIsAiSearchActive(false);
+    setAiSuggestion(null);
+    setCitySearchInput('');
+  };
+
+  const toggleSpecialty = (specialty: string) => {
+    if (selectedSpecialty === specialty) {
+      setSelectedSpecialty('');
+    } else {
+      setSelectedSpecialty(specialty);
+    }
     setIsAiSearchActive(false);
     setAiSuggestion(null);
   };
 
-  const hasActiveFilters = selectedSpecialty || selectedRegion || query;
+  const selectCity = (city: string) => {
+    setSelectedCity(city);
+    setShowCityDropdown(false);
+    setCitySearchInput('');
+  };
 
-  // Show loading indicator while lawyers are being fetched from Firebase
+  const hasActiveFilters = selectedSpecialty || selectedCity || query;
+
+  // Loading state
   if (isLoadingLawyers) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] bg-surface-50 dark:bg-deep-950 px-4">
+      <div className="flex flex-col items-center justify-center h-screen bg-stone-50 dark:bg-deep-950 px-4">
         <div className="relative">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-primary-200 dark:border-primary-900" />
-          <div className="absolute inset-0 w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-primary-500 border-t-transparent animate-spin" />
+          <div className="w-16 h-16 rounded-full border-4 border-primary-200 dark:border-primary-900" />
+          <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-primary-500 border-t-transparent animate-spin" />
         </div>
-        <p className="text-base sm:text-lg font-semibold text-deep-900 dark:text-surface-100 mt-6">Chargement des avocats...</p>
-        <p className="text-sm text-deep-500 dark:text-surface-500 mt-2">Connexion en cours</p>
+        <p className="text-lg font-semibold text-deep-900 dark:text-surface-100 mt-6">Chargement...</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="flex flex-col h-[calc(100vh-80px)] lg:h-[calc(100vh-80px)] overflow-hidden bg-surface-50 dark:bg-deep-950">
-        {/* Top Search Bar */}
-        <div className="bg-white dark:bg-deep-900 border-b border-surface-200 dark:border-deep-800 shadow-glass z-20">
-          <div className="container mx-auto px-4 py-3 sm:py-4">
-            <form onSubmit={handleManualSearch} className="space-y-3">
-              {/* Search Row */}
-              <div className="flex gap-2 sm:gap-3">
-                {/* Search Input */}
-                <div className="relative flex-grow">
-                  <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-primary-500" />
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => {
-                      setQuery(e.target.value);
-                      setIsAiSearchActive(false);
-                    }}
-                    placeholder="Rechercher..."
-                    className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 rounded-xl bg-surface-50 dark:bg-deep-800 border-2 border-surface-200 dark:border-deep-700 input-focus outline-none text-sm sm:text-base text-deep-900 dark:text-surface-100"
-                    style={{ fontSize: '16px' }}
-                  />
-                </div>
+      <div className="fixed inset-0 top-20 flex flex-col bg-stone-50 dark:bg-deep-950 z-30">
+        {/* Search Header */}
+        <div className="bg-white dark:bg-deep-900 border-b border-stone-200 dark:border-deep-800 shadow-sm flex-shrink-0">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="mb-3">
+              <div className="flex items-center bg-stone-50 dark:bg-deep-800 rounded-xl border border-stone-200 dark:border-deep-700 focus-within:border-primary-500 transition-colors overflow-hidden">
+                {isAnalyzing ? (
+                  <div className="pl-3 pr-2">
+                    <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <Sparkles className="ml-3 mr-2 w-4 h-4 text-primary-500 flex-shrink-0" />
+                )}
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setIsAiSearchActive(false);
+                    setAiSuggestion(null);
+                  }}
+                  placeholder="Décrivez votre besoin juridique ou recherchez par nom..."
+                  className="flex-1 bg-transparent border-none py-2.5 pr-4 text-deep-900 dark:text-surface-100 placeholder-stone-400 focus:outline-none focus:ring-0 text-sm"
+                  style={{ fontSize: '16px' }}
+                />
+                <button
+                  type="submit"
+                  disabled={isAnalyzing}
+                  className="m-1 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white font-medium text-sm rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="hidden sm:inline">Rechercher</span>
+                </button>
+              </div>
+            </form>
 
-                {/* Filter Toggle - Mobile */}
+            {/* AI Suggestion */}
+            {aiSuggestion && (
+              <div className={`mb-3 px-3 py-2 rounded-lg border text-sm ${
+                aiSuggestion.summary.includes('indisponible')
+                  ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200'
+                  : 'bg-primary-50 dark:bg-primary-950/30 border-primary-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                  <p className="text-stone-600 dark:text-surface-400 flex-1 truncate">{aiSuggestion.reasoning}</p>
+                  <button
+                    onClick={() => { setAiSuggestion(null); setIsAiSearchActive(false); }}
+                    className="p-1 hover:bg-black/5 rounded flex-shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5 text-stone-400" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Filters Row */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* City Dropdown */}
+              <div className="relative" ref={cityDropdownRef}>
                 <button
                   type="button"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`lg:hidden p-2.5 sm:p-3 rounded-xl border-2 transition-colors ${showFilters || hasActiveFilters
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/50 text-primary-600'
-                      : 'border-surface-200 dark:border-deep-700 text-deep-500'
-                    }`}
+                  onClick={() => setShowCityDropdown(!showCityDropdown)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    selectedCity
+                      ? 'bg-primary-100 dark:bg-primary-900/50 border-primary-300 text-primary-700'
+                      : 'bg-white dark:bg-deep-800 border-stone-200 text-stone-600 hover:border-stone-300'
+                  }`}
                 >
-                  <SlidersHorizontal className="w-5 h-5" />
-                  {hasActiveFilters && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full" />
-                  )}
+                  <MapPin className="w-3.5 h-3.5" />
+                  {selectedCity || 'Ville'}
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`} />
                 </button>
-
-                {/* Search Button */}
-                <Button type="submit" variant="primary" className="hidden sm:flex">
-                  Rechercher
-                </Button>
-              </div>
-
-              {/* Desktop Filters Row */}
-              <div className="hidden lg:flex items-center gap-3">
-                {/* Specialty Dropdown */}
-                <div className="relative">
-                  <select
-                    className="appearance-none pl-4 pr-10 py-2.5 rounded-xl bg-white dark:bg-deep-800 border-2 border-surface-200 dark:border-deep-700 input-focus outline-none text-sm font-medium text-deep-700 dark:text-surface-300 cursor-pointer"
-                    value={selectedSpecialty}
-                    onChange={(e) => setSelectedSpecialty(e.target.value)}
-                  >
-                    <option value="">Toutes spécialités</option>
-                    {Object.values(LegalSpecialty).map(s => (
-                      <option key={s} value={s}>{translateSpecialty(s)}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-deep-400 pointer-events-none" />
-                </div>
-
-                {/* City Search */}
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-deep-400" />
-                  <input
-                    type="text"
-                    value={citySearch}
-                    onChange={(e) => {
-                      setCitySearch(e.target.value);
-                      setShowCityDropdown(true);
-                    }}
-                    onClick={() => setShowCityDropdown(true)}
-                    onFocus={() => setShowCityDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
-                    placeholder={selectedRegion || "Ville..."}
-                    className="w-44 pl-10 pr-8 py-2.5 rounded-xl bg-white dark:bg-deep-800 border-2 border-surface-200 dark:border-deep-700 input-focus outline-none text-sm text-deep-700 dark:text-surface-300"
-                  />
-                  {selectedRegion && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedRegion('');
-                        setCitySearch('');
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-surface-100 dark:hover:bg-deep-700"
-                    >
-                      <X className="w-3 h-3 text-deep-400" />
-                    </button>
-                  )}
-
-                  {showCityDropdown && (
-                    <div className="absolute z-50 w-full mt-2 bg-white dark:bg-deep-900 border border-surface-200 dark:border-deep-700 rounded-xl shadow-glass-lg max-h-64 overflow-y-auto">
+                
+                {showCityDropdown && (
+                  <div className="absolute z-[100] mt-2 w-64 bg-white dark:bg-deep-900 border border-stone-200 dark:border-deep-700 rounded-xl shadow-2xl overflow-hidden">
+                    {/* Search input */}
+                    <div className="p-2 border-b border-stone-100 dark:border-deep-800">
+                      <input
+                        type="text"
+                        value={citySearchInput}
+                        onChange={(e) => setCitySearchInput(e.target.value)}
+                        placeholder="Rechercher une ville..."
+                        className="w-full px-3 py-2 text-sm bg-stone-50 dark:bg-deep-800 border border-stone-200 dark:border-deep-700 rounded-lg focus:outline-none focus:border-primary-500"
+                        autoFocus
+                      />
+                    </div>
+                    {/* City list */}
+                    <div className="max-h-48 overflow-y-auto">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedRegion('');
-                          setCitySearch('');
-                          setShowCityDropdown(false);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-surface-50 dark:hover:bg-deep-800 text-sm font-medium border-b border-surface-100 dark:border-deep-800"
+                        onClick={() => selectCity('')}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-stone-50 dark:hover:bg-deep-800 ${
+                          !selectedCity ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 font-medium' : ''
+                        }`}
                       >
                         Toutes les villes
                       </button>
@@ -308,132 +379,121 @@ export const SearchPage: React.FC = () => {
                           <button
                             type="button"
                             key={city}
-                            onClick={() => {
-                              setSelectedRegion(city);
-                              setCitySearch('');
-                              setShowCityDropdown(false);
-                            }}
-                            className={`w-full px-4 py-2.5 text-left hover:bg-surface-50 dark:hover:bg-deep-800 text-sm ${selectedRegion === city ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 font-medium' : ''
-                              }`}
+                            onClick={() => selectCity(city)}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-stone-50 dark:hover:bg-deep-800 ${
+                              selectedCity === city ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 font-medium' : ''
+                            }`}
                           >
                             {city}
                           </button>
                         ))
                       ) : (
-                        <div className="px-4 py-3 text-sm text-deep-500">
-                          Aucune ville trouvée
-                        </div>
+                        <p className="px-3 py-2 text-sm text-stone-400">Aucune ville trouvée</p>
                       )}
                     </div>
-                  )}
-                </div>
-
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    className="flex items-center gap-1 px-3 py-2 text-sm text-deep-500 hover:text-deep-700 dark:hover:text-surface-300"
-                  >
-                    <X className="w-4 h-4" />
-                    Effacer
-                  </button>
+                  </div>
                 )}
-
-                <div className="flex-1" />
-
-                {/* AI Search Button */}
-                <Button
-                  type="button"
-                  variant="accent"
-                  onClick={() => handleAISearch(query)}
-                  isLoading={isAnalyzing}
-                  disabled={!query}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Recherche IA
-                </Button>
               </div>
 
-              {/* Mobile Filters Panel */}
-              {showFilters && (
-                <div className="lg:hidden space-y-3 pt-3 border-t border-surface-100 dark:border-deep-800 animate-fade-in">
-                  <select
-                    className="w-full px-4 py-3 rounded-xl bg-surface-50 dark:bg-deep-800 border-2 border-surface-200 dark:border-deep-700 text-sm"
-                    value={selectedSpecialty}
-                    onChange={(e) => setSelectedSpecialty(e.target.value)}
-                    style={{ fontSize: '16px' }}
-                  >
-                    <option value="">Toutes spécialités</option>
-                    {Object.values(LegalSpecialty).map(s => (
-                      <option key={s} value={s}>{translateSpecialty(s)}</option>
-                    ))}
-                  </select>
+              {/* Divider */}
+              <div className="w-px h-5 bg-stone-200 dark:bg-deep-700" />
 
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-deep-400" />
-                    <input
-                      type="text"
-                      value={selectedRegion || citySearch}
-                      onChange={(e) => setCitySearch(e.target.value)}
-                      placeholder="Rechercher une ville..."
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-50 dark:bg-deep-800 border-2 border-surface-200 dark:border-deep-700 text-sm"
-                      style={{ fontSize: '16px' }}
-                    />
-                  </div>
+              {/* Specialty Pills */}
+              {popularSpecialties.map(specialty => (
+                <button
+                  key={specialty}
+                  type="button"
+                  onClick={() => toggleSpecialty(specialty)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    selectedSpecialty === specialty
+                      ? 'bg-primary-700 border-primary-700 text-white'
+                      : 'bg-white dark:bg-deep-800 border-stone-200 text-stone-600 hover:border-primary-300 hover:text-primary-700'
+                  }`}
+                >
+                  {specialtyIcons[specialty]}
+                  <span className="hidden sm:inline">{translateSpecialty(specialty)}</span>
+                </button>
+              ))}
+              
+              {/* More button */}
+              <button
+                type="button"
+                onClick={() => setShowAllSpecialties(!showAllSpecialties)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium border border-dashed border-stone-300 text-stone-500 hover:text-primary-600 transition-all"
+              >
+                +{otherSpecialties.length}
+                <ChevronDown className={`w-3 h-3 transition-transform ${showAllSpecialties ? 'rotate-180' : ''}`} />
+              </button>
 
-                  <div className="flex gap-2">
-                    <Button type="submit" variant="primary" className="flex-1">
-                      Appliquer
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="accent"
-                      className="flex-1"
-                      onClick={() => handleAISearch(query)}
-                      isLoading={isAnalyzing}
-                      disabled={!query}
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      IA
-                    </Button>
-                  </div>
-
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={clearFilters}
-                      className="w-full py-2 text-sm text-deep-500 hover:text-deep-700"
-                    >
-                      Effacer les filtres
-                    </button>
-                  )}
-                </div>
+              {/* Clear filters */}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="p-1.5 text-stone-400 hover:text-primary-600 transition-colors"
+                  title="Effacer les filtres"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               )}
-            </form>
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Map Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setShowMap(!showMap)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                  showMap
+                    ? 'bg-primary-100 border-primary-300 text-primary-700'
+                    : 'bg-white border-stone-200 text-stone-600 hover:border-stone-300'
+                }`}
+              >
+                {showMap ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                <span className="hidden sm:inline">{showMap ? 'Masquer carte' : 'Afficher carte'}</span>
+              </button>
+            </div>
+
+            {/* Expanded specialties */}
+            {showAllSpecialties && (
+              <div className="flex flex-wrap gap-1.5 pt-2 mt-2 border-t border-stone-100 dark:border-deep-800">
+                {otherSpecialties.map(specialty => (
+                  <button
+                    key={specialty}
+                    type="button"
+                    onClick={() => toggleSpecialty(specialty)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                      selectedSpecialty === specialty
+                        ? 'bg-primary-700 border-primary-700 text-white'
+                        : 'bg-white dark:bg-deep-800 border-stone-200 text-stone-600 hover:border-primary-300 hover:text-primary-700'
+                    }`}
+                  >
+                    {specialtyIcons[specialty]}
+                    {translateSpecialty(specialty)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Mobile View Toggle */}
-        <div className="md:hidden flex items-center justify-between px-4 py-2 bg-white dark:bg-deep-900 border-b border-surface-200 dark:border-deep-800">
-          <p className="text-sm font-medium text-deep-600 dark:text-surface-400">
-            {filteredLawyers.length} {t.search.found}
+        {/* Results info bar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-stone-100/50 dark:bg-deep-900/50 border-b border-stone-200 dark:border-deep-800 flex-shrink-0">
+          <p className="text-xs font-medium text-stone-500">
+            {filteredLawyers.length} avocat{filteredLawyers.length > 1 ? 's' : ''} trouvé{filteredLawyers.length > 1 ? 's' : ''}
           </p>
-          <div className="flex gap-1 bg-surface-100 dark:bg-deep-800 rounded-lg p-1">
+          {/* Mobile view toggle */}
+          <div className="md:hidden flex gap-1 bg-white dark:bg-deep-800 rounded-lg p-0.5 shadow-sm">
             <button
-              onClick={() => setMobileView('list')}
-              className={`p-2 rounded-md transition-colors ${mobileView === 'list'
-                  ? 'bg-white dark:bg-deep-700 shadow-sm text-primary-600'
-                  : 'text-deep-500'
-                }`}
+              onClick={() => setShowMap(false)}
+              className={`p-1.5 rounded-md transition-colors ${!showMap ? 'bg-primary-100 text-primary-600' : 'text-stone-400'}`}
             >
               <List className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setMobileView('map')}
-              className={`p-2 rounded-md transition-colors ${mobileView === 'map'
-                  ? 'bg-white dark:bg-deep-700 shadow-sm text-primary-600'
-                  : 'text-deep-500'
-                }`}
+              onClick={() => setShowMap(true)}
+              className={`p-1.5 rounded-md transition-colors ${showMap ? 'bg-primary-100 text-primary-600' : 'text-stone-400'}`}
             >
               <Map className="w-4 h-4" />
             </button>
@@ -441,168 +501,138 @@ export const SearchPage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex flex-grow overflow-hidden">
-          {/* Results List - Hidden on mobile when map view is active */}
-          <div className={`w-full md:w-1/2 lg:w-5/12 overflow-y-auto scrollbar-thin momentum-scroll ${mobileView === 'map' ? 'hidden md:block' : 'block'
-            }`}>
-            <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20 lg:pb-4">
-              {/* AI Suggestion Banner */}
-              {aiSuggestion && (
-                <div className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 ${aiSuggestion.summary.includes('indisponible')
-                    ? 'bg-accent-50 dark:bg-accent-950/30 border-accent-200 dark:border-accent-800/50'
-                    : 'bg-primary-50 dark:bg-primary-950/30 border-primary-200 dark:border-primary-800/50'
-                  }`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-xl flex-shrink-0 ${aiSuggestion.summary.includes('indisponible')
-                        ? 'bg-accent-100 dark:bg-accent-900/50 text-accent-600'
-                        : 'bg-primary-100 dark:bg-primary-900/50 text-primary-600'
-                      }`}>
-                      <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-sm sm:text-base text-deep-900 dark:text-surface-100 mb-1">
-                        {aiSuggestion.summary.includes('indisponible') ? '⚠️ Service Indisponible' : t.search.aiSuggestion}
-                      </h4>
-                      <p className="text-xs sm:text-sm text-deep-600 dark:text-surface-400">{aiSuggestion.reasoning}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Results Count - Desktop only, mobile is in view toggle bar */}
-              <div className="hidden md:flex items-center justify-between">
-                <p className="text-sm font-medium text-deep-600 dark:text-surface-400">
-                  {filteredLawyers.length} {t.search.found}
-                </p>
-              </div>
-
-              {/* Loading State */}
-              {isLoading || lawyers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center py-16 sm:py-20">
-                  <div className="relative">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-4 border-surface-200 dark:border-deep-800" />
-                    <div className="absolute inset-0 w-12 h-12 sm:w-16 sm:h-16 rounded-full border-4 border-primary-500 border-t-transparent animate-spin" />
-                  </div>
-                  <p className="text-base sm:text-lg font-semibold text-deep-900 dark:text-surface-100 mt-6">
-                    {lawyers.length === 0 ? 'Chargement...' : 'Recherche...'}
-                  </p>
-                </div>
-              ) : (
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          {/* Results List */}
+          <div className={`${showMap ? 'w-full md:w-2/5 lg:w-1/3' : 'w-full'} overflow-y-auto bg-white dark:bg-deep-900 ${showMap ? 'hidden md:block' : 'block'}`}>
+            <div className="p-3 space-y-2">
+              {filteredLawyers.length > 0 ? (
                 <>
-                  {/* Lawyer Cards */}
                   {filteredLawyers.slice(0, displayLimit).map(lawyer => (
                     <div
                       key={lawyer.id}
                       id={`lawyer-card-${lawyer.id}`}
                       onClick={() => handleCardClick(lawyer.id)}
-                      className={`group relative bg-white dark:bg-deep-900 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 cursor-pointer active:scale-[0.98] ${selectedLawyerId === lawyer.id
-                          ? 'border-primary-500 shadow-card-hover'
-                          : 'border-surface-100 dark:border-deep-800 hover:border-primary-200 dark:hover:border-primary-800 hover:shadow-card-hover'
-                        }`}
+                      className={`group relative rounded-xl border transition-all duration-200 cursor-pointer ${
+                        selectedLawyerId === lawyer.id
+                          ? 'border-primary-500 bg-primary-50/50'
+                          : 'border-transparent hover:bg-stone-50 dark:hover:bg-deep-800'
+                      }`}
                     >
-                      <div className="p-4 sm:p-5">
-                        <div className="flex gap-3 sm:gap-4">
+                      <div className="p-3">
+                        <div className="flex gap-3">
                           <img
                             src={lawyer.avatarUrl}
                             alt={lawyer.name}
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover ring-2 ring-surface-100 dark:ring-deep-700"
+                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                           />
                           <div className="flex-grow min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <h3 className="font-semibold text-base sm:text-lg text-deep-900 dark:text-surface-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors truncate">
+                                <h3 className="font-semibold text-sm text-deep-900 dark:text-surface-100 group-hover:text-primary-600 transition-colors truncate">
                                   {lawyer.name}
                                 </h3>
-                                <p className="text-xs sm:text-sm text-deep-500 dark:text-surface-500 truncate">
+                                <p className="text-xs text-stone-400 truncate">
                                   {lawyer.firmName}
                                 </p>
                               </div>
                               {lawyer.rating && (
-                                <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-accent-50 dark:bg-accent-950/50 flex-shrink-0">
-                                  <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-accent-500 fill-accent-500" />
-                                  <span className="text-xs sm:text-sm font-semibold text-accent-700 dark:text-accent-300">
-                                    {lawyer.rating}
-                                  </span>
+                                <div className="flex items-center gap-0.5 flex-shrink-0">
+                                  <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                  <span className="text-xs font-medium text-amber-600">{lawyer.rating}</span>
                                 </div>
                               )}
                             </div>
 
-                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-                              <span className="badge badge-primary text-[10px] sm:text-xs">
-                                <Briefcase className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-primary-600 font-medium">
+                                {specialtyIcons[lawyer.specialty]}
                                 {translateSpecialty(lawyer.specialty)}
                               </span>
-                              <span className="badge badge-neutral text-[10px] sm:text-xs">
-                                <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span className="text-stone-300">•</span>
+                              <span className="inline-flex items-center gap-0.5 text-[10px] text-stone-500">
+                                <MapPin className="w-2.5 h-2.5" />
                                 {lawyer.location?.split(',')[0]}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-surface-100 dark:border-deep-800 flex items-center justify-between gap-2">
-                          <p className="text-xs sm:text-sm text-deep-500 dark:text-surface-500 line-clamp-1 flex-1">
-                            {lawyer.bio?.slice(0, 60)}...
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <p className="text-xs text-stone-400 line-clamp-1 flex-1">
+                            {lawyer.bio?.slice(0, 50)}...
                           </p>
-                          <Button
-                            size="sm"
-                            variant="primary"
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setModalLawyer(lawyer);
                             }}
-                            className="flex-shrink-0"
+                            className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 flex-shrink-0"
                           >
-                            <span className="hidden sm:inline">{t.search.viewProfile}</span>
-                            <span className="sm:hidden">Voir</span>
-                            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1" />
-                          </Button>
+                            Voir
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     </div>
                   ))}
 
-                  {/* Load More Button */}
                   {filteredLawyers.length > displayLimit && (
-                    <div className="text-center py-4">
-                      <Button
-                        onClick={() => setDisplayLimit(prev => prev + 20)}
-                        variant="secondary"
-                        className="w-full sm:w-auto"
-                      >
-                        Charger plus ({displayLimit}/{filteredLawyers.length})
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Empty State */}
-                  {filteredLawyers.length === 0 && !aiSuggestion && (
-                    <div className="text-center py-16 sm:py-20">
-                      <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-surface-100 dark:bg-deep-800 flex items-center justify-center">
-                        <Search className="w-6 h-6 sm:w-8 sm:h-8 text-deep-300 dark:text-deep-600" />
-                      </div>
-                      <p className="text-deep-500 dark:text-surface-500">{t.search.noResults}</p>
-                    </div>
+                    <button
+                      onClick={() => setDisplayLimit(prev => prev + 20)}
+                      className="w-full py-2 text-xs font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                    >
+                      Voir plus ({filteredLawyers.length - displayLimit} restants)
+                    </button>
                   )}
                 </>
+              ) : (
+                <div className="text-center py-12">
+                  <Search className="w-10 h-10 text-stone-200 mx-auto mb-3" />
+                  <p className="text-sm text-stone-500">Aucun résultat</p>
+                  {hasActiveFilters && (
+                    <button onClick={clearAllFilters} className="mt-2 text-xs text-primary-600 hover:underline">
+                      Effacer les filtres
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          {/* Map View - Hidden on mobile when list view is active */}
-          <div className={`w-full md:w-1/2 lg:w-7/12 h-full relative ${mobileView === 'list' ? 'hidden md:block' : 'block'
-            }`}>
-            <MapComponent
-              lawyers={filteredLawyers.slice(0, 200)}
-              selectedLawyerId={selectedLawyerId || undefined}
-              onSelectLawyer={handleCardClick}
-            />
-            {filteredLawyers.length > 200 && (
-              <div className="absolute bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 glass rounded-xl px-4 py-2 text-sm font-medium shadow-glass">
-                Carte limitée à 200 avocats
-              </div>
-            )}
-          </div>
+          {/* Map View */}
+          {showMap && (
+            <div className={`flex-1 h-full relative ${!showMap ? 'hidden' : 'hidden md:block'}`}>
+              <MapComponent
+                lawyers={filteredLawyers.slice(0, 200)}
+                selectedLawyerId={selectedLawyerId || undefined}
+                onSelectLawyer={handleCardClick}
+              />
+              {filteredLawyers.length > 200 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-medium shadow-lg">
+                  200 avocats affichés sur {filteredLawyers.length}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mobile Map View */}
+          {showMap && (
+            <div className="md:hidden absolute inset-0 top-0 z-20">
+              <MapComponent
+                lawyers={filteredLawyers.slice(0, 200)}
+                selectedLawyerId={selectedLawyerId || undefined}
+                onSelectLawyer={handleCardClick}
+              />
+              {/* Back to list button on mobile */}
+              <button
+                onClick={() => setShowMap(false)}
+                className="absolute top-4 left-4 bg-white shadow-lg rounded-full px-4 py-2 text-sm font-medium flex items-center gap-2"
+              >
+                <List className="w-4 h-4" />
+                Voir la liste
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

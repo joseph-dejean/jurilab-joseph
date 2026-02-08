@@ -3,14 +3,63 @@ import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { UserRole } from '../types';
 import { Button } from './Button';
-import { User, Moon, Sun, Menu, X, LogOut, Calendar, MessageSquare, ChevronRight, Home, Search, LayoutDashboard, Lock, Briefcase } from 'lucide-react';
+import { User, Moon, Sun, Menu, X, LogOut, Calendar, MessageSquare, ChevronRight, Home, Search, LayoutDashboard, Lock, Briefcase, Palette, Settings } from 'lucide-react';
 import { LegalChatbot } from './LegalChatbot';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, logout, darkMode, toggleDarkMode, language, setLanguage, t, unreadMessagesCount } = useApp();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const navTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
+  const isHomePage = location.pathname === '/';
+  const isSearchPage = location.pathname === '/search';
+
+  // Auto-hide navbar logic
+  const showNav = () => {
+    if (navTimeoutRef.current) {
+      clearTimeout(navTimeoutRef.current);
+      navTimeoutRef.current = null;
+    }
+    setIsNavVisible(true);
+  };
+
+  const hideNavDelayed = () => {
+    if (navTimeoutRef.current) {
+      clearTimeout(navTimeoutRef.current);
+    }
+    navTimeoutRef.current = setTimeout(() => {
+      setIsNavVisible(false);
+    }, 1500); // Hide after 1.5 seconds
+  };
+
+  // Show nav when mouse is near the top of the screen
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.clientY < 80) {
+        showNav();
+      }
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  // Start auto-hide after initial load and cleanup timeout on unmount
+  useEffect(() => {
+    // Start with nav visible, then begin auto-hide after 3 seconds
+    const initialTimeout = setTimeout(() => {
+      hideNavDelayed();
+    }, 3000);
+    
+    return () => {
+      clearTimeout(initialTimeout);
+      if (navTimeoutRef.current) {
+        clearTimeout(navTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Track scroll position for header blur effect
   useEffect(() => {
@@ -47,8 +96,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const navLinks = [
     { path: '/search', label: t.nav.search, showAlways: true },
     { path: '/dashboard', label: t.nav.dashboard, requiresAuth: true },
+    { path: '/calendar', label: 'Calendrier', requiresRole: UserRole.LAWYER, icon: Calendar },
     { path: '/messages', label: t.dashboard.messages, requiresAuth: true, hasNotification: true },
     { path: '/portfolio', label: t.dashboard.portfolio, requiresRole: UserRole.LAWYER },
+    { path: '/lawyer/profile-editor', label: 'Éditeur Profil', requiresRole: UserRole.LAWYER, icon: Palette },
     { path: '/admin', label: 'Admin', requiresRole: UserRole.ADMIN },
   ];
 
@@ -57,278 +108,276 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     { path: '/', icon: Home, label: 'Accueil' },
     { path: '/search', icon: Search, label: 'Recherche' },
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', requiresAuth: true },
+    { path: '/calendar', icon: Calendar, label: 'Calendrier', requiresRole: UserRole.LAWYER },
     { path: '/messages', icon: MessageSquare, label: 'Messages', requiresAuth: true, hasBadge: unreadMessagesCount > 0 },
-    { path: '/portfolio', icon: Briefcase, label: 'Portfolio', requiresRole: UserRole.LAWYER },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-50 dark:bg-deep-950 text-deep-800 dark:text-surface-200">
-      {/* Header */}
-      <header
-        className={`sticky top-0 z-50 w-full transition-all duration-300 ${isScrolled
-          ? 'bg-white/80 dark:bg-deep-950/80 backdrop-blur-xl shadow-glass border-b border-surface-200/50 dark:border-deep-800/50'
-          : 'bg-transparent'
-          }`}
+    <div className="relative min-h-screen flex flex-col bg-surface-50 dark:bg-deep-950 text-deep-800 dark:text-surface-200">
+      {/* Invisible hover zone at top to trigger nav appearance - like Windows taskbar */}
+      <div 
+        className="fixed top-0 left-0 right-0 h-3 z-[60]"
+        onMouseEnter={showNav}
+        aria-hidden="true"
+      />
+      
+      {/* Header - Collapsible nav bar that pushes content (like Windows taskbar auto-hide) */}
+      <div 
+        className={`w-full overflow-hidden transition-all duration-300 ease-out ${
+          isNavVisible ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+        onMouseEnter={showNav}
+        onMouseLeave={hideNavDelayed}
       >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20">
-            {/* Logo */}
-            <Link
-              to="/"
-              className="flex items-center gap-2 sm:gap-3 group"
-            >
+        <nav className="flex justify-center px-4 py-4 w-full">
+        <div className="bg-primary-700 dark:bg-primary-800 rounded-full px-2 py-2 pl-5 flex items-center gap-4 xl:gap-8 pointer-events-auto transition-all duration-500 hover:scale-[1.01] shadow-xl shadow-primary-900/20">
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center group-hover:scale-110 transition-transform">
               <img
                 src="/logo.png"
-                alt="Jurilab Logo"
-                className="w-14 h-14 sm:w-16 sm:h-16 object-contain"
+                alt="Jurilab"
+                className="w-6 h-6 object-contain"
               />
-              <span className="font-serif text-xl sm:text-2xl font-bold text-deep-900 dark:text-surface-100 tracking-tight">
-                Jurilab
-              </span>
-            </Link>
+            </div>
+            <span className="font-bold text-lg tracking-tight hidden sm:block text-white">
+              Jurilab
+            </span>
+          </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center gap-1">
+          {/* Desktop Navigation Links */}
+          <div className="hidden lg:flex items-center gap-1 xl:gap-2">
+            {navLinks.map((link) => {
+              if (link.requiresAuth && !currentUser) return null;
+              if (link.requiresRole && currentUser?.role !== link.requiresRole) return null;
+              if (!link.showAlways && !link.requiresAuth && !currentUser) return null;
+
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`relative px-3 xl:px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                    isActive(link.path)
+                      ? 'text-white bg-white/20'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  {link.path === '/messages' && <MessageSquare className="w-4 h-4 inline-block mr-1.5" />}
+                  {link.label}
+                  {link.hasNotification && unreadMessagesCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 ml-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                      {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Desktop Actions */}
+          <div className="hidden lg:flex items-center gap-1">
+            {/* Language Toggle */}
+            <button
+              onClick={toggleLanguage}
+              className="px-3 py-2 text-sm font-semibold text-white/70 hover:text-white rounded-full hover:bg-white/10 transition-colors duration-200"
+            >
+              {language === 'en' ? 'FR' : 'EN'}
+            </button>
+
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
+              aria-label="Toggle theme"
+            >
+              {darkMode ? (
+                <Sun className="w-5 h-5" />
+              ) : (
+                <Moon className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Auth Buttons */}
+            {currentUser ? (
+              <div className="flex items-center gap-2 ml-1">
+                <div className="flex items-center gap-2 px-2">
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-semibold">
+                    {currentUser.name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-sm font-medium text-white hidden xl:block">
+                    {currentUser.name}
+                  </span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-4 py-2 rounded-full transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden xl:inline">{t.nav.signout}</span>
+                </button>
+              </div>
+            ) : (
+              <Link to="/login">
+                <button className="bg-white text-primary-700 text-sm font-bold px-5 py-2.5 rounded-full hover:bg-white/90 transition-all active:scale-95 shadow-md">
+                  {t.nav.login}
+                </button>
+              </Link>
+            )}
+          </div>
+
+          {/* Mobile Actions */}
+          <div className="flex lg:hidden items-center gap-1">
+            {/* Theme Toggle - Mobile */}
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+
+            {/* Mobile Menu Button */}
+            <button
+              className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+        </nav>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-deep-950/50 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
+          {/* Mobile Menu Panel */}
+          <div
+            className="absolute right-0 top-0 h-full w-full max-w-sm bg-white dark:bg-deep-950 shadow-glass-lg animate-fade-in-right safe-area-top"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Menu Header */}
+            <div className="flex items-center justify-between p-4 border-b border-surface-200 dark:border-deep-800">
+              <span className="font-serif text-xl font-bold text-deep-900 dark:text-surface-100">Menu</span>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-surface-100 dark:hover:bg-deep-900 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* User Info (if logged in) */}
+            {currentUser && (
+              <div className="p-4 border-b border-surface-100 dark:border-deep-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-lg font-semibold">
+                    {currentUser.name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-deep-900 dark:text-surface-100">{currentUser.name}</p>
+                    <p className="text-sm text-deep-500 dark:text-surface-500 capitalize">
+                      {currentUser.role === UserRole.LAWYER ? 'Avocat' : 'Client'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Menu Items */}
+            <div className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
               {navLinks.map((link) => {
                 if (link.requiresAuth && !currentUser) return null;
                 if (link.requiresRole && currentUser?.role !== link.requiresRole) return null;
-                if (!link.showAlways && !link.requiresAuth && !currentUser) return null;
 
                 return (
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isActive(link.path)
-                      ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50'
-                      : 'text-deep-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-surface-100 dark:hover:bg-deep-900'
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center justify-between px-4 py-3.5 rounded-xl transition-colors touch-target ${isActive(link.path)
+                      ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400'
+                      : 'text-deep-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-deep-900 active:bg-surface-200 dark:active:bg-deep-800'
                       }`}
                   >
-                    <span className="flex items-center gap-2">
-                      {link.path === '/messages' && <MessageSquare className="w-4 h-4" />}
-                      {link.label}
+                    <div className="flex items-center gap-3 font-medium">
+                      {link.path === '/messages' && <MessageSquare className="w-5 h-5" />}
+                      {link.path === '/search' && <Search className="w-5 h-5" />}
+                      {link.path === '/dashboard' && <LayoutDashboard className="w-5 h-5" />}
+                      <span>{link.label}</span>
                       {link.hasNotification && unreadMessagesCount > 0 && (
-                        <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full">
-                          {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          {unreadMessagesCount}
                         </span>
                       )}
-                    </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 opacity-50" />
                   </Link>
                 );
               })}
-            </nav>
 
-            {/* Desktop Actions */}
-            <div className="hidden lg:flex items-center gap-2">
-              {/* Language Toggle */}
-              <button
-                onClick={toggleLanguage}
-                className="px-3 py-2 text-sm font-semibold text-deep-500 dark:text-surface-400 hover:text-deep-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-deep-900 rounded-lg transition-colors duration-200"
-              >
-                {language === 'en' ? 'FR' : 'EN'}
-              </button>
+              {/* Divider */}
+              <div className="my-4 border-t border-surface-200 dark:border-deep-800" />
 
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleDarkMode}
-                className="p-2.5 rounded-lg text-deep-500 dark:text-surface-400 hover:text-deep-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-deep-900 transition-all duration-200"
-                aria-label="Toggle theme"
-              >
-                {darkMode ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
-              </button>
-
-              {/* Auth Buttons */}
-              {currentUser ? (
-                <div className="flex items-center gap-3 ml-2 pl-4 border-l border-surface-200 dark:border-deep-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-semibold">
-                      {currentUser.name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                    <span className="text-sm font-medium text-deep-700 dark:text-surface-300 hidden xl:block">
-                      {currentUser.name}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={logout}
-                    className="text-deep-500 hover:text-red-600 dark:hover:text-red-400"
+              {/* Settings */}
+              <div className="space-y-3 px-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-deep-500 dark:text-surface-500">Langue</span>
+                  <button
+                    onClick={toggleLanguage}
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg bg-surface-100 dark:bg-deep-900"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span className="hidden xl:inline ml-1">{t.nav.signout}</span>
+                    {language === 'en' ? 'Français' : 'English'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Auth Actions */}
+              <div className="mt-6 px-4 space-y-2">
+                {currentUser ? (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => { logout(); setIsMobileMenuOpen(false); }}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    {t.nav.signout}
                   </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 ml-2 pl-4 border-l border-surface-200 dark:border-deep-800">
-                  <Link to="/login">
-                    <Button variant="ghost" size="sm">
-                      {t.nav.login}
-                    </Button>
-                  </Link>
-                  <Link to="/login?register=true">
-                    <Button variant="primary" size="sm">
-                      {t.nav.signup}
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Mobile Header Actions */}
-            <div className="flex lg:hidden items-center gap-2">
-              {/* Theme Toggle - Mobile */}
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-lg text-deep-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-deep-900 transition-colors"
-                aria-label="Toggle theme"
-              >
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-
-              {/* Mobile Menu Button */}
-              <button
-                className="p-2 rounded-lg text-deep-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-deep-900 transition-colors"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                aria-label="Toggle menu"
-              >
-                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
+                ) : (
+                  <>
+                    <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block">
+                      <Button variant="secondary" className="w-full">
+                        {t.nav.login}
+                      </Button>
+                    </Link>
+                    <Link to="/login?register=true" onClick={() => setIsMobileMenuOpen(false)} className="block">
+                      <Button variant="primary" className="w-full">
+                        {t.nav.signup}
+                      </Button>
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Mobile Menu Overlay */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 bg-deep-950/50 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
-            {/* Mobile Menu Panel */}
-            <div
-              className="absolute right-0 top-0 h-full w-full max-w-sm bg-white dark:bg-deep-950 shadow-glass-lg animate-fade-in-right safe-area-top"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Menu Header */}
-              <div className="flex items-center justify-between p-4 border-b border-surface-200 dark:border-deep-800">
-                <span className="font-serif text-xl font-bold text-deep-900 dark:text-surface-100">Menu</span>
-                <button
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 rounded-lg hover:bg-surface-100 dark:hover:bg-deep-900 transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* User Info (if logged in) */}
-              {currentUser && (
-                <div className="p-4 border-b border-surface-100 dark:border-deep-800">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-lg font-semibold">
-                      {currentUser.name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-deep-900 dark:text-surface-100">{currentUser.name}</p>
-                      <p className="text-sm text-deep-500 dark:text-surface-500 capitalize">
-                        {currentUser.role === UserRole.LAWYER ? 'Avocat' : 'Client'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Menu Items */}
-              <div className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-                {navLinks.map((link) => {
-                  if (link.requiresAuth && !currentUser) return null;
-                  if (link.requiresRole && currentUser?.role !== link.requiresRole) return null;
-
-                  return (
-                    <Link
-                      key={link.path}
-                      to={link.path}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`flex items-center justify-between px-4 py-3.5 rounded-xl transition-colors touch-target ${isActive(link.path)
-                        ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400'
-                        : 'text-deep-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-deep-900 active:bg-surface-200 dark:active:bg-deep-800'
-                        }`}
-                    >
-                      <span className="flex items-center gap-3 font-medium">
-                        {link.path === '/messages' && <MessageSquare className="w-5 h-5" />}
-                        {link.path === '/search' && <Search className="w-5 h-5" />}
-                        {link.path === '/dashboard' && <LayoutDashboard className="w-5 h-5" />}
-                        {link.label}
-                        {link.hasNotification && unreadMessagesCount > 0 && (
-                          <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                            {unreadMessagesCount}
-                          </span>
-                        )}
-                      </span>
-                      <ChevronRight className="w-4 h-4 opacity-50" />
-                    </Link>
-                  );
-                })}
-
-                {/* Divider */}
-                <div className="my-4 border-t border-surface-200 dark:border-deep-800" />
-
-                {/* Settings */}
-                <div className="space-y-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-deep-500 dark:text-surface-500">Langue</span>
-                    <button
-                      onClick={toggleLanguage}
-                      className="px-3 py-1.5 text-sm font-medium rounded-lg bg-surface-100 dark:bg-deep-900"
-                    >
-                      {language === 'en' ? 'Français' : 'English'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Auth Actions */}
-                <div className="mt-6 px-4 space-y-2">
-                  {currentUser ? (
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => { logout(); setIsMobileMenuOpen(false); }}
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      {t.nav.signout}
-                    </Button>
-                  ) : (
-                    <>
-                      <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block">
-                        <Button variant="secondary" className="w-full">
-                          {t.nav.login}
-                        </Button>
-                      </Link>
-                      <Link to="/login?register=true" onClick={() => setIsMobileMenuOpen(false)} className="block">
-                        <Button variant="primary" className="w-full">
-                          {t.nav.signup}
-                        </Button>
-                      </Link>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-grow pb-16 lg:pb-0">
+      {/* Main Content - no top padding, nav floats on top like macOS */}
+      <main className={`flex-grow ${isSearchPage ? '' : 'pb-16 lg:pb-0'}`}>
         {children}
       </main>
 
-      {/* Legal Chatbot */}
-      <LegalChatbot />
+      {/* Legal Chatbot - Hidden on search page */}
+      {!isSearchPage && <LegalChatbot />}
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-deep-950/90 backdrop-blur-xl border-t border-surface-200 dark:border-deep-800 safe-area-bottom">
+      {/* Mobile Bottom Navigation - Hidden on search page */}
+      <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-deep-950/90 backdrop-blur-xl border-t border-surface-200 dark:border-deep-800 safe-area-bottom ${isSearchPage ? 'hidden' : ''}`}>
         <div className="flex items-center justify-around h-16">
           {mobileNavItems.map((item) => {
             if (item.requiresAuth && !currentUser) return null;
+            if (item.requiresRole && currentUser?.role !== item.requiresRole) return null;
 
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -342,26 +391,26 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   : 'text-deep-500 dark:text-surface-500'
                   }`}
               >
+                {active && (
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary-500 rounded-full" />
+                )}
                 <div className="relative">
                   <Icon className={`w-5 h-5 ${active ? 'scale-110' : ''} transition-transform`} />
                   {item.hasBadge && (
-                    <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full" />
+                    <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full" aria-hidden="true" />
                   )}
                 </div>
                 <span className={`text-[10px] mt-1 font-medium ${active ? 'font-semibold' : ''}`}>
                   {item.label}
                 </span>
-                {active && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary-500 rounded-full" />
-                )}
               </Link>
             );
           })}
         </div>
       </nav>
 
-      {/* Footer - Hidden on mobile for cleaner experience */}
-      <footer className="hidden lg:block bg-deep-900 dark:bg-deep-950 text-surface-300 border-t border-deep-800">
+      {/* Footer - Hidden on mobile and on search page for cleaner experience */}
+      <footer className={`hidden lg:block bg-deep-900 dark:bg-deep-950 text-surface-300 border-t border-deep-800 ${isSearchPage ? 'lg:hidden' : ''}`}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
           {/* Tiny admin shortcut (bottom-left) */}
           <Link

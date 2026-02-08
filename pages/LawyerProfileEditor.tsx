@@ -1,7 +1,7 @@
 import React from 'react';
-import { ProfileBuilder } from '../components/profile-builder/ProfileBuilder';
+import { ProfileBuilderV2 } from '../components/profile-builder/ProfileBuilderV2';
 
 export const LawyerProfileEditor: React.FC = () => {
-  return <ProfileBuilder />;
+  return <ProfileBuilderV2 />;
 };
 

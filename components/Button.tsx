@@ -129,7 +129,7 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       {/* Shine effect overlay */}
-      <span className="absolute inset-0 overflow-hidden rounded-xl">
+      <span className="absolute inset-0 overflow-hidden rounded-xl" aria-hidden="true">
         <span 
           className="absolute inset-0 -translate-x-full group-hover:animate-shimmer"
           style={{
@@ -139,21 +139,17 @@ export const Button: React.FC<ButtonProps> = ({
       </span>
       
       {/* Content */}
-      <span className="relative flex items-center justify-center gap-2">
-        {isLoading ? (
-          loadingSpinner
-        ) : (
-          <>
-            {icon && iconPosition === 'left' && (
-              <span className={iconSizeClasses[size]}>{icon}</span>
-            )}
-            {children}
-            {icon && iconPosition === 'right' && (
-              <span className={iconSizeClasses[size]}>{icon}</span>
-            )}
-          </>
-        )}
-      </span>
+      {isLoading ? (
+        <span className="relative flex items-center justify-center gap-2">
+          {loadingSpinner}
+        </span>
+      ) : (
+        <span className="relative flex items-center justify-center gap-2">
+          {icon && iconPosition === 'left' && icon}
+          {children}
+          {icon && iconPosition === 'right' && icon}
+        </span>
+      )}
     </button>
   );
 };

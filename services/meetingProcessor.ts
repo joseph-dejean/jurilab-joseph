@@ -1,6 +1,11 @@
 /**
  * Meeting Processor Service
  * Traite les réunions terminées : extrait le transcript et génère le résumé
+ * 
+ * NOUVEAU: Système de retry intelligent
+ * - Essaye immédiatement après l'appel
+ * - Réessaye toutes les 2 minutes pendant 20 minutes
+ * - Affiche la progression à l'utilisateur
  */
 
 import { getRoomTranscript, getRoomInfo, deleteRoom } from './dailyService';
@@ -10,18 +15,36 @@ import { Appointment } from '../types';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
+// Interface pour le callback de progression
+export interface TranscriptFetchProgress {
+  attempt: number;
+  maxAttempts: number;
+  nextRetryIn?: number; // secondes
+  estimatedReadyTime?: string; // "~5 minutes", "~10 minutes"
+  status: 'fetching' | 'processing' | 'ready' | 'unavailable';
+}
+
 /**
- * Traite une réunion terminée :
- * 1. Récupère le transcript depuis Daily.co
- * 2. Génère un résumé avec Gemini
- * 3. Met à jour l'Appointment dans Firebase
+ * Traite une réunion terminée AVEC RETRY AUTOMATIQUE
+ * 
+ * @param appointment - Rendez-vous à traiter
+ * @param lawyerName - Nom de l'avocat
+ * @param clientName - Nom du client
+ * @param lawyerId - ID de l'avocat (optionnel)
+ * @param clientId - ID du client (optionnel)
+ * @param onProgress - Callback pour afficher la progression
+ * @param maxAttempts - Nombre maximum de tentatives (défaut: 10 = 20 minutes)
+ * @param retryIntervalMs - Délai entre les tentatives (défaut: 2 minutes)
  */
 export const processCompletedMeeting = async (
   appointment: Appointment,
   lawyerName: string,
   clientName: string,
   lawyerId?: string,
-  clientId?: string
+  clientId?: string,
+  onProgress?: (progress: TranscriptFetchProgress) => void,
+  maxAttempts: number = 10, // 10 tentatives = 20 minutes
+  retryIntervalMs: number = 120000 // 2 minutes entre les tentatives
 ): Promise<{ transcript: string; summary: string }> => {
   console.log(`🔄 Processing completed meeting: ${appointment.id}`);
 
@@ -31,75 +54,145 @@ export const processCompletedMeeting = async (
 
   let transcript = '';
   let summary = '';
+  let attempt = 1;
 
-  try {
-    // 1. Récupérer le transcript depuis Daily.co
-    // On passe la date et la durée pour filtrer uniquement les sessions avec les deux participants
-    console.log(`📝 Fetching transcript for room: ${appointment.dailyRoomId}`);
-    transcript = await getRoomTranscript(
-      appointment.dailyRoomId,
-      appointment.date, // Date du RDV pour filtrer
-      appointment.duration // Durée pour calculer la fenêtre
-    );
-
-    if (!transcript || transcript.trim().length === 0) {
-      console.warn('⚠️ No transcript available yet, will retry later');
-      // Le transcript peut ne pas être disponible immédiatement après la fin
-      // On retourne vide et on pourra réessayer plus tard
-      return { transcript: '', summary: '' };
-    }
-
-    console.log(`✅ Transcript retrieved (${transcript.length} characters)`);
-
-    // 2. Générer le résumé avec Gemini
-    console.log(`🤖 Generating summary with Gemini...`);
-    const appointmentDate = format(new Date(appointment.date), 'PPP', { locale: fr });
-    
-    summary = await generateMeetingSummary(
-      transcript,
-      lawyerName,
-      clientName,
-      appointmentDate
-    );
-
-    console.log(`✅ Summary generated (${summary.length} characters)`);
-
-    // 3. Mettre à jour l'Appointment dans Firebase
-    console.log(`💾 Saving transcript and summary to Firebase...`);
-    await updateAppointmentTranscript(
-      appointment.id,
-      transcript,
-      summary,
-      new Date().toISOString() // meetingEndedAt
-    );
-
-    console.log(`✅ Meeting processing completed successfully`);
-
-    // 4. Vérifier si on peut fermer la salle (si les deux participants sont sortis)
-    // Attendre un peu pour laisser le temps aux participants de quitter
-    setTimeout(async () => {
-      try {
-        await checkAndCloseRoomIfEmpty(appointment.dailyRoomId, appointment.date, appointment.duration);
-      } catch (error) {
-        console.error('❌ Error checking room status:', error);
-        // Ne pas bloquer si la vérification échoue
+  // Boucle de retry
+  while (attempt <= maxAttempts) {
+    try {
+      // Notifier la progression
+      if (onProgress) {
+        const minutesElapsed = (attempt - 1) * (retryIntervalMs / 60000);
+        const estimatedMinutes = Math.max(5, 15 - minutesElapsed); // Daily.co dit 15 min max
+        
+        onProgress({
+          attempt,
+          maxAttempts,
+          nextRetryIn: attempt < maxAttempts ? retryIntervalMs / 1000 : undefined,
+          estimatedReadyTime: estimatedMinutes > 1 ? `~${Math.ceil(estimatedMinutes)} minutes` : '~1 minute',
+          status: 'fetching'
+        });
       }
-    }, 30000); // Attendre 30 secondes après la fin du traitement
 
-    return { transcript, summary };
-  } catch (error: any) {
-    console.error('❌ Error processing meeting:', error);
-    
-    // Si le transcript n'est pas encore disponible, on ne considère pas ça comme une erreur fatale
-    if (error.message?.includes('No transcript') || 
-        error.message?.includes('No recordings') || 
-        error.message?.includes('No transcripts found')) {
-      console.log('ℹ️ Transcript not available yet, will be processed later');
-      return { transcript: '', summary: '' };
+      console.log(`📝 Fetching transcript (attempt ${attempt}/${maxAttempts}) for room: ${appointment.dailyRoomId}`);
+      
+      // 1. Récupérer le transcript depuis Daily.co
+      transcript = await getRoomTranscript(
+        appointment.dailyRoomId,
+        appointment.date,
+        appointment.duration
+      );
+
+      // Transcript trouvé !
+      if (transcript && transcript.trim().length > 0) {
+        console.log(`✅ Transcript retrieved (${transcript.length} characters)`);
+        
+        // Notifier: en cours de traitement
+        if (onProgress) {
+          onProgress({
+            attempt,
+            maxAttempts,
+            status: 'processing'
+          });
+        }
+
+        // 2. Générer le résumé avec Gemini
+        console.log(`🤖 Generating summary with Gemini...`);
+        const appointmentDate = format(new Date(appointment.date), 'PPP', { locale: fr });
+        
+        summary = await generateMeetingSummary(
+          transcript,
+          lawyerName,
+          clientName,
+          appointmentDate
+        );
+
+        console.log(`✅ Summary generated (${summary.length} characters)`);
+
+        // 3. Mettre à jour l'Appointment dans Firebase
+        console.log(`💾 Saving transcript and summary to Firebase...`);
+        await updateAppointmentTranscript(
+          appointment.id,
+          transcript,
+          summary,
+          new Date().toISOString()
+        );
+
+        // Notifier: prêt !
+        if (onProgress) {
+          onProgress({
+            attempt,
+            maxAttempts,
+            status: 'ready'
+          });
+        }
+
+        console.log(`✅ Meeting processing completed successfully`);
+
+        // 4. Fermer la salle après un délai
+        setTimeout(async () => {
+          try {
+            await checkAndCloseRoomIfEmpty(appointment.dailyRoomId, appointment.date, appointment.duration);
+          } catch (error) {
+            console.error('❌ Error checking room status:', error);
+          }
+        }, 30000);
+
+        return { transcript, summary };
+      }
+
+      // Transcript pas encore disponible
+      console.warn(`⏳ Transcript not ready yet (attempt ${attempt}/${maxAttempts})`);
+
+      // Si c'est la dernière tentative, arrêter
+      if (attempt >= maxAttempts) {
+        console.warn(`⚠️ Transcript not available after ${maxAttempts} attempts`);
+        if (onProgress) {
+          onProgress({
+            attempt,
+            maxAttempts,
+            status: 'unavailable'
+          });
+        }
+        return { transcript: '', summary: '' };
+      }
+
+      // Attendre avant de réessayer
+      console.log(`⏰ Waiting ${retryIntervalMs / 1000}s before next attempt...`);
+      await new Promise(resolve => setTimeout(resolve, retryIntervalMs));
+      attempt++;
+
+    } catch (error: any) {
+      console.error(`❌ Error processing meeting (attempt ${attempt}/${maxAttempts}):`, error);
+      
+      // Si le transcript n'est pas encore disponible, continuer à réessayer
+      if (error.message?.includes('No transcript') || 
+          error.message?.includes('No recordings') || 
+          error.message?.includes('No transcripts found')) {
+        
+        if (attempt >= maxAttempts) {
+          console.log('ℹ️ Transcript not available after all attempts');
+          if (onProgress) {
+            onProgress({
+              attempt,
+              maxAttempts,
+              status: 'unavailable'
+            });
+          }
+          return { transcript: '', summary: '' };
+        }
+
+        console.log(`⏰ Waiting ${retryIntervalMs / 1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryIntervalMs));
+        attempt++;
+        continue;
+      }
+      
+      // Autre erreur: arrêter
+      throw error;
     }
-    
-    throw error;
   }
+  
+  return { transcript: '', summary: '' };
 };
 
 /**

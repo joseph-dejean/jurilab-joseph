@@ -13,10 +13,15 @@ interface DraggableGridProps {
   };
 }
 
-export const DraggableGrid: React.FC<DraggableGridProps> = ({ blocks, onRemoveBlock, onUpdateBlock, lawyerData }) => {
+export const DraggableGrid: React.FC<DraggableGridProps> = ({ 
+  blocks, 
+  onRemoveBlock, 
+  onUpdateBlock, 
+  lawyerData 
+}) => {
   return (
     <SortableContext items={blocks.map(b => b.id)} strategy={rectSortingStrategy}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[200px] pb-20">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 auto-rows-[180px] pb-20">
         {blocks.map((block) => (
           <SortableBlock
             key={block.id}
@@ -30,4 +35,3 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({ blocks, onRemoveBl
     </SortableContext>
   );
 };
-

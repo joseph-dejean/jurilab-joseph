@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/store';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { UserRole } from '../types';
@@ -6,7 +6,8 @@ import { Button } from '../components/Button';
 import { getAuthErrorMessage } from '../services/firebaseService';
 import {
   Mail, Lock, User, ArrowRight, Scale, Sparkles, ChevronLeft,
-  Eye, EyeOff, CheckCircle2, AlertCircle, UserCircle, Briefcase
+  Eye, EyeOff, CheckCircle2, AlertCircle, UserCircle, Briefcase,
+  Loader2
 } from 'lucide-react';
 
 // Google Icon SVG
@@ -20,9 +21,10 @@ const GoogleIcon = () => (
 );
 
 type AuthMode = 'signin' | 'signup-choice' | 'signup-client';
+type AuthStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export const LoginPage: React.FC = () => {
-  const { login, loginGoogle, loginMicrosoft, register, t } = useApp();
+  const { login, loginGoogle, loginMicrosoft, register, t, currentUser, isAuthLoading } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const registerParam = searchParams.get('register') === 'true';
@@ -38,6 +40,20 @@ export const LoginPage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('idle');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!isAuthLoading && currentUser) {
+      // Check if profile is complete
+      if (currentUser.profileCompleted === false) {
+        navigate('/complete-profile');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [currentUser, isAuthLoading, navigate]);
 
   // Validation
   const validateForm = (): boolean => {
@@ -73,48 +89,87 @@ export const LoginPage: React.FC = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setAuthStatus('loading');
+    setErrors({});
+
     try {
       if (authMode === 'signup-client') {
         await register(email, password, UserRole.CLIENT, name);
-        navigate('/dashboard');
+        setSuccessMessage('Compte créé avec succès !');
+        setAuthStatus('success');
+        // Small delay to show success message before redirect
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1000);
       } else {
         await login(email, password);
-        navigate('/dashboard');
+        setSuccessMessage('Connexion réussie !');
+        setAuthStatus('success');
+        // Small delay to show success message before redirect
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 800);
       }
     } catch (error: any) {
       console.error(error);
+      setAuthStatus('error');
       setErrors({ form: getAuthErrorMessage(error) });
-    } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
+    setAuthStatus('loading');
+    setErrors({});
+
     try {
-      await loginGoogle(UserRole.CLIENT);
-      navigate('/dashboard');
+      const { isNewUser } = await loginGoogle(UserRole.CLIENT);
+      setSuccessMessage(isNewUser ? 'Bienvenue sur Jurilab !' : 'Connexion réussie !');
+      setAuthStatus('success');
+      
+      // Small delay to show success message before redirect
+      setTimeout(() => {
+        if (isNewUser) {
+          navigate('/complete-profile');
+        } else {
+          navigate('/dashboard');
+        }
+      }, 800);
     } catch (error: any) {
       console.error(error);
+      setAuthStatus('error');
       if (error.code !== 'auth/popup-closed-by-user') {
         setErrors({ form: getAuthErrorMessage(error) });
       }
-    } finally {
       setIsLoading(false);
     }
   };
 
   const handleMicrosoftLogin = async () => {
     setIsLoading(true);
+    setAuthStatus('loading');
+    setErrors({});
+
     try {
-      await loginMicrosoft(UserRole.CLIENT);
-      navigate('/dashboard');
+      const { isNewUser } = await loginMicrosoft(UserRole.CLIENT);
+      setSuccessMessage(isNewUser ? 'Bienvenue sur Jurilab !' : 'Connexion réussie !');
+      setAuthStatus('success');
+      
+      // Small delay to show success message before redirect
+      setTimeout(() => {
+        if (isNewUser) {
+          navigate('/complete-profile');
+        } else {
+          navigate('/dashboard');
+        }
+      }, 800);
     } catch (error: any) {
       console.error(error);
+      setAuthStatus('error');
       if (error.code !== 'auth/popup-closed-by-user') {
         setErrors({ form: getAuthErrorMessage(error) });
       }
-    } finally {
       setIsLoading(false);
     }
   };
@@ -391,8 +446,32 @@ export const LoginPage: React.FC = () => {
     </form>
   );
 
+  // Success Overlay Component
+  const SuccessOverlay = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 dark:bg-deep-950/95 backdrop-blur-sm animate-fadeIn">
+      <div className="text-center">
+        <div className="relative w-24 h-24 mx-auto mb-6">
+          <div className="absolute inset-0 bg-green-100 dark:bg-green-900/30 rounded-full animate-ping opacity-50" />
+          <div className="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30">
+            <CheckCircle2 className="w-12 h-12 text-white animate-scaleIn" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-serif font-bold text-deep-900 dark:text-surface-100 mb-2">
+          {successMessage}
+        </h2>
+        <p className="text-deep-500 dark:text-surface-400 flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Redirection en cours...
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-[calc(100vh-80px)] flex flex-col lg:flex-row">
+      {/* Success Overlay */}
+      {authStatus === 'success' && <SuccessOverlay />}
+
       {/* Left side - Form */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 sm:py-12 bg-surface-50 dark:bg-deep-950 safe-area-bottom">
         <div className="w-full max-w-md">

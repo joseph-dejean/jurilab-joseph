@@ -8,7 +8,7 @@ import {
   User, Briefcase, MapPin, DollarSign, Languages,
   FileText, Upload, Check, ChevronRight, ChevronLeft,
   Eye, EyeOff, AlertCircle, Phone, Mail, Lock,
-  Building, Award, GraduationCap, Globe
+  Building, Award, GraduationCap, Globe, CheckCircle2, Loader2
 } from 'lucide-react';
 
 interface LawyerFormData {
@@ -125,6 +125,7 @@ export const LawyerRegistrationPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   const updateField = (field: keyof LawyerFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -303,9 +304,13 @@ export const LawyerRegistrationPage: React.FC = () => {
       console.log('📝 Submitting lawyer registration:', lawyerData);
       await registerLawyer(formData.email, formData.password, lawyerData);
 
-      console.log('✅ Registration successful, redirecting...');
-      alert('✅ Inscription réussie ! Bienvenue sur Jurilab. Veuillez compléter votre profil.');
-      navigate('/dashboard'); // Direct to dashboard or login
+      console.log('✅ Registration successful, showing success...');
+      setRegistrationSuccess(true);
+      
+      // Redirect after showing success message
+      setTimeout(() => {
+        navigate('/dashboard', { state: { welcomeMessage: true } });
+      }, 2000);
     } catch (error: any) {
       console.error('❌ Error during registration:', error);
       let errorMessage = "Une erreur est survenue lors de l'inscription.";
@@ -881,6 +886,32 @@ export const LawyerRegistrationPage: React.FC = () => {
       )}
     </div>
   );
+
+  // Success Overlay
+  if (registrationSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-50 via-surface-100 to-accent-50 dark:from-deep-950 dark:via-deep-900 dark:to-accent-950/20">
+        <div className="text-center p-8">
+          <div className="relative w-24 h-24 mx-auto mb-6">
+            <div className="absolute inset-0 bg-green-100 dark:bg-green-900/30 rounded-full animate-ping opacity-50" />
+            <div className="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30">
+              <CheckCircle2 className="w-12 h-12 text-white animate-scaleIn" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-serif font-bold text-deep-900 dark:text-surface-100 mb-2">
+            Inscription réussie !
+          </h2>
+          <p className="text-deep-600 dark:text-surface-400 mb-4">
+            Bienvenue sur Jurilab, Maître {formData.firstName} {formData.lastName}
+          </p>
+          <p className="text-deep-500 dark:text-surface-500 flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Redirection vers votre tableau de bord...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-surface-50 via-surface-100 to-accent-50 dark:from-deep-950 dark:via-deep-900 dark:to-accent-950/20 py-8 px-4">

@@ -32,6 +32,8 @@ export enum ProfileBlockType {
 
 export type ProfileBlockSize = 'small' | 'medium' | 'large' | 'full' | 'tall' | 'wide' | 'hero' | 'square';
 
+export type ProfileBlockStylePreset = 'clean' | 'cream' | 'glass' | 'primary' | 'dark' | 'custom';
+
 export interface ProfileBlock {
   id: string;
   type: ProfileBlockType;
@@ -39,6 +41,9 @@ export interface ProfileBlock {
   content?: string; // For text or media URL
   order: number;
   size: ProfileBlockSize;
+  stylePreset?: ProfileBlockStylePreset; // Visual style preset for the block
+  customBgColor?: string; // Custom background color (hex)
+  customTextColor?: string; // Custom text color (hex) - 'light' or 'dark' for auto
 }
 
 export interface User {
@@ -49,6 +54,12 @@ export interface User {
   avatarUrl?: string;
   /** If true, user can still sign-in to Firebase Auth but app access is blocked and rules can deny writes. */
   disabled?: boolean;
+  /** If true, user has completed their profile after OAuth signup */
+  profileCompleted?: boolean;
+  /** Phone number */
+  phone?: string;
+  /** Date the user joined */
+  createdAt?: string;
 }
 
 /**
@@ -99,6 +110,11 @@ export interface Lawyer extends User {
   googleCalendarAccessToken?: string; // Token d'accès Google (chiffré)
   googleCalendarRefreshToken?: string; // Token de rafraîchissement (chiffré)
   googleCalendarLastSyncAt?: string; // ISO timestamp de la dernière synchronisation
+  // Outlook Calendar integration
+  outlookCalendarConnected?: boolean; // Si le calendrier Outlook est connecté
+  outlookCalendarAccessToken?: string; // Token d'accès Outlook (chiffré)
+  outlookCalendarRefreshToken?: string; // Token de rafraîchissement (chiffré)
+  outlookCalendarLastSyncAt?: string; // ISO timestamp de la dernière synchronisation
   // Heures de disponibilité
   availabilityHours?: AvailabilityHours; // Heures de disponibilité hebdomadaires
   // Additional fields from registration
@@ -114,8 +130,11 @@ export interface Lawyer extends User {
 
 export interface Client extends User {
   role: UserRole.CLIENT;
-  phone?: string;
   favorites: string[]; // Lawyer IDs
+  /** City/location for better lawyer recommendations */
+  location?: string;
+  /** Preferred legal specialties */
+  preferredSpecialties?: LegalSpecialty[];
 }
 
 export interface Appointment {
@@ -217,4 +236,80 @@ export interface Document {
   sharedWithClient: boolean;       // Visibility flag
   lawyerNote?: string;             // Private note from lawyer
   lawyerNoteUpdatedAt?: string;    // When the note was last updated
+}
+
+/**
+ * Représente une entrée de diligence (time tracking)
+ */
+export interface DiligenceEntry {
+  id: string;
+  lawyerId: string;              // Avocat qui a effectué la diligence
+  clientId: string;              // Client pour lequel le travail a été fait
+  startTime: string;             // ISO timestamp de début
+  endTime?: string;              // ISO timestamp de fin (undefined si en cours)
+  duration?: number;             // Durée en secondes (calculée après arrêt)
+  description: string;           // Description du travail effectué
+  category?: string;             // Type de diligence (ex: "Recherche", "Rédaction", "Révision", etc.)
+  createdAt: string;             // ISO timestamp de création
+  updatedAt: string;             // ISO timestamp de dernière modification
+  billable?: boolean;            // Si c'est facturable ou non
+}
+
+/**
+ * Types pour l'intégration Outlook Calendar
+ */
+export interface OutlookCalendarCredentials {
+  outlookCalendarConnected: boolean;
+  outlookCalendarAccessToken?: string; // Chiffré
+  outlookCalendarRefreshToken?: string; // Chiffré
+  outlookCalendarLastSyncAt?: string; // ISO timestamp
+}
+
+/**
+ * Événement personnel créé dans Jurilab
+ */
+export interface PersonalEvent {
+  id: string;
+  userId: string;               // ID de l'utilisateur propriétaire
+  title: string;
+  start: string;                // ISO timestamp
+  end: string;                  // ISO timestamp
+  allDay?: boolean;
+  description?: string;
+  location?: string;
+  color?: string;               // Couleur personnalisée
+  type?: 'EVENT' | 'AVAILABILITY'; // Type d'événement
+  googleCalendarEventId?: string; // ID de l'événement Google Calendar associé
+  createdAt: string;            // ISO timestamp
+  updatedAt: string;            // ISO timestamp
+}
+
+/**
+ * Type d'événement dans le calendrier unifié
+ */
+export type CalendarEventType = 'APPOINTMENT' | 'GOOGLE' | 'OUTLOOK' | 'PERSONAL' | 'AVAILABILITY';
+
+/**
+ * Source d'un événement
+ */
+export type CalendarEventSource = 'JURILAB' | 'GOOGLE' | 'OUTLOOK';
+
+/**
+ * Événement du calendrier unifié (tous les événements de toutes sources)
+ */
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay?: boolean;
+  color?: string;
+  type: CalendarEventType;
+  source: CalendarEventSource;
+  sourceEventId?: string;       // ID original dans la source
+  description?: string;
+  location?: string;
+  appointment?: Appointment;    // Si c'est un rendez-vous Jurilab
+  editable: boolean;            // Si l'événement peut être modifié
+  deletable: boolean;           // Si l'événement peut être supprimé
 }

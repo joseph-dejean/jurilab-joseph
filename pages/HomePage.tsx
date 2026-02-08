@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Shield, Clock, Award, ArrowRight, Star, Users, Sparkles, CheckCircle } from 'lucide-react';
+import { Search, Shield, Clock, Award, ArrowRight, Star, Users, Sparkles, CheckCircle, Video, Bot, FolderLock, Lock } from 'lucide-react';
 import { Button } from '../components/Button';
 import { LegalSpecialty } from '../types';
 import { useApp } from '../store/store';
@@ -8,7 +8,7 @@ import { analyzeLegalCase } from '../services/geminiService';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { t, translateSpecialty } = useApp();
+  const { t, translateSpecialty, language } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [adminTapCount, setAdminTapCount] = useState(0);
@@ -51,13 +51,6 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  const stats = [
-    { value: '500+', label: 'Avocats vérifiés', icon: Users },
-    { value: '98%', label: 'Clients satisfaits', icon: Star },
-    { value: '24h', label: 'Réponse moyenne', icon: Clock },
-    { value: '15+', label: 'Spécialités', icon: Award },
-  ];
-
   const specialtyIcons: Record<string, string> = {
     [LegalSpecialty.CRIMINAL]: '⚖️',
     [LegalSpecialty.FAMILY]: '👨‍👩‍👧',
@@ -69,8 +62,31 @@ export const HomePage: React.FC = () => {
     [LegalSpecialty.TAX]: '📊',
   };
 
+  const ecosystemFeatures = [
+    {
+      icon: Video,
+      title: 'Consultation Vidéo',
+      description: 'Échangez en direct avec votre avocat via notre plateforme sécurisée et chiffrée de bout en bout.',
+    },
+    {
+      icon: Bot,
+      title: 'Assistant IA',
+      description: 'Une première analyse instantanée de vos besoins pour vous orienter vers la bonne spécialité.',
+    },
+    {
+      icon: FolderLock,
+      title: 'Gestion Documentaire',
+      description: 'Centralisez, partagez et signez vos documents juridiques dans un espace collaboratif sécurisé.',
+    },
+    {
+      icon: Lock,
+      title: 'Sécurité Maximale',
+      description: 'Vos données sont protégées par les plus hauts standards de confidentialité et d\'anonymat.',
+    },
+  ];
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col selection:bg-primary-600 selection:text-white">
       {/* Hidden admin access zone (7 taps in <2s) */}
       <button
         type="button"
@@ -79,257 +95,157 @@ export const HomePage: React.FC = () => {
         className="fixed bottom-2 left-2 w-10 h-10 opacity-0 z-[60]"
       />
 
-      {/* Hero Section */}
-      <section className="relative min-h-[85vh] sm:min-h-[90vh] flex items-center overflow-hidden px-4 sm:px-0">
-        {/* Background Elements */}
-        <div className="absolute inset-0 hero-gradient dark:hero-gradient-dark" />
-        <div className="absolute inset-0 pattern-dots dark:pattern-dots-dark opacity-40" />
+      {/* Hero Section with Mesh Background */}
+      <section className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden pt-32 sm:pt-36 pb-10 bg-gradient-to-b from-rose-50/80 via-stone-50 to-white dark:from-deep-950 dark:via-deep-900 dark:to-deep-900">
+        {/* Mesh Background Blobs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-[20%] left-[20%] w-[400px] md:w-[600px] h-[400px] md:h-[600px] bg-rose-200/40 dark:bg-primary-900/20 rounded-full filter blur-[100px] animate-pulse" style={{ animationDuration: '10s' }} />
+          <div className="absolute top-[30%] right-[20%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-pink-100/60 dark:bg-primary-800/20 rounded-full filter blur-[80px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+          <div className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-[500px] md:w-[800px] h-[500px] md:h-[800px] bg-indigo-100/40 dark:bg-accent-900/20 rounded-full filter blur-[120px] animate-pulse" style={{ animationDuration: '12s', animationDelay: '4s' }} />
+        </div>
 
-        {/* Floating decorative elements - Hidden on mobile for performance */}
-        <div className="hidden sm:block absolute top-20 right-[15%] w-64 h-64 bg-primary-200/30 dark:bg-primary-800/20 rounded-full blur-3xl animate-float" />
-        <div className="hidden sm:block absolute bottom-20 left-[10%] w-48 h-48 bg-accent-200/30 dark:bg-accent-800/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            {/* Main Headline */}
-            <h1
-              className="text-3xl sm:text-4xl md:text-display-md lg:text-display-lg font-serif text-deep-900 dark:text-surface-100 mb-4 sm:mb-6 opacity-0 animate-fade-in-up delay-100 leading-tight"
-            >
-              {t.hero.title1}
-              <span className="text-gradient">{t.hero.title2}</span>
-              {t.hero.title3}
-            </h1>
-
-            {/* Subtitle */}
-            <p
-              className="text-base sm:text-lg md:text-xl text-deep-600 dark:text-surface-400 mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed opacity-0 animate-fade-in-up delay-200 px-2"
-            >
-              {t.hero.subtitle}
-            </p>
-
-            {/* Search Box */}
-            <div
-              className="max-w-2xl mx-auto opacity-0 animate-fade-in-up delay-300"
-            >
-              <form onSubmit={handleAISearch} className="relative">
-                <div className="glass rounded-2xl p-2 shadow-glass-lg">
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    <div className="relative flex-grow">
-                      <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-500" />
-                      <input
-                        type="text"
-                        placeholder={t.hero.searchPlaceholder}
-                        className="w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-xl bg-white dark:bg-deep-900 border-2 border-transparent focus:border-primary-500 focus:ring-0 outline-none text-base transition-colors duration-200"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="lg"
-                      className="w-full sm:w-auto px-6 sm:px-8 rounded-xl shadow-glow"
-                      isLoading={isSearching}
-                      disabled={isSearching}
-                    >
-                      <Sparkles className="w-5 h-5 mr-2" />
-                      Recherche IA
-                    </Button>
-                  </div>
-                </div>
-              </form>
-
-              {/* Quick tags - Horizontal scroll on mobile */}
-              <div className="flex items-center gap-2 mt-4 sm:mt-6 overflow-x-auto no-scrollbar pb-2 sm:justify-center sm:flex-wrap">
-                <span className="text-sm text-deep-500 dark:text-surface-500 flex-shrink-0">Populaires:</span>
-                {['Divorce', 'Immobilier', 'Pénal', 'Travail'].map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => navigate(`/search?q=${tag}`)}
-                    className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-deep-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/50 rounded-lg transition-colors duration-200"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
+        {/* Floating Decorative Cards */}
+        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+          <div className="absolute top-[25%] left-[10%] hidden lg:block animate-float">
+            <div className="bg-white/40 dark:bg-deep-800/40 backdrop-blur-xl w-32 h-40 rounded-xl transform rotate-12 flex flex-col p-4 gap-2 border border-white/60 dark:border-deep-700/60 shadow-lg">
+              <div className="w-full h-2 bg-primary-600/10 rounded-full" />
+              <div className="w-2/3 h-2 bg-primary-600/5 rounded-full" />
+              <div className="w-full h-2 bg-primary-600/5 rounded-full mt-2" />
+              <div className="w-full h-2 bg-primary-600/5 rounded-full" />
+            </div>
+          </div>
+          <div className="absolute bottom-[20%] right-[8%] hidden lg:block animate-float" style={{ animationDelay: '4s' }}>
+            <div className="bg-white/40 dark:bg-deep-800/40 backdrop-blur-xl w-28 h-28 rounded-2xl transform -rotate-12 flex items-center justify-center border border-white/60 dark:border-deep-700/60 shadow-lg">
+              <span className="text-5xl text-primary-600/20 dark:text-primary-400/20">⚖️</span>
             </div>
           </div>
         </div>
 
-        {/* Bottom wave decoration */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-            <path
-              d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z"
-              className="fill-white dark:fill-deep-900"
-            />
+        {/* Hero Content */}
+        <div className="relative z-10 w-full max-w-[960px] px-6 flex flex-col items-center text-center gap-10">
+          <div className="flex flex-col gap-6 items-center">
+            <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl font-medium leading-[0.95] tracking-tight text-primary-700 dark:text-primary-400 drop-shadow-sm">
+              Un <span className="text-deep-900 dark:text-surface-100">avocat</span><br />
+              <span className="italic text-primary-500 dark:text-primary-300">au bon moment</span>
+            </h1>
+            <p className="text-lg md:text-xl text-stone-500 dark:text-surface-400 max-w-lg font-light leading-relaxed tracking-wide">
+              Quand l'intelligence artificielle rencontre <br className="hidden sm:block" /> l'excellence juridique humaine.
+            </p>
+          </div>
+
+          {/* Search Box - Glass Style */}
+          <div className="w-full max-w-2xl mt-4 group">
+            <form onSubmit={handleAISearch} className="relative block w-full">
+              <div className="bg-white/70 dark:bg-deep-800/70 backdrop-blur-2xl rounded-2xl p-2.5 flex items-center gap-4 relative overflow-hidden border border-white/60 dark:border-deep-700/60 shadow-xl transition-all duration-400 focus-within:shadow-2xl focus-within:border-primary-300 dark:focus-within:border-primary-700 focus-within:bg-white/90 dark:focus-within:bg-deep-800/90 focus-within:scale-[1.01]">
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer pointer-events-none" style={{ animationDuration: '3s', animationIterationCount: 'infinite' }} />
+                
+                <div className="pl-4 text-primary-500/60 dark:text-primary-400/60 flex items-center">
+                  <Sparkles className="w-7 h-7" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Rechercher une expertise juridique..."
+                  className="w-full bg-transparent border-none text-gray-800 dark:text-surface-100 placeholder-stone-400 dark:placeholder-surface-500 focus:ring-0 text-lg md:text-xl py-4 font-light tracking-wide outline-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="bg-primary-700 hover:bg-primary-600 dark:bg-primary-600 dark:hover:bg-primary-500 text-white rounded-xl h-12 w-12 md:w-auto md:px-6 transition-all shadow-lg shadow-primary-900/20 flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                  {isSearching ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <ArrowRight className="w-5 h-5 md:hidden" />
+                      <span className="hidden md:block font-bold text-sm tracking-wide">Rechercher</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Quick Tags */}
+            <div className="flex flex-wrap justify-center gap-4 mt-8">
+              {[
+                { icon: '🏢', label: 'Fusions-Acquisitions', query: 'Fusions Acquisitions' },
+                { icon: '💡', label: 'Propriété Intellectuelle', query: 'Propriété Intellectuelle' },
+                { icon: '⚖️', label: 'Contentieux', query: 'Contentieux' },
+              ].map((tag) => (
+                <button
+                  key={tag.label}
+                  onClick={() => navigate(`/search?q=${encodeURIComponent(tag.query)}`)}
+                  className="flex items-center gap-2 text-xs font-medium text-stone-500 dark:text-surface-400 hover:text-primary-700 dark:hover:text-primary-400 bg-white/40 dark:bg-deep-800/40 hover:bg-white/80 dark:hover:bg-deep-800/80 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-deep-700 hover:border-primary-200 dark:hover:border-primary-700 transition-all shadow-sm"
+                >
+                  <span>{tag.icon}</span>
+                  {tag.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 animate-bounce opacity-40">
+          <svg className="w-8 h-8 text-primary-700 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
           </svg>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-6 sm:py-8 bg-white dark:bg-deep-900 relative -mt-1">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Horizontal scroll on mobile, grid on larger screens */}
-          <div className="flex sm:grid sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 md:gap-8 overflow-x-auto no-scrollbar pb-4 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
-            {stats.map((stat, index) => (
-              <div
-                key={index}
-                className="flex-shrink-0 w-[200px] sm:w-auto text-center p-4 sm:p-6 rounded-2xl bg-surface-50 dark:bg-deep-800 border border-surface-100 dark:border-deep-700 opacity-0 animate-fade-in-up"
-                style={{ animationDelay: `${400 + index * 100}ms` }}
-              >
-                <div className="inline-flex items-center justify-center w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mb-3 sm:mb-4">
-                  <stat.icon className="w-5 sm:w-6 h-5 sm:h-6" />
-                </div>
-                <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-deep-900 dark:text-surface-100 mb-1">
-                  {stat.value}
-                </div>
-                <div className="text-xs sm:text-sm text-deep-500 dark:text-surface-500">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-16 sm:py-24 bg-white dark:bg-deep-900">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10 sm:mb-16">
-            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full">
-              Comment ça marche
-            </span>
-            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-deep-900 dark:text-surface-100 mb-4">
-              Trouvez votre avocat en 3 étapes
+      {/* Ecosystem Features Section */}
+      <section className="relative bg-white dark:bg-deep-900 py-24 md:py-32 border-t border-stone-100 dark:border-deep-800">
+        <div className="max-w-[1100px] mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16 md:mb-20">
+            <span className="text-primary-700 dark:text-primary-400 text-sm font-bold tracking-widest uppercase mb-4 block">Notre Écosystème</span>
+            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-primary-700 dark:text-primary-400 mb-6 leading-tight">
+              Comment Jurilab transforme<br />votre expérience juridique
             </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 sm:gap-6 md:gap-8 relative">
-            {/* Connection line - Hidden on mobile */}
-            <div className="hidden md:block absolute top-24 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-primary-200 via-primary-400 to-primary-200 dark:from-primary-900 dark:via-primary-700 dark:to-primary-900" />
-
-            {[
-              {
-                step: '01',
-                title: 'Décrivez votre besoin',
-                description: 'Utilisez notre recherche intelligente ou notre assistant IA pour décrire votre situation juridique.',
-                icon: Search,
-              },
-              {
-                step: '02',
-                title: 'Comparez les profils',
-                description: 'Consultez les profils détaillés, avis clients et tarifs des avocats correspondant à vos critères.',
-                icon: Users,
-              },
-              {
-                step: '03',
-                title: 'Prenez rendez-vous',
-                description: 'Réservez directement en ligne votre consultation vidéo, téléphone ou en cabinet.',
-                icon: CheckCircle,
-              },
-            ].map((item, index) => (
-              <div key={index} className="relative text-center">
-                <div className="relative z-10 inline-flex items-center justify-center w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-white mb-4 sm:mb-6 shadow-glow">
-                  <item.icon className="w-6 sm:w-8 h-6 sm:h-8" />
-                </div>
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 text-5xl sm:text-6xl font-bold text-surface-100 dark:text-deep-800 -z-10">
-                  {item.step}
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-deep-900 dark:text-surface-100 mb-2 sm:mb-3">
-                  {item.title}
-                </h3>
-                <p className="text-sm sm:text-base text-deep-600 dark:text-surface-400 leading-relaxed max-w-xs mx-auto">
-                  {item.description}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center mt-12 sm:mt-16">
-            <Button
-              variant="primary"
-              size="xl"
-              onClick={() => navigate('/search')}
-              className="w-full sm:w-auto shadow-glow"
-            >
-              Commencer maintenant
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 sm:py-24 bg-surface-50 dark:bg-deep-950">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10 sm:mb-16">
-            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full">
-              Pourquoi nous choisir
-            </span>
-            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-deep-900 dark:text-surface-100 mb-3 sm:mb-4">
-              {t.hero.whyTitle}
-            </h2>
-            <p className="text-base sm:text-lg text-deep-600 dark:text-surface-400 max-w-2xl mx-auto px-4">
-              Une plateforme conçue pour simplifier votre recherche juridique
+            <p className="text-stone-500 dark:text-surface-400 text-lg font-light leading-relaxed">
+              Une plateforme unifiée qui connecte les besoins juridiques complexes avec l'expertise la plus adaptée, propulsée par l'intelligence artificielle.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-            {[
-              {
-                icon: Shield,
-                color: 'primary',
-                ...t.hero.features.vetted
-              },
-              {
-                icon: Clock,
-                color: 'accent',
-                ...t.hero.features.time
-              },
-              {
-                icon: Award,
-                color: 'primary',
-                ...t.hero.features.rated
-              },
-            ].map((feature, index) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+            {ecosystemFeatures.map((feature, index) => (
               <div
                 key={index}
-                className="group relative p-6 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-deep-800 border border-surface-100 dark:border-deep-700 transition-all duration-500 hover:shadow-elevated hover:-translate-y-2 active:scale-[0.98]"
+                className="group p-6 md:p-8 rounded-3xl bg-stone-50 dark:bg-deep-800 border border-stone-100 dark:border-deep-700 hover:border-primary-100 dark:hover:border-primary-800 hover:shadow-xl hover:shadow-primary-900/5 transition-all duration-500 flex flex-col items-center text-center"
               >
-                {/* Gradient overlay on hover */}
-                <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                <div className={`relative inline-flex items-center justify-center w-12 sm:w-16 h-12 sm:h-16 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 ${feature.color === 'accent'
-                  ? 'bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400'
-                  : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                  }`}>
-                  <feature.icon className="w-6 sm:w-8 h-6 sm:h-8" />
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white dark:bg-deep-900 shadow-sm flex items-center justify-center text-primary-700 dark:text-primary-400 mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <feature.icon className="w-7 h-7 md:w-8 md:h-8" />
                 </div>
-
-                <h3 className="relative text-lg sm:text-xl font-bold text-deep-900 dark:text-surface-100 mb-2 sm:mb-3">
-                  {feature.title}
-                </h3>
-                <p className="relative text-sm sm:text-base text-deep-600 dark:text-surface-400 leading-relaxed">
-                  {feature.desc}
-                </p>
+                <h3 className="font-serif text-lg md:text-xl text-deep-900 dark:text-surface-100 mb-3 font-medium">{feature.title}</h3>
+                <p className="text-stone-500 dark:text-surface-400 text-sm leading-relaxed">{feature.description}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-12 md:mt-16 flex justify-center">
+            <button
+              onClick={() => navigate('/search')}
+              className="group bg-primary-700 dark:bg-primary-600 text-white text-sm font-bold px-8 py-4 rounded-full hover:bg-primary-600 dark:hover:bg-primary-500 transition-all shadow-lg hover:shadow-primary-900/30 flex items-center gap-3"
+            >
+              Découvrir toutes les fonctionnalités
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
         </div>
       </section>
 
       {/* Specialties Section */}
-      <section className="py-16 sm:py-24 bg-white dark:bg-deep-900">
+      <section className="py-16 sm:py-24 bg-stone-50 dark:bg-deep-950">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10 sm:mb-16">
-            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full">
+            <span className="inline-block px-4 py-1.5 mb-4 text-xs sm:text-sm font-semibold text-primary-700 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 rounded-full uppercase tracking-widest">
               Domaines d'expertise
             </span>
-            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-deep-900 dark:text-surface-100 mb-3 sm:mb-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-primary-700 dark:text-primary-400 mb-3 sm:mb-4">
               {t.hero.browseTitle}
             </h2>
-            <p className="text-base sm:text-lg text-deep-600 dark:text-surface-400 max-w-2xl mx-auto px-4">
+            <p className="text-base sm:text-lg text-stone-500 dark:text-surface-400 max-w-2xl mx-auto px-4">
               {t.hero.browseSubtitle}
             </p>
           </div>
@@ -340,19 +256,19 @@ export const HomePage: React.FC = () => {
               <button
                 key={specialty}
                 onClick={() => navigate(`/search?specialty=${specialty}`)}
-                className="group relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-surface-50 dark:bg-deep-900 border border-surface-100 dark:border-deep-800 transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1 hover:border-primary-200 dark:hover:border-primary-800 text-left active:scale-[0.98]"
+                className="group relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-white dark:bg-deep-800 border border-stone-100 dark:border-deep-700 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary-200 dark:hover:border-primary-700 text-left active:scale-[0.98]"
               >
                 <div className="text-2xl sm:text-3xl mb-2 sm:mb-3">
                   {specialtyIcons[specialty] || '⚖️'}
                 </div>
-                <h3 className="font-semibold text-sm sm:text-base text-deep-900 dark:text-surface-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors mb-1 sm:mb-2 line-clamp-2">
+                <h3 className="font-semibold text-sm sm:text-base text-deep-900 dark:text-surface-100 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors mb-1 sm:mb-2 line-clamp-2">
                   {translateSpecialty(specialty)}
                 </h3>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs sm:text-sm text-deep-500 dark:text-surface-500">
+                  <span className="text-xs sm:text-sm text-stone-500 dark:text-surface-500">
                     120+ avocats
                   </span>
-                  <ArrowRight className="w-4 h-4 text-deep-400 dark:text-surface-600 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
+                  <ArrowRight className="w-4 h-4 text-stone-400 dark:text-surface-600 group-hover:text-primary-600 dark:group-hover:text-primary-400 group-hover:translate-x-1 transition-all" />
                 </div>
               </button>
             ))}
@@ -373,7 +289,7 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-primary-600 to-primary-800 dark:from-primary-800 dark:to-primary-950 relative overflow-hidden">
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-primary-700 to-primary-900 dark:from-primary-800 dark:to-primary-950 relative overflow-hidden">
         {/* Background decorations */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 right-0 w-64 sm:w-96 h-64 sm:h-96 bg-white rounded-full blur-3xl" />
@@ -382,34 +298,70 @@ export const HomePage: React.FC = () => {
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-2xl sm:text-display-sm md:text-display-md font-serif text-white mb-4 sm:mb-6">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-white mb-4 sm:mb-6">
               Prêt à trouver l'avocat qu'il vous faut?
             </h2>
             <p className="text-base sm:text-xl text-primary-100 mb-8 sm:mb-10 leading-relaxed px-4">
               Rejoignez des milliers de clients satisfaits qui ont trouvé leur avocat idéal sur Jurilab.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 sm:px-0">
-              <Button
-                variant="accent"
-                size="xl"
+              <button
                 onClick={() => navigate('/search')}
-                className="w-full sm:w-auto"
+                className="bg-white text-primary-700 font-bold px-8 py-4 rounded-full hover:bg-white/90 transition-all shadow-lg flex items-center justify-center gap-2"
               >
                 Trouver un avocat
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-              <Button
-                variant="outline"
-                size="xl"
+                <ArrowRight className="w-5 h-5" />
+              </button>
+              <button
                 onClick={() => navigate('/register-lawyer')}
-                className="w-full sm:w-auto border-white/30 text-white hover:bg-white/10"
+                className="border-2 border-white/30 text-white font-bold px-8 py-4 rounded-full hover:bg-white/10 transition-all flex items-center justify-center gap-2"
               >
                 Je suis avocat
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-stone-50 dark:bg-deep-950 border-t border-stone-200 dark:border-deep-800 text-stone-600 dark:text-surface-400 py-16">
+        <div className="max-w-[960px] mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+            <div className="col-span-1 md:col-span-2">
+              <div className="flex items-center gap-2 mb-6">
+                <img src="/logo.png" alt="Jurilab" className="w-8 h-8 object-contain" />
+                <span className="font-bold text-xl text-primary-700 dark:text-primary-400 tracking-tight">Jurilab</span>
+              </div>
+              <p className="text-sm font-light max-w-xs leading-relaxed opacity-80">
+                Redéfinir l'accès au droit grâce au matching intelligent et des partenariats premium.
+              </p>
+            </div>
+            <div className="flex flex-col gap-4">
+              <h4 className="text-primary-700 dark:text-primary-400 font-bold text-sm">Plateforme</h4>
+              <button onClick={() => navigate('/register-lawyer')} className="text-sm hover:text-primary-700 dark:hover:text-primary-400 transition-colors text-left">Pour les Avocats</button>
+              <button onClick={() => navigate('/search')} className="text-sm hover:text-primary-700 dark:hover:text-primary-400 transition-colors text-left">Pour les Clients</button>
+              <button onClick={() => navigate('/search')} className="text-sm hover:text-primary-700 dark:hover:text-primary-400 transition-colors text-left">Entreprise</button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <h4 className="text-primary-700 dark:text-primary-400 font-bold text-sm">Légal</h4>
+              <a href="#" className="text-sm hover:text-primary-700 dark:hover:text-primary-400 transition-colors">Politique de Confidentialité</a>
+              <a href="#" className="text-sm hover:text-primary-700 dark:hover:text-primary-400 transition-colors">Conditions Générales</a>
+              <a href="#" className="text-sm hover:text-primary-700 dark:hover:text-primary-400 transition-colors">Conformité</a>
+            </div>
+          </div>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-8 border-t border-stone-200 dark:border-deep-800">
+            <p className="text-xs opacity-60">© {new Date().getFullYear()} Jurilab Inc. Tous droits réservés.</p>
+            <div className="flex gap-4">
+              <a href="#" className="w-8 h-8 rounded-full bg-stone-200 dark:bg-deep-800 flex items-center justify-center hover:bg-stone-300 dark:hover:bg-deep-700 transition-colors text-primary-700 dark:text-primary-400">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              </a>
+              <a href="#" className="w-8 h-8 rounded-full bg-stone-200 dark:bg-deep-800 flex items-center justify-center hover:bg-stone-300 dark:hover:bg-deep-700 transition-colors text-primary-700 dark:text-primary-400">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

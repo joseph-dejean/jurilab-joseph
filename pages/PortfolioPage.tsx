@@ -17,15 +17,16 @@ import {
     Eye,
     MessageSquare,
     Clock,
-    Sparkles
+    Sparkles,
+    Timer
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { UserRole, Appointment, Client, User as UserType } from '../types';
 import { Button } from '../components/Button';
+import { DiligenceTracker } from '../components/DiligenceTracker';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { getSharedDocuments, deleteDocument, toggleDocumentSharing } from '../services/documentService';
 import { getClientById } from '../services/firebaseService';
 
 interface ClientPortfolioData {
@@ -43,8 +44,7 @@ export const PortfolioPage: React.FC = () => {
     const [clients, setClients] = useState<ClientPortfolioData[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [sharedDocs, setSharedDocs] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'info' | 'documents' | 'history'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'history' | 'diligences'>('info');
 
     // Check auth and role
     useEffect(() => {
@@ -95,43 +95,7 @@ export const PortfolioPage: React.FC = () => {
         aggregateClients();
     }, [appointments, currentUser]);
 
-    // Fetch documents for selected client
-    useEffect(() => {
-        if (selectedClientId && currentUser) {
-            const fetchDocs = async () => {
-                try {
-                    const docs = await getSharedDocuments(currentUser.id, selectedClientId);
-                    setSharedDocs(docs);
-                } catch (error) {
-                    console.error("Error fetching docs:", error);
-                }
-            };
-            fetchDocs();
-        }
-    }, [selectedClientId, currentUser]);
-
     const selectedClient = clients.find(c => c.id === selectedClientId);
-
-    const handleToggleSharing = async (docId: string, currentShared: boolean) => {
-        try {
-            await toggleDocumentSharing(docId, !currentShared);
-            // Update local state
-            setSharedDocs(prev => prev.map(d => d.id === docId ? { ...d, sharedWithClient: !currentShared } : d));
-        } catch (error) {
-            alert("Erreur lors de la modification du partage");
-        }
-    };
-
-    const handleDeleteDoc = async (docId: string) => {
-        if (window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
-            try {
-                await deleteDocument(docId);
-                setSharedDocs(prev => prev.filter(d => d.id !== docId));
-            } catch (error) {
-                alert("Erreur lors de la suppression");
-            }
-        }
-    };
 
     if (isLoading) {
         return (
@@ -283,8 +247,8 @@ export const PortfolioPage: React.FC = () => {
                                 <div className="flex gap-2 p-1 bg-surface-100 dark:bg-deep-900 rounded-2xl w-fit">
                                     {[
                                         { id: 'info', icon: User, label: 'Résumé' },
-                                        { id: 'documents', icon: FileText, label: 'Documents' },
-                                        { id: 'history', icon: Calendar, label: 'Historique RDV' }
+                                        { id: 'history', icon: Calendar, label: 'Historique RDV' },
+                                        { id: 'diligences', icon: Timer, label: 'Diligences' }
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
@@ -328,62 +292,10 @@ export const PortfolioPage: React.FC = () => {
                                                         <span className="font-bold text-deep-900 dark:text-surface-100">{selectedClient.appointments.length}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center p-3 bg-surface-50 dark:bg-deep-800 rounded-xl">
-                                                        <span className="text-sm text-deep-500">Documents partagés</span>
-                                                        <span className="font-bold text-deep-900 dark:text-surface-100">{sharedDocs.length}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center p-3 bg-surface-50 dark:bg-deep-800 rounded-xl">
                                                         <span className="text-sm text-deep-500">Dernière activité</span>
                                                         <span className="text-sm font-medium">{selectedClient.lastAppointment ? format(parseISO(selectedClient.lastAppointment), 'dd/MM/yyyy') : '-'}</span>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {activeTab === 'documents' && (
-                                        <div className="glass rounded-3xl overflow-hidden">
-                                            <div className="p-6 border-b border-surface-100 dark:border-deep-800 flex items-center justify-between">
-                                                <h4 className="font-semibold text-deep-900 dark:text-surface-100">Coffre-fort Documents</h4>
-                                                <Button size="sm">
-                                                    <Plus className="w-4 h-4 mr-2" />
-                                                    Ajouter un document
-                                                </Button>
-                                            </div>
-                                            <div className="p-0">
-                                                {sharedDocs.length === 0 ? (
-                                                    <div className="p-12 text-center text-deep-500">
-                                                        Aucun document partagé pour le moment.
-                                                    </div>
-                                                ) : (
-                                                    <div className="divide-y divide-surface-100 dark:divide-deep-800">
-                                                        {sharedDocs.map(doc => (
-                                                            <div key={doc.id} className="p-4 flex items-center gap-4 hover:bg-surface-50 dark:hover:bg-deep-800/50">
-                                                                <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-600">
-                                                                    <FileText className="w-5 h-5" />
-                                                                </div>
-                                                                <div className="flex-grow min-w-0">
-                                                                    <h5 className="font-medium text-deep-900 dark:text-surface-100 truncate">{doc.name}</h5>
-                                                                    <p className="text-xs text-deep-500">{format(parseISO(doc.uploadedAt), 'dd/MM/yyyy HH:mm')} • {doc.fileSize ? (doc.fileSize / 1024).toFixed(1) + ' KB' : 'PDF'}</p>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <button
-                                                                        onClick={() => handleToggleSharing(doc.id, doc.sharedWithClient)}
-                                                                        className={`p-2 rounded-lg transition-colors ${doc.sharedWithClient ? 'text-primary-600 bg-primary-50 dark:bg-primary-950/30' : 'text-deep-400 bg-surface-100 dark:bg-deep-800'}`}
-                                                                        title={doc.sharedWithClient ? "Partagé avec le client" : "Privé"}
-                                                                    >
-                                                                        <Share2 className="w-4 h-4" />
-                                                                    </button>
-                                                                    <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-deep-500 hover:text-primary-600">
-                                                                        <Eye className="w-4 h-4" />
-                                                                    </a>
-                                                                    <button onClick={() => handleDeleteDoc(doc.id)} className="p-2 text-deep-500 hover:text-red-500">
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -434,6 +346,13 @@ export const PortfolioPage: React.FC = () => {
                                                 ))}
                                             </div>
                                         </div>
+                                    )}
+
+                                    {activeTab === 'diligences' && currentUser && (
+                                        <DiligenceTracker
+                                            lawyerId={currentUser.id}
+                                            clientId={selectedClient.id}
+                                        />
                                     )}
                                 </div>
                             </div>

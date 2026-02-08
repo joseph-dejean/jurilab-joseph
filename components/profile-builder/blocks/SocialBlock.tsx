@@ -1,6 +1,13 @@
-import { Facebook, Instagram, Linkedin, Twitter, Globe } from 'lucide-react';
+import { Facebook, Instagram, Linkedin, Twitter, Globe, Share2 } from 'lucide-react';
 import React from 'react';
 import { ProfileBlock } from '../../../types';
+import { getStylePresetClasses, getCustomTextClasses, shouldUseLightText } from '../shared/stylePresets';
+
+interface SocialLink {
+  id?: string;
+  platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'website';
+  url: string;
+}
 
 interface SocialBlockProps {
   block: ProfileBlock;
@@ -8,77 +15,110 @@ interface SocialBlockProps {
   readOnly?: boolean;
 }
 
+const platformConfig = {
+  linkedin: { icon: Linkedin, label: 'LinkedIn', color: 'hover:bg-[#0077b5] hover:text-white' },
+  facebook: { icon: Facebook, label: 'Facebook', color: 'hover:bg-[#1877f2] hover:text-white' },
+  twitter: { icon: Twitter, label: 'Twitter', color: 'hover:bg-[#1da1f2] hover:text-white' },
+  instagram: { icon: Instagram, label: 'Instagram', color: 'hover:bg-gradient-to-br hover:from-[#f58529] hover:via-[#dd2a7b] hover:to-[#8134af] hover:text-white' },
+  website: { icon: Globe, label: 'Site web', color: 'hover:bg-primary-600 hover:text-white' },
+};
+
 export const SocialBlock: React.FC<SocialBlockProps> = ({ block, onChange, readOnly }) => {
-  // Parse social links from content (JSON object)
-  const parseSocial = () => {
+  const presetStyles = getStylePresetClasses(block.stylePreset);
+  
+  // Determine if using custom colors
+  const isCustom = block.stylePreset === 'custom' && block.customBgColor;
+  const isDarkBg = isCustom ? shouldUseLightText(block) : presetStyles.isDark;
+  const textStyles = isCustom ? getCustomTextClasses(block) : presetStyles;
+  const containerClass = isCustom ? '' : presetStyles.container;
+  
+  // Parse social links from content (array format)
+  const parseSocial = (): SocialLink[] => {
     if (block.content) {
       try {
-        return JSON.parse(block.content);
+        const parsed = JSON.parse(block.content);
+        // Handle both old object format and new array format
+        if (Array.isArray(parsed)) return parsed;
+        // Convert old object format to array
+        return Object.entries(parsed)
+          .filter(([_, url]) => url)
+          .map(([platform, url]) => ({ platform: platform as SocialLink['platform'], url: url as string }));
       } catch {
-        return {};
+        return [];
       }
     }
-    return {
-      linkedin: '',
-      facebook: '',
-      twitter: '',
-      instagram: '',
-      website: ''
-    };
+    return [];
   };
 
-  const social = parseSocial();
-  const socialIcons = {
-    linkedin: Linkedin,
-    facebook: Facebook,
-    twitter: Twitter,
-    instagram: Instagram,
-    website: Globe
-  };
-
-  const handleLinkChange = (platform: string, url: string) => {
-    const newSocial = { ...social, [platform]: url };
-    onChange(block.id, { content: JSON.stringify(newSocial) });
-  };
+  const socialLinks = parseSocial();
+  
+  // Get links that have URLs
+  const activeLinks = socialLinks.filter(l => l.url);
 
   return (
-    <div className="h-full flex flex-col justify-center bg-slate-50 dark:bg-slate-800 p-6 rounded-lg">
-      <h3 className="font-serif font-bold text-primary-900 dark:text-white mb-4 text-center">
+    <div className={`h-full flex flex-col items-center justify-center p-6 ${containerClass}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${isDarkBg ? 'bg-white/10' : 'bg-primary-100 dark:bg-primary-900/30'}`}>
+        <Share2 className={`w-5 h-5 ${isDarkBg ? 'text-white/70' : 'text-primary-600 dark:text-primary-400'}`} />
+      </div>
+      
+      <h3 className={`font-display font-bold mb-5 text-center ${textStyles.heading}`}>
         {block.title || 'Réseaux sociaux'}
       </h3>
+      
       {readOnly ? (
         <div className="flex flex-wrap justify-center gap-3">
-          {Object.entries(social).map(([platform, url]) => {
-            if (!url) return null;
-            const Icon = socialIcons[platform as keyof typeof socialIcons];
-            if (!Icon) return null;
+          {activeLinks.map((link, index) => {
+            const config = platformConfig[link.platform];
+            if (!config) return null;
+            const Icon = config.icon;
             return (
               <a
-                key={platform}
-                href={url as string}
+                key={index}
+                href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-full text-slate-600 dark:text-slate-300 hover:bg-primary-600 hover:text-white transition-colors"
+                className={`w-12 h-12 flex items-center justify-center rounded-xl transition-all duration-200 shadow-sm ${
+                  isDarkBg 
+                    ? 'bg-white/10 text-white/80 hover:bg-white/20' 
+                    : `bg-surface-100 dark:bg-deep-800 text-deep-600 dark:text-surface-300 ${config.color}`
+                }`}
               >
                 <Icon className="w-5 h-5" />
               </a>
             );
           })}
+          {activeLinks.length === 0 && (
+            <p className={`text-sm ${textStyles.subtext}`}>
+              Aucun réseau configuré
+            </p>
+          )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {Object.entries(socialIcons).map(([platform, Icon]) => (
-            <div key={platform} className="flex items-center gap-2">
-              <Icon className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-              <input
-                type="url"
-                value={social[platform] || ''}
-                onChange={(e) => handleLinkChange(platform, e.target.value)}
-                placeholder={`URL ${platform}`}
-                className="flex-1 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-700"
-              />
-            </div>
-          ))}
+        <div className="w-full space-y-2">
+          {Object.entries(platformConfig).map(([platform, config]) => {
+            const Icon = config.icon;
+            const link = socialLinks.find(l => l.platform === platform);
+            return (
+              <div key={platform} className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-deep-800 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4 text-deep-500 dark:text-surface-400" />
+                </div>
+                <input
+                  type="url"
+                  value={link?.url || ''}
+                  onChange={(e) => {
+                    const newLinks = socialLinks.filter(l => l.platform !== platform);
+                    if (e.target.value) {
+                      newLinks.push({ platform: platform as SocialLink['platform'], url: e.target.value });
+                    }
+                    onChange(block.id, { content: JSON.stringify(newLinks) });
+                  }}
+                  placeholder={`URL ${config.label}`}
+                  className="flex-1 px-3 py-2 text-sm border border-surface-200 dark:border-deep-700 rounded-lg bg-white dark:bg-deep-800 text-deep-700 dark:text-surface-200 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,9 +1,9 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
-import { GripVertical, X } from 'lucide-react';
-import React from 'react';
-import { ProfileBlock, ProfileBlockType } from '../../types';
+import { GripVertical, X, Maximize2, Minimize2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { ProfileBlock, ProfileBlockType, ProfileBlockSize } from '../../types';
 import { ContactBlock } from './blocks/ContactBlock';
 import { MediaBlock } from './blocks/MediaBlock';
 import { TextBlock } from './blocks/TextBlock';
@@ -20,9 +20,52 @@ interface SortableBlockProps {
   block: ProfileBlock;
   onRemove: (id: string) => void;
   onChange: (id: string, updates: Partial<ProfileBlock>) => void;
+  lawyerData?: {
+    coordinates?: { lat: number; lng: number };
+    location?: string;
+  };
 }
 
+const SIZE_OPTIONS: { value: ProfileBlockSize; label: string; icon: string }[] = [
+  { value: 'small', label: 'Petit', icon: 'S' },
+  { value: 'medium', label: 'Moyen', icon: 'M' },
+  { value: 'large', label: 'Grand', icon: 'L' },
+  { value: 'full', label: 'Pleine largeur', icon: 'F' },
+  { value: 'tall', label: 'Vertical', icon: 'T' },
+  { value: 'hero', label: 'Hero', icon: 'H' },
+];
+
+const BLOCK_TYPE_LABELS: Record<ProfileBlockType, string> = {
+  [ProfileBlockType.TEXT]: 'Texte',
+  [ProfileBlockType.MEDIA]: 'Média',
+  [ProfileBlockType.VIDEO]: 'Vidéo',
+  [ProfileBlockType.CONTACT]: 'Contact',
+  [ProfileBlockType.LOGO]: 'Logo',
+  [ProfileBlockType.MAP]: 'Carte',
+  [ProfileBlockType.STATS]: 'Stats',
+  [ProfileBlockType.TESTIMONIALS]: 'Avis',
+  [ProfileBlockType.CERTIFICATIONS]: 'Certifications',
+  [ProfileBlockType.SOCIAL]: 'Réseaux',
+  [ProfileBlockType.COLLABORATORS]: 'Équipe',
+};
+
+const BLOCK_TYPE_COLORS: Record<ProfileBlockType, string> = {
+  [ProfileBlockType.TEXT]: 'bg-blue-500',
+  [ProfileBlockType.MEDIA]: 'bg-purple-500',
+  [ProfileBlockType.VIDEO]: 'bg-red-500',
+  [ProfileBlockType.CONTACT]: 'bg-green-500',
+  [ProfileBlockType.LOGO]: 'bg-slate-500',
+  [ProfileBlockType.MAP]: 'bg-emerald-500',
+  [ProfileBlockType.STATS]: 'bg-amber-500',
+  [ProfileBlockType.TESTIMONIALS]: 'bg-pink-500',
+  [ProfileBlockType.CERTIFICATIONS]: 'bg-yellow-500',
+  [ProfileBlockType.SOCIAL]: 'bg-cyan-500',
+  [ProfileBlockType.COLLABORATORS]: 'bg-indigo-500',
+};
+
 export const SortableBlock: React.FC<SortableBlockProps> = ({ block, onRemove, onChange, lawyerData }) => {
+  const [showSizeSelector, setShowSizeSelector] = useState(false);
+  
   const {
     attributes,
     listeners,
@@ -74,15 +117,15 @@ export const SortableBlock: React.FC<SortableBlockProps> = ({ block, onRemove, o
     }
   };
 
-  const sizeClasses = {
-    small: 'col-span-1 row-span-1',           // 1x1 - Petit carré
-    medium: 'col-span-1 md:col-span-2 row-span-1',  // 2x1 - Rectangle horizontal
-    large: 'col-span-1 md:col-span-2 row-span-2',   // 2x2 - Grand carré
-    full: 'col-span-1 md:col-span-3 row-span-1',     // 3x1 - Bandeau complet
-    tall: 'col-span-1 row-span-2',                   // 1x2 - Rectangle vertical
-    wide: 'col-span-1 md:col-span-3 row-span-1',     // 3x1 - Large (identique à full)
-    hero: 'col-span-1 md:col-span-3 row-span-2',      // 3x2 - Format héro
-    square: 'col-span-1 row-span-1',                 // 1x1 - Carré (identique à small)
+  const sizeClasses: Record<ProfileBlockSize, string> = {
+    small: 'col-span-1 row-span-1',
+    medium: 'col-span-1 md:col-span-2 row-span-1',
+    large: 'col-span-1 md:col-span-2 row-span-2',
+    full: 'col-span-1 md:col-span-3 row-span-1',
+    tall: 'col-span-1 row-span-2',
+    wide: 'col-span-1 md:col-span-3 row-span-1',
+    hero: 'col-span-1 md:col-span-3 row-span-2',
+    square: 'col-span-1 row-span-1',
   };
 
   return (
@@ -90,51 +133,91 @@ export const SortableBlock: React.FC<SortableBlockProps> = ({ block, onRemove, o
       ref={setNodeRef}
       style={style}
       className={clsx(
-        'relative bg-white dark:bg-slate-800 rounded-xl shadow-subtle border border-slate-100 dark:border-slate-700 group transition-shadow hover:shadow-subtle-lg',
+        'relative bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700',
+        'group transition-all duration-200',
+        'hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-slate-900/50',
+        'hover:border-slate-300 dark:hover:border-slate-600',
         sizeClasses[block.size],
-        isDragging && 'opacity-50 shadow-2xl ring-2 ring-brand-DEFAULT'
+        isDragging && 'opacity-60 shadow-2xl ring-2 ring-primary-500 scale-[1.02]'
       )}
     >
+      {/* Block Type Indicator */}
+      <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
+        <div className={`w-2 h-2 rounded-full ${BLOCK_TYPE_COLORS[block.type]}`} />
+        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+          {BLOCK_TYPE_LABELS[block.type]}
+        </span>
+      </div>
+
       {/* Drag Handle */}
       <div
         {...attributes}
         {...listeners}
-        className="absolute top-2 left-2 p-1.5 bg-white/80 dark:bg-slate-700/80 rounded-md cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-slate-100 dark:hover:bg-slate-600"
+        className="absolute top-3 left-1/2 -translate-x-1/2 p-1.5 bg-white/90 dark:bg-slate-700/90 backdrop-blur-sm rounded-lg cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all z-20 hover:bg-slate-100 dark:hover:bg-slate-600 shadow-sm"
       >
         <GripVertical className="w-4 h-4 text-slate-400" />
       </div>
 
-      {/* Remove Button */}
-      <button
-        onClick={() => onRemove(block.id)}
-        className="absolute top-2 right-2 p-1.5 bg-white/80 dark:bg-slate-700/80 rounded-md cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500"
-      >
-        <X className="w-4 h-4" />
-      </button>
-
-      {/* Resize Controls */}
-      <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-wrap gap-1 max-w-[120px]">
-        {(['small', 'medium', 'large', 'full', 'tall', 'wide', 'hero', 'square'] as const).map((s) => (
+      {/* Action Buttons */}
+      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+        {/* Size Toggle */}
+        <div className="relative">
           <button
-            key={s}
-            onClick={() => onChange(block.id, { size: s })}
-            className={clsx(
-              "w-6 h-6 text-[9px] flex items-center justify-center rounded border font-bold",
-              block.size === s 
-                ? "bg-brand-DEFAULT text-white border-brand-DEFAULT shadow-md" 
-                : "bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600"
-            )}
-            title={`Taille: ${s}`}
+            onClick={() => setShowSizeSelector(!showSizeSelector)}
+            className="p-1.5 bg-white/90 dark:bg-slate-700/90 backdrop-blur-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors shadow-sm"
+            title="Changer la taille"
           >
-            {s === 'small' ? 'S' : s === 'medium' ? 'M' : s === 'large' ? 'L' : s === 'full' ? 'F' : s === 'tall' ? 'T' : s === 'wide' ? 'W' : s === 'hero' ? 'H' : 'Q'}
+            {showSizeSelector ? (
+              <Minimize2 className="w-4 h-4 text-slate-500" />
+            ) : (
+              <Maximize2 className="w-4 h-4 text-slate-500" />
+            )}
           </button>
-        ))}
+
+          {/* Size Selector Dropdown */}
+          {showSizeSelector && (
+            <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 min-w-[140px] z-30">
+              <div className="grid grid-cols-3 gap-1">
+                {SIZE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      onChange(block.id, { size: option.value });
+                      setShowSizeSelector(false);
+                    }}
+                    className={clsx(
+                      'w-10 h-10 rounded-lg text-xs font-bold flex items-center justify-center transition-all',
+                      block.size === option.value
+                        ? 'bg-primary-500 text-white shadow-md shadow-primary-500/30'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    )}
+                    title={option.label}
+                  >
+                    {option.icon}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400 text-center mt-2 px-1">
+                {SIZE_OPTIONS.find(o => o.value === block.size)?.label}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Remove Button */}
+        <button
+          onClick={() => onRemove(block.id)}
+          className="p-1.5 bg-white/90 dark:bg-slate-700/90 backdrop-blur-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors shadow-sm"
+          title="Supprimer"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
-      <div className="h-full overflow-hidden rounded-xl">
+      {/* Block Content */}
+      <div className="h-full overflow-hidden rounded-2xl">
         {renderBlockContent()}
       </div>
     </div>
   );
 };
-

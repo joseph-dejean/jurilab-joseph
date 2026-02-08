@@ -161,11 +161,18 @@ export const MyAppointmentsPage: React.FC = () => {
   const canJoinVideo = (appointment: Appointment) => {
     if (appointment.type !== 'VIDEO') return false;
     if (appointment.status === 'CANCELLED') return false;
-    const aptDate = parseISO(appointment.date);
-    const now = new Date();
-    const canJoinBefore = new Date(aptDate.getTime() - 5 * 60 * 1000);
-    const canJoinAfter = new Date(aptDate.getTime() + 60 * 60 * 1000);
-    return now >= canJoinBefore && now <= canJoinAfter;
+    if (appointment.status !== 'CONFIRMED') return false; // Must be confirmed
+    
+    // FOR TESTING: Allow immediate join after acceptance
+    // Remove this in production and uncomment the time-based logic below
+    return true;
+    
+    // PRODUCTION VERSION (uncomment when ready):
+    // const aptDate = parseISO(appointment.date);
+    // const now = new Date();
+    // const canJoinBefore = new Date(aptDate.getTime() - 5 * 60 * 1000);
+    // const canJoinAfter = new Date(aptDate.getTime() + 60 * 60 * 1000);
+    // return now >= canJoinBefore && now <= canJoinAfter;
   };
 
   // Check if can cancel

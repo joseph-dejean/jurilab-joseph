@@ -1,5 +1,225 @@
 # 📝 Changelog - Jurilab
 
+## 🚀 Version 2.1.0 - Janvier 2026
+
+### ✨ Nouvelles Fonctionnalités
+
+#### ⏱️ Système de Suivi des Diligences (Time Tracking)
+- **Chronomètre en temps réel** pour le suivi précis du temps de travail
+- **Enregistrement détaillé** de chaque diligence avec catégorisation
+- **Historique complet** par client dans le Portfolio
+- **Statistiques** : Temps total et temps facturable
+
+**Fonctionnalités principales:**
+- Démarrer/arrêter un chronomètre pour suivre le temps de travail
+- Ajouter une description et une catégorie pour chaque diligence
+- Marquer le temps comme facturable ou non facturable
+- Éditer et supprimer les diligences passées
+- Visualiser le temps total cumulé et le temps facturable par client
+
+**Catégories prédéfinies:**
+1. Recherche
+2. Rédaction
+3. Révision documents
+4. Consultation
+5. Correspondance
+6. Appel téléphonique
+7. Déplacement
+8. Réunion
+9. Préparation audience
+10. Autre
+
+**Structure de données:**
+```typescript
+interface DiligenceEntry {
+  id: string;
+  lawyerId: string;
+  clientId: string;
+  startTime: string;           // ISO timestamp
+  endTime?: string;            // ISO timestamp (undefined si en cours)
+  duration?: number;           // Durée en secondes
+  description: string;         // Description du travail
+  category?: string;           // Catégorie de la diligence
+  createdAt: string;
+  updatedAt: string;
+  billable?: boolean;          // Temps facturable
+}
+```
+
+**Intégration:**
+- Nouvel onglet "Diligences" dans le Portfolio Client
+- Synchronisation temps réel avec Firestore
+- Règles de sécurité Firestore : seul l'avocat propriétaire peut accéder
+
+**Fichiers créés:**
+- `components/DiligenceTracker.tsx` - Composant principal
+- `firestore.rules` - Règles de sécurité Firestore
+- `DILIGENCES_README.md` - Documentation complète
+- `DILIGENCES_QUICK_START.md` - Guide de démarrage rapide
+
+**Fichiers modifiés:**
+- `types.ts` - Ajout du type `DiligenceEntry`
+- `pages/PortfolioPage.tsx` - Intégration du tracker
+- `firebase.json` - Configuration Firestore rules
+
+---
+
+### 🔐 Sécurité
+
+#### Règles Firestore
+- Nouvelle collection `diligences` avec règles de sécurité strictes
+- Seuls les avocats peuvent créer/lire/modifier leurs propres diligences
+- Les admins ont accès complet pour supervision
+- Validation de l'authentification et du rôle utilisateur
+
+**Règles principales:**
+```javascript
+// Seul l'avocat propriétaire peut accéder à ses diligences
+allow read: if request.auth.uid == resource.data.lawyerId;
+allow create: if request.auth.uid == request.resource.data.lawyerId;
+allow update: if request.auth.uid == resource.data.lawyerId;
+allow delete: if request.auth.uid == resource.data.lawyerId;
+```
+
+---
+
+### 🎨 Améliorations UI/UX
+
+#### Chronomètre
+- Affichage grand format en HH:MM:SS
+- Design gradient avec effets visuels
+- Boutons intuitifs (Démarrer/Arrêter)
+- Indicateur visuel pour diligence en cours
+
+#### Historique des diligences
+- Liste scrollable avec toutes les entrées
+- Affichage de la durée en format HH:MM:SS
+- Badges colorés pour catégories et facturable
+- Actions rapides (éditer, supprimer)
+- Dates formatées en français
+
+#### Statistiques
+- Affichage du temps total cumulé
+- Séparation temps facturable / non facturable
+- Mise à jour en temps réel
+- Couleurs distinctives (primary pour total, vert pour facturable)
+
+---
+
+### 📊 Performance
+
+**Temps réel:**
+- Mise à jour du chronomètre chaque seconde
+- Synchronisation automatique avec Firestore
+- Persistance du chronomètre actif entre sessions
+- Nettoyage automatique des intervalles
+
+**Optimisations:**
+- Utilisation de `onSnapshot` pour les mises à jour temps réel
+- Calcul client-side de la durée pour réduire les appels API
+- Index Firestore pour requêtes rapides par `lawyerId` et `clientId`
+
+---
+
+### 📱 Responsive Design
+
+- Design adapté mobile, tablette et desktop
+- Zones tactiles optimisées pour mobile
+- Chronomètre lisible sur petits écrans
+- Liste scrollable avec hauteur maximale
+
+---
+
+### 📄 Documentation
+
+**Nouveaux fichiers:**
+- `DILIGENCES_README.md` - Guide complet avec architecture
+- `DILIGENCES_QUICK_START.md` - Guide de démarrage rapide
+- `firestore.rules` - Règles de sécurité commentées
+
+**Contenu:**
+- Vue d'ensemble de la fonctionnalité
+- Instructions d'utilisation détaillées
+- Structure des données Firestore
+- Guide de déploiement
+- Évolutions futures possibles
+
+---
+
+### 🗂️ Fichiers Modifiés
+
+```
+Nouveaux Fichiers:
++ components/DiligenceTracker.tsx (350 lignes)
++ firestore.rules (120 lignes)
++ DILIGENCES_README.md
++ DILIGENCES_QUICK_START.md
+
+Fichiers Modifiés:
+~ types.ts (ajout type DiligenceEntry)
+~ pages/PortfolioPage.tsx (ajout onglet Diligences, import Timer)
+~ firebase.json (ajout configuration Firestore rules)
+```
+
+---
+
+### 🎯 Avantages pour les Avocats
+
+**Gestion du temps:**
+- ✅ Suivi précis du temps de travail par client
+- ✅ Historique complet pour facturation
+- ✅ Distinction temps facturable / non facturable
+- ✅ Catégorisation pour analyse détaillée
+
+**Facturation:**
+- ✅ Base solide pour la facturation horaire
+- ✅ Descriptions détaillées pour justification
+- ✅ Export futur possible pour logiciels de comptabilité
+- ✅ Statistiques par client
+
+**Productivité:**
+- ✅ Pas besoin d'outils externes
+- ✅ Intégré directement dans le workflow
+- ✅ Synchronisation automatique
+- ✅ Accessible de partout
+
+---
+
+### 🚀 Prochaines Étapes
+
+**Évolutions prévues pour la fonctionnalité Diligences:**
+- [ ] Export PDF des diligences pour facturation
+- [ ] Calcul automatique du montant (temps × taux horaire)
+- [ ] Graphiques de temps par client/catégorie
+- [ ] Filtres par date, catégorie, client
+- [ ] Export Excel pour comptabilité
+- [ ] Notifications rappel d'enregistrement
+- [ ] Templates de descriptions récurrentes
+- [ ] Intégration avec module de facturation
+
+---
+
+### 📈 Déploiement
+
+**Commandes nécessaires:**
+```bash
+# 1. Déployer les règles Firestore
+firebase deploy --only firestore:rules
+
+# 2. Builder et déployer l'application
+npm run build
+firebase deploy --only hosting
+
+# 3. Vérifier les index Firestore dans la console Firebase
+```
+
+**Configuration requise:**
+- Firebase Firestore activé
+- Index sur `diligences` : `lawyerId`, `clientId`, `createdAt`
+- Règles de sécurité déployées
+
+---
+
 ## 🚀 Version 2.0.0 - Novembre 2024
 
 ### ✨ Nouvelles Fonctionnalités

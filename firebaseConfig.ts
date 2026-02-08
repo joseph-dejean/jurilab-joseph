@@ -5,7 +5,7 @@ import type { Analytics } from "firebase/analytics";
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "FIREBASE_API_KEY_REMOVED",
@@ -19,6 +19,7 @@ const firebaseConfig = {
 };
 
 import { getStorage } from "firebase/storage";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -28,6 +29,20 @@ const analytics = getAnalytics(app);
 export const database = getDatabase(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// Initialize Firestore with persistent cache (new API - replaces deprecated enableIndexedDbPersistence)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
 export const googleProvider = new GoogleAuthProvider();
+
+// Enable auth persistence for faster login
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn('⚠️ Auth persistence not available:', error.message);
+});
+
 import { OAuthProvider } from "firebase/auth";
 export const microsoftProvider = new OAuthProvider('microsoft.com');

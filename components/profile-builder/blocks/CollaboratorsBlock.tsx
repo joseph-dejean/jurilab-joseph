@@ -1,13 +1,16 @@
-import { UserPlus, Plus, X, Briefcase } from 'lucide-react';
+import { UserPlus, Plus, X, Briefcase, Users } from 'lucide-react';
 import React from 'react';
 import { ProfileBlock } from '../../../types';
+import { getStylePresetClasses, getCustomTextClasses, shouldUseLightText } from '../shared/stylePresets';
 
 interface Collaborator {
   id: string;
-  firstName: string;
-  lastName: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
   photo?: string;
-  specialties: string[];
+  imageUrl?: string;
+  specialties?: string[];
   role?: string;
 }
 
@@ -18,6 +21,14 @@ interface CollaboratorsBlockProps {
 }
 
 export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, onChange, readOnly }) => {
+  const presetStyles = getStylePresetClasses(block.stylePreset);
+  
+  // Determine if using custom colors
+  const isCustom = block.stylePreset === 'custom' && block.customBgColor;
+  const isDarkBg = isCustom ? shouldUseLightText(block) : presetStyles.isDark;
+  const textStyles = isCustom ? getCustomTextClasses(block) : presetStyles;
+  const containerClass = isCustom ? '' : presetStyles.container;
+  
   // Parse collaborators from content (JSON array)
   const parseCollaborators = (): Collaborator[] => {
     if (block.content) {
@@ -89,74 +100,79 @@ export const CollaboratorsBlock: React.FC<CollaboratorsBlockProps> = ({ block, o
     'Droit international'
   ];
 
+  // Get display name for collaborator
+  const getCollabName = (collab: Collaborator) => {
+    if (collab.name) return collab.name;
+    const first = collab.firstName || '';
+    const last = collab.lastName || '';
+    return `${first} ${last}`.trim() || 'Sans nom';
+  };
+
+  const getCollabInitials = (collab: Collaborator) => {
+    const name = getCollabName(collab);
+    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  };
+
+  const getCollabPhoto = (collab: Collaborator) => collab.photo || collab.imageUrl;
+
   return (
-    <div className="h-full w-full flex flex-col bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 p-4 overflow-y-auto">
-      <div className="flex items-center gap-2 mb-4">
-        <UserPlus className="w-5 h-5 text-primary-600" />
-        <h3 className="font-serif font-bold text-primary-900 dark:text-white text-lg">
-          {block.title || 'Équipe'}
+    <div className={`h-full w-full flex flex-col p-5 overflow-hidden ${containerClass}`}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+          isDarkBg ? 'bg-white/10' : 'bg-primary-100 dark:bg-primary-900/30'
+        }`}>
+          <Users className={`w-5 h-5 ${isDarkBg ? 'text-white/70' : 'text-primary-600 dark:text-primary-400'}`} />
+        </div>
+        <h3 className={`font-display font-bold text-lg ${textStyles.heading}`}>
+          {block.title || 'Notre Équipe'}
         </h3>
-        {!readOnly && (
-          <input
-            type="text"
-            value={block.title || ''}
-            onChange={(e) => onChange(block.id, { title: e.target.value })}
-            placeholder="Titre (ex: Notre équipe)"
-            className="ml-auto flex-1 max-w-[200px] px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-700"
-          />
-        )}
       </div>
 
       {readOnly ? (
-        <div className="space-y-4 flex-1">
+        <div className="space-y-3 flex-1 overflow-y-auto">
           {collaborators.length === 0 ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">
-              Aucun collaborateur
+            <p className={`text-sm text-center py-8 ${textStyles.subtext}`}>
+              Aucun membre configuré
             </p>
           ) : (
             collaborators.map((collab) => (
               <div
                 key={collab.id}
-                className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700"
+                className={`rounded-xl p-3 ${
+                  isDarkBg 
+                    ? 'bg-white/5 border border-white/10' 
+                    : 'bg-surface-50 dark:bg-deep-800 border border-surface-200 dark:border-deep-700'
+                }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
-                    {collab.photo ? (
+                    {getCollabPhoto(collab) ? (
                       <img
-                        src={collab.photo}
-                        alt={`${collab.firstName} ${collab.lastName}`}
-                        className="w-16 h-16 rounded-full object-cover border-2 border-brand-DEFAULT"
+                        src={getCollabPhoto(collab)}
+                        alt={getCollabName(collab)}
+                        className="w-12 h-12 rounded-xl object-cover"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
                       />
                     ) : (
-                      <div className="w-16 h-16 rounded-full bg-primary-50 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 font-bold text-lg">
-                        {collab.firstName?.[0] || ''}{collab.lastName?.[0] || ''}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold ${
+                        isDarkBg 
+                          ? 'bg-white/10 text-white' 
+                          : 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
+                      }`}>
+                        {getCollabInitials(collab)}
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-primary-900 dark:text-white text-sm">
-                      {collab.firstName} {collab.lastName}
+                    <h4 className={`font-semibold text-sm truncate ${textStyles.heading}`}>
+                      {getCollabName(collab)}
                     </h4>
                     {collab.role && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      <p className={`text-xs mt-0.5 truncate ${textStyles.subtext}`}>
                         {collab.role}
                       </p>
-                    )}
-                    {collab.specialties.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {collab.specialties.map((spec, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-primary-50/30 dark:bg-primary-900/30 text-primary-600 rounded-full"
-                          >
-                            <Briefcase className="w-3 h-3" />
-                            {spec}
-                          </span>
-                        ))}
-                      </div>
                     )}
                   </div>
                 </div>

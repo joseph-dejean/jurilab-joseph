@@ -1,15 +1,26 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Lawyer, Appointment } from '../types';
+import { Lawyer, Appointment, AvailabilityHours } from '../types';
 import { useApp } from '../store/store';
 import { Button } from './Button';
 import { BookingCalendar } from './BookingCalendar';
 import { ProfileViewer } from './profile-builder/ProfileViewer';
-import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, Video, MapPin, Phone, Award, CheckCircle, ChevronLeft } from 'lucide-react';
-import { format, addDays, setHours, setMinutes, setSeconds, isPast, startOfDay, isSameDay, parseISO } from 'date-fns';
+import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, Video, MapPin, Phone, Award, CheckCircle, ChevronLeft, Calendar, User, Send, Timer } from 'lucide-react';
+import { format, addDays, setHours, setMinutes, setSeconds, isPast, startOfDay, isSameDay, parseISO, getDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { getGoogleCalendarCredentials } from '../services/firebaseService';
 import { getAvailableSlots, refreshGoogleAccessToken, isSlotInAvailabilityHours } from '../services/googleCalendarService';
+
+// Map day index (0-6, Sunday-Saturday) to availability key
+const DAY_INDEX_TO_KEY: Record<number, keyof AvailabilityHours> = {
+  0: 'sunday',
+  1: 'monday',
+  2: 'tuesday',
+  3: 'wednesday',
+  4: 'thursday',
+  5: 'friday',
+  6: 'saturday',
+};
 
 interface LawyerProfileModalProps {
   lawyer: Lawyer;
@@ -88,7 +99,7 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
     loadGoogleCalendarSlots();
   }, [lawyer.id, lawyer.googleCalendarConnected, duration]);
 
-  // Generate available slots
+  // Generate available slots from availabilityHours
   const availableSlots = useMemo(() => {
     const bookedSlots = appointments
       .filter(apt =>
@@ -114,90 +125,86 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
         })
       : [];
 
+    // Helper to check for conflicts
+    const hasConflict = (slotDate: Date, slotDuration: number) => {
+      const slotEnd = new Date(slotDate.getTime() + slotDuration * 60 * 1000);
+      
+      const hasLawyerConflict = bookedSlots.some(booked =>
+        slotDate < booked.end && slotEnd > booked.start
+      );
+
+      const hasClientConflict = clientBookedSlots.some(booked =>
+        slotDate < booked.end && slotEnd > booked.start
+      );
+
+      return hasLawyerConflict || hasClientConflict;
+    };
+
+    // If Google Calendar is connected and we have slots from it
     if (lawyer.googleCalendarConnected && googleCalendarSlots && googleCalendarSlots.length > 0) {
       const filteredGoogleSlots = googleCalendarSlots.filter(slotStr => {
         const slotDate = parseISO(slotStr);
-        const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
-
-        const hasLawyerConflict = bookedSlots.some(booked =>
-          slotDate < booked.end && slotEnd > booked.start
-        );
-
-        const hasClientConflict = clientBookedSlots.some(booked =>
-          slotDate < booked.end && slotEnd > booked.start
-        );
-
-        return !hasLawyerConflict && !hasClientConflict;
+        return !hasConflict(slotDate, duration);
       });
-
       return filteredGoogleSlots;
     }
 
+    // If there are legacy availableSlots
     if (lawyer.availableSlots && lawyer.availableSlots.length > 0) {
       const filteredSlots = lawyer.availableSlots.filter(slotStr => {
         const slotDate = parseISO(slotStr);
-        const slotEnd = new Date(slotDate.getTime() + (duration || 60) * 60 * 1000);
-
         const isInAvailability = isSlotInAvailabilityHours(slotDate, lawyer.availabilityHours);
-
-        const hasLawyerConflict = bookedSlots.some(booked =>
-          slotDate < booked.end && slotEnd > booked.start
-        );
-
-        const hasClientConflict = clientBookedSlots.some(booked =>
-          slotDate < booked.end && slotEnd > booked.start
-        );
-
-        return isInAvailability && !hasLawyerConflict && !hasClientConflict;
+        return isInAvailability && !hasConflict(slotDate, duration);
       });
-
       return filteredSlots;
     }
 
-    // Generate mock slots
-    const mockSlots: string[] = [];
-    const now = new Date();
-
-    for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
-      const targetDay = addDays(startOfDay(now), dayOffset);
-      const isToday = dayOffset === 0;
-
-      for (let minutesFromMidnight = 0; minutesFromMidnight < 24 * 60; minutesFromMidnight += 15) {
-        const slotDate = new Date(targetDay);
-        slotDate.setMinutes(minutesFromMidnight, 0, 0);
-
-        if (isToday) {
-          const minTime = now;
-          if (slotDate < minTime || isPast(slotDate)) {
-            continue;
-          }
-        }
-
-        if (!isPast(slotDate)) {
-          mockSlots.push(slotDate.toISOString());
+    // Generate slots from availabilityHours (weekly recurring schedule)
+    if (lawyer.availabilityHours) {
+      const now = new Date();
+      const generatedSlots: string[] = [];
+      
+      // Generate for the next 60 days
+      for (let dayOffset = 0; dayOffset < 60; dayOffset++) {
+        const targetDay = addDays(startOfDay(now), dayOffset);
+        const dayIndex = getDay(targetDay);
+        const dayKey = DAY_INDEX_TO_KEY[dayIndex];
+        const dayAvailability = lawyer.availabilityHours[dayKey];
+        
+        if (dayAvailability?.enabled && dayAvailability.timeSlots?.length > 0) {
+          dayAvailability.timeSlots.forEach(timeSlot => {
+            const [startHour, startMinute] = timeSlot.start.split(':').map(Number);
+            const [endHour, endMinute] = timeSlot.end.split(':').map(Number);
+            
+            // Generate 30-minute slots within this time range
+            let currentHour = startHour;
+            let currentMinute = startMinute;
+            
+            while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+              const slotDate = new Date(targetDay);
+              slotDate.setHours(currentHour, currentMinute, 0, 0);
+              
+              // Only add future slots that don't have conflicts
+              if (slotDate > now && !hasConflict(slotDate, duration)) {
+                generatedSlots.push(slotDate.toISOString());
+              }
+              
+              // Advance by 30 minutes
+              currentMinute += 30;
+              if (currentMinute >= 60) {
+                currentMinute = 0;
+                currentHour++;
+              }
+            }
+          });
         }
       }
+      
+      return generatedSlots;
     }
 
-    const uniqueSlots = Array.from(new Set(mockSlots))
-      .map(slot => parseISO(slot))
-      .filter(slot => slot >= now)
-      .filter(slot => isSlotInAvailabilityHours(slot, lawyer.availabilityHours))
-      .filter(slot => {
-        const slotEnd = new Date(slot.getTime() + (duration || 60) * 60 * 1000);
-        const hasLawyerConflict = bookedSlots.some(booked =>
-          slot < booked.end && slotEnd > booked.start
-        );
-
-        const hasClientConflict = clientBookedSlots.some(booked =>
-          slot < booked.end && slotEnd > booked.start
-        );
-
-        return !hasLawyerConflict && !hasClientConflict;
-      })
-      .sort((a, b) => a.getTime() - b.getTime());
-
-    return uniqueSlots.map(slot => slot.toISOString());
+    // No availability configured - return empty array (don't generate mock slots)
+    return [];
   }, [lawyer.availableSlots, lawyer.googleCalendarConnected, googleCalendarSlots, appointments, lawyer.id, currentUser?.id, duration, lawyer.availabilityHours]);
 
   const handleBooking = async () => {
@@ -407,7 +414,7 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
 
             {/* Profile Content */}
             {lawyer.profileConfig && lawyer.profileConfig.length > 0 ? (
-              <div className="mb-8">
+              <div className="mb-6">
                 <ProfileViewer
                   blocks={lawyer.profileConfig}
                   lawyerData={{
@@ -423,13 +430,16 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
                     const bookingSection = document.querySelector('[data-booking-section]');
                     bookingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }}
+                  compact
                 />
               </div>
-            ) : (
-              <p className="text-deep-600 dark:text-surface-400 leading-relaxed mb-8">
-                {lawyer.bio}
-              </p>
-            )}
+            ) : lawyer.bio ? (
+              <div className="mb-6 p-4 bg-surface-50 dark:bg-deep-800 rounded-xl border border-surface-100 dark:border-deep-700">
+                <p className="text-deep-600 dark:text-surface-400 leading-relaxed text-sm">
+                  {lawyer.bio}
+                </p>
+              </div>
+            ) : null}
 
             {/* Booking Section */}
             <div className="flex-grow" data-booking-section>
@@ -464,6 +474,7 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
                 <BookingCalendar
                   availableSlots={availableSlots}
                   onSlotSelect={setSelectedSlot}
+                  availabilityHours={lawyer.availabilityHours}
                 />
               </div>
 
@@ -580,7 +591,7 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
 
               {/* Bio */}
               <div>
-                <h3 className="font-semibold text-deep-900 dark:text-surface-100 mb-2">{t.modal.about}</h3>
+                <h3 className="font-semibold text-deep-900 dark:text-surface-100 mb-3">{t.modal.about}</h3>
                 {lawyer.profileConfig && lawyer.profileConfig.length > 0 ? (
                   <ProfileViewer
                     blocks={lawyer.profileConfig}
@@ -593,12 +604,15 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
                       setConsultationType('VIDEO');
                       setActiveTab('booking');
                     }}
+                    compact
                   />
-                ) : (
-                  <p className="text-sm text-deep-600 dark:text-surface-400 leading-relaxed">
-                    {lawyer.bio}
-                  </p>
-                )}
+                ) : lawyer.bio ? (
+                  <div className="p-3 bg-surface-50 dark:bg-deep-800 rounded-xl">
+                    <p className="text-sm text-deep-600 dark:text-surface-400 leading-relaxed">
+                      {lawyer.bio}
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               {/* CTA Button */}
@@ -642,6 +656,7 @@ export const LawyerProfileModal: React.FC<LawyerProfileModalProps> = ({ lawyer, 
               <BookingCalendar
                 availableSlots={availableSlots}
                 onSlotSelect={setSelectedSlot}
+                availabilityHours={lawyer.availabilityHours}
               />
 
               {/* Duration */}

@@ -4,6 +4,13 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/ge
 // Load API key from environment variable (from parent .env file)
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
+// Validate API key on initialization
+if (!API_KEY) {
+  console.error("❌ VITE_GEMINI_API_KEY is not set! Gemini AI features will not work.");
+} else {
+  console.log("✅ Gemini API key loaded successfully");
+}
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 const generationConfig = {
@@ -32,11 +39,26 @@ const safetySettings = [
   },
 ];
 
-const model = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash",
-  safetySettings,
-  generationConfig,
-});
+// Helper function to create model with timeout
+const createModelWithTimeout = () => {
+  return genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    safetySettings,
+    generationConfig,
+  });
+};
+
+const model = createModelWithTimeout();
+
+// Helper to add timeout to promises
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    ),
+  ]);
+};
 
 // System instruction for the expert lawyer persona (Base)
 const SYSTEM_INSTRUCTION_BASE = `
@@ -51,26 +73,48 @@ RÈGLES FONDAMENTALES :
 `;
 
 export async function* streamLegalChat(history: any[], userMessage: string) {
-  const modelWithSystem = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    safetySettings,
-    generationConfig,
-    systemInstruction: SYSTEM_INSTRUCTION_BASE,
-  });
+  // Check if API key is available
+  if (!API_KEY) {
+    yield { error: "L'API Gemini n'est pas configurée. Veuillez vérifier la configuration." };
+    return;
+  }
 
-  const chat = modelWithSystem.startChat({
-    history: history,
-  });
+  try {
+    const modelWithSystem = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      safetySettings,
+      generationConfig,
+      systemInstruction: SYSTEM_INSTRUCTION_BASE,
+    });
 
-  const result = await chat.sendMessageStream(userMessage);
+    const chat = modelWithSystem.startChat({
+      history: history,
+    });
 
-  for await (const chunk of result.stream) {
-    try {
-      const chunkText = chunk.text();
-      if (chunkText) yield { text: chunkText };
-    } catch (error) {
-      console.error("Error processing stream chunk:", error);
-      yield { error: "Failed to process a part of the response." };
+    const result = await chat.sendMessageStream(userMessage);
+
+    for await (const chunk of result.stream) {
+      try {
+        const chunkText = chunk.text();
+        if (chunkText) yield { text: chunkText };
+      } catch (error: any) {
+        // Handle SAFETY blocks gracefully
+        if (error.message?.includes('SAFETY') || error.message?.includes('blocked')) {
+          console.warn("⚠️ Response blocked by safety filter:", error.message);
+          yield { text: "\n\n*Je ne peux pas répondre à cette question car elle a été bloquée par les filtres de sécurité. Veuillez reformuler votre question.*" };
+          return;
+        }
+        console.error("Error processing stream chunk:", error);
+        yield { error: "Erreur lors du traitement de la réponse." };
+        return;
+      }
+    }
+  } catch (error: any) {
+    console.error("Error in streamLegalChat:", error);
+    if (error.message?.includes('SAFETY') || error.message?.includes('blocked')) {
+      yield { text: "*Votre question a été bloquée par les filtres de sécurité. Veuillez reformuler.*" };
+    } else {
+      yield { error: "Une erreur est survenue avec l'assistant IA. Veuillez réessayer." };
     }
   }
 }
@@ -88,50 +132,147 @@ export async function* streamWorkspaceChat(
     appointments: any[];
   }
 ) {
-  // Construire un contexte riche à partir des données réelles
-  const contextString = `
-  CONTEXTE ADMINISTRATIF (Données Réelles du Cabinet) :
-  - Avocat connecté : ${contextData.userName}
-  - Date et Heure actuelles : ${contextData.currentTime}
-  
-  AGENDA (Prochains Rendez-vous) :
-  ${contextData.appointments.length > 0 ? JSON.stringify(contextData.appointments, null, 2) : "Aucun rendez-vous prévu."}
-  
-  INSTRUCTIONS SPÉCIFIQUES "ASSISTANT EXÉCUTIF" :
-  - Tu as accès à l'agenda réel de l'avocat ci-dessus.
-  - Si l'utilisateur demande "mon prochain rdv", utilise les données JSON pour répondre précisément (Nom, Date, Notes).
-  - Si l'utilisateur demande un résumé d'un rdv spécifique, analyse les notes et détails disponibles.
-  - Tu restes AUSSI un expert juridique capable de répondre aux questions de droit avec des liens Légifrance.
-  `;
+  // Check if API key is available
+  if (!API_KEY) {
+    yield { error: "L'API Gemini n'est pas configurée. Veuillez vérifier la configuration." };
+    return;
+  }
 
-  // Combiner l'instruction de base juridique avec le contexte administratif
-  const fullSystemInstruction = `${SYSTEM_INSTRUCTION_BASE}\n\n${contextString}`;
+  try {
+    // Construire un contexte riche à partir des données réelles
+    const contextString = `
+    CONTEXTE ADMINISTRATIF (Données Réelles du Cabinet) :
+    - Avocat connecté : ${contextData.userName}
+    - Date et Heure actuelles : ${contextData.currentTime}
+    
+    AGENDA (Prochains Rendez-vous) :
+    ${contextData.appointments.length > 0 ? JSON.stringify(contextData.appointments, null, 2) : "Aucun rendez-vous prévu."}
+    
+    INSTRUCTIONS SPÉCIFIQUES "ASSISTANT EXÉCUTIF" :
+    - Tu as accès à l'agenda réel de l'avocat ci-dessus.
+    - Si l'utilisateur demande "mon prochain rdv", utilise les données JSON pour répondre précisément (Nom, Date, Notes).
+    - Si l'utilisateur demande un résumé d'un rdv spécifique, analyse les notes et détails disponibles.
+    - Tu restes AUSSI un expert juridique capable de répondre aux questions de droit avec des liens Légifrance.
+    `;
 
-  const modelWithSystem = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    safetySettings,
-    generationConfig,
-    systemInstruction: fullSystemInstruction,
-  });
+    // Combiner l'instruction de base juridique avec le contexte administratif
+    const fullSystemInstruction = `${SYSTEM_INSTRUCTION_BASE}\n\n${contextString}`;
 
-  const chat = modelWithSystem.startChat({
-    history: history,
-  });
+    const modelWithSystem = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      safetySettings,
+      generationConfig,
+      systemInstruction: fullSystemInstruction,
+    });
 
-  const result = await chat.sendMessageStream(userMessage);
+    const chat = modelWithSystem.startChat({
+      history: history,
+    });
 
-  for await (const chunk of result.stream) {
-    try {
-      const chunkText = chunk.text();
-      if (chunkText) yield { text: chunkText };
-    } catch (error) {
-      console.error("Error stream workspace chat:", error);
-      yield { error: "Erreur de traitement." };
+    const result = await chat.sendMessageStream(userMessage);
+
+    for await (const chunk of result.stream) {
+      try {
+        const chunkText = chunk.text();
+        if (chunkText) yield { text: chunkText };
+      } catch (error: any) {
+        // Handle SAFETY blocks gracefully
+        if (error.message?.includes('SAFETY') || error.message?.includes('blocked')) {
+          console.warn("⚠️ Response blocked by safety filter:", error.message);
+          yield { text: "\n\n*Je ne peux pas répondre à cette question car elle a été bloquée par les filtres de sécurité. Veuillez reformuler votre question.*" };
+          return;
+        }
+        console.error("Error stream workspace chat:", error);
+        yield { error: "Erreur de traitement." };
+        return;
+      }
+    }
+  } catch (error: any) {
+    console.error("Error in streamWorkspaceChat:", error);
+    if (error.message?.includes('SAFETY') || error.message?.includes('blocked')) {
+      yield { text: "*Votre question a été bloquée par les filtres de sécurité. Veuillez reformuler.*" };
+    } else {
+      yield { error: "Une erreur est survenue avec l'assistant. Veuillez réessayer." };
+    }
+  }
+}
+
+/**
+ * Generic message streaming function for the workspace assistant
+ * Used by backendService for conversation management
+ */
+export async function* sendMessageToGemini(
+  userMessage: string,
+  history: any[] = []
+): AsyncGenerator<{ text?: string; error?: string; done?: boolean }> {
+  // Check if API key is available
+  if (!API_KEY) {
+    yield { error: "L'API Gemini n'est pas configurée." };
+    return;
+  }
+
+  try {
+    const modelWithSystem = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      safetySettings,
+      generationConfig,
+      systemInstruction: SYSTEM_INSTRUCTION_BASE,
+    });
+
+    // Convert history to Gemini format
+    const formattedHistory = history.map((msg: any) => ({
+      role: msg.role === 'model' ? 'model' : 'user',
+      parts: [{ text: msg.text }],
+    }));
+
+    const chat = modelWithSystem.startChat({
+      history: formattedHistory,
+    });
+
+    const result = await chat.sendMessageStream(userMessage);
+
+    for await (const chunk of result.stream) {
+      try {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          yield { text: chunkText };
+        }
+      } catch (error: any) {
+        // Handle SAFETY blocks gracefully
+        if (error.message?.includes('SAFETY') || error.message?.includes('blocked')) {
+          console.warn("⚠️ Response blocked by safety filter:", error.message);
+          yield { text: "\n\n*Je ne peux pas répondre à cette question car elle a été bloquée par les filtres de sécurité. Veuillez reformuler votre question.*" };
+          yield { done: true };
+          return;
+        }
+        console.error("Error processing stream chunk:", error);
+        yield { error: "Erreur lors du traitement de la réponse." };
+        return;
+      }
+    }
+
+    yield { done: true };
+  } catch (error: any) {
+    console.error("Error in sendMessageToGemini:", error);
+    if (error.message?.includes('SAFETY') || error.message?.includes('blocked')) {
+      yield { text: "*Votre question a été bloquée par les filtres de sécurité. Veuillez reformuler.*" };
+      yield { done: true };
+    } else {
+      yield { error: "Une erreur est survenue. Veuillez réessayer." };
     }
   }
 }
 
 export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: string; summary: string }> {
+  // Check if API key is available
+  if (!API_KEY) {
+    console.warn("⚠️ Gemini API key not configured, using fallback");
+    return {
+      summary: "Votre cas semble concerner une question juridique. Utilisez les filtres ci-dessous pour affiner votre recherche.",
+      specialty: 'General Practice'
+    };
+  }
+
   const specialties = [
     'Criminal Law', 'Family Law', 'Corporate Law', 'Real Estate',
     'Labor Law', 'Intellectual Property', 'Immigration', 'Tax Law', 'General Practice'
@@ -157,13 +298,27 @@ export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: 
   `;
 
   try {
-    const result = await model.generateContent(prompt);
+    console.log("🤖 Calling Gemini API for legal case analysis...");
+    
+    // Add 15 second timeout
+    const result = await withTimeout(
+      model.generateContent(prompt),
+      15000,
+      "Gemini API timeout - the service is taking too long to respond"
+    );
+    
     const response = await result.response;
     const text = response.text();
 
-    const lines = text.trim().split('\n');
+    console.log("✅ Gemini response received");
+
+    const lines = text.trim().split('\n').filter(line => line.trim());
     if (lines.length < 2) {
-      throw new Error("AI response is not in the expected format.");
+      console.warn("⚠️ AI response format unexpected, using fallback");
+      return {
+        summary: "Votre cas semble concerner une question juridique. Utilisez les filtres ci-dessous pour affiner votre recherche.",
+        specialty: 'General Practice'
+      };
     }
 
     const summary = lines[0].trim();
@@ -172,10 +327,32 @@ export async function analyzeLegalCase(userQuery: string): Promise<{ specialty: 
     // Relaxed check: find the specialty in the string instead of exact match
     const foundSpecialty = specialties.find(s => specialty.includes(s)) || 'General Practice';
 
+    console.log(`✅ Legal case analyzed: ${foundSpecialty}`);
     return { summary, specialty: foundSpecialty };
-  } catch (error) {
-    console.error("Error analyzing legal case:", error);
-    throw new Error("Failed to analyze the legal case with the AI.");
+  } catch (error: any) {
+    console.error("❌ Error analyzing legal case:", error);
+    
+    // Return a helpful fallback instead of throwing
+    if (error.message?.includes('timeout')) {
+      return {
+        summary: "Le service d'analyse IA est temporairement lent. Utilisez les filtres pour trouver un avocat.",
+        specialty: 'General Practice'
+      };
+    }
+    
+    if (error.message?.includes('API_KEY') || error.message?.includes('403') || error.message?.includes('401')) {
+      console.error("❌ Gemini API key issue - check your VITE_GEMINI_API_KEY");
+      return {
+        summary: "Service d'analyse temporairement indisponible. Utilisez les filtres ci-dessous.",
+        specialty: 'General Practice'
+      };
+    }
+    
+    // Generic fallback
+    return {
+      summary: "Votre recherche a été comprise. Utilisez les filtres pour affiner les résultats.",
+      specialty: 'General Practice'
+    };
   }
 }
 

@@ -2,7 +2,7 @@ import { ref, get, set, onValue, push, update, remove } from 'firebase/database'
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { database, auth, storage, googleProvider, microsoftProvider } from '../firebaseConfig';
-import { Lawyer, Client, UserRole, Appointment, User, ProfileBlock, GoogleCalendarCredentials, AvailabilityHours } from '../types';
+import { Lawyer, Client, UserRole, Appointment, User, ProfileBlock, GoogleCalendarCredentials, AvailabilityHours, OutlookCalendarCredentials, PersonalEvent } from '../types';
 import { encryptToken, decryptToken, getGoogleCalendarEvents as fetchGoogleEvents, refreshGoogleAccessToken } from './googleCalendarService';
 
 /**
@@ -281,6 +281,8 @@ export const registerUser = async (email: string, password: string, role: UserRo
     role,
     avatarUrl: `https://ui-avatars.com/api/?name=${name}`,
     disabled: false,
+    profileCompleted: true, // Email signup includes name, so profile is considered complete
+    createdAt: new Date().toISOString(),
   };
 
   if (role === UserRole.CLIENT) {
@@ -308,6 +310,8 @@ export const registerLawyer = async (email: string, password: string, lawyerData
     role: UserRole.LAWYER,
     avatarUrl: `https://ui-avatars.com/api/?name=${lawyerData.name}`,
     disabled: false,
+    profileCompleted: true, // Lawyer registration is a full form, so profile is complete
+    createdAt: new Date().toISOString(),
   };
 
   try {
@@ -343,15 +347,16 @@ export const loginUser = async (email: string, password: string) => {
   return await signInWithEmailAndPassword(auth, email, password);
 };
 
-export const loginWithMicrosoft = async (defaultRole: UserRole = UserRole.CLIENT): Promise<FirebaseUser> => {
+export const loginWithMicrosoft = async (defaultRole: UserRole = UserRole.CLIENT): Promise<{ user: FirebaseUser; isNewUser: boolean }> => {
   const result = await signInWithPopup(auth, microsoftProvider);
   const user = result.user;
-  await ensureUserProfileExists(user, defaultRole, 'Microsoft');
-  return user;
+  const { isNewUser } = await ensureUserProfileExists(user, defaultRole, 'Microsoft');
+  return { user, isNewUser };
 };
 
 // Helper to ensure profile exists after social login
-const ensureUserProfileExists = async (user: FirebaseUser, defaultRole: UserRole, providerName: string) => {
+// Returns true if the user is NEW (just created), false if they already existed
+const ensureUserProfileExists = async (user: FirebaseUser, defaultRole: UserRole, providerName: string): Promise<{ isNewUser: boolean }> => {
   // Check if user exists in DB
   const userRef = ref(database, `users/${user.uid}`);
   const snapshot = await get(userRef);
@@ -366,6 +371,8 @@ const ensureUserProfileExists = async (user: FirebaseUser, defaultRole: UserRole
       role: defaultRole,
       avatarUrl: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}`,
       disabled: false,
+      profileCompleted: false, // New OAuth users need to complete their profile
+      createdAt: new Date().toISOString(),
     };
 
     if (defaultRole === UserRole.CLIENT) {
@@ -378,42 +385,26 @@ const ensureUserProfileExists = async (user: FirebaseUser, defaultRole: UserRole
       // For lawyers, we create a basic entry
       await set(userRef, userData);
     }
+    
+    return { isNewUser: true };
   }
+  
+  return { isNewUser: false };
 };
 
-export const loginWithGoogle = async (defaultRole: UserRole = UserRole.CLIENT): Promise<FirebaseUser> => {
+export const loginWithGoogle = async (defaultRole: UserRole = UserRole.CLIENT): Promise<{ user: FirebaseUser; isNewUser: boolean }> => {
   const result = await signInWithPopup(auth, googleProvider);
   const user = result.user;
 
-  await ensureUserProfileExists(user, defaultRole, 'Google');
+  const { isNewUser } = await ensureUserProfileExists(user, defaultRole, 'Google');
 
-  return user;
+  return { user, isNewUser };
 };
 
 export const logoutUser = async () => {
   return await signOut(auth);
 };
 
-/**
- * Create a default client profile if user exists in Auth but not in DB
- */
-const createDefaultClientProfile = async (uid: string, email: string | null): Promise<Client> => {
-  console.log(`📝 Creating default client profile for UID: ${uid}`);
-  const defaultClient: Client = {
-    id: uid,
-    name: email ? email.split('@')[0] : 'Client',
-    email: email || '',
-    role: UserRole.CLIENT,
-    avatarUrl: `https://ui-avatars.com/api/?name=${email ? email.split('@')[0] : 'Client'}`,
-    disabled: false,
-    favorites: []
-  };
-
-  const userRef = ref(database, `users/${uid}`);
-  await set(userRef, defaultClient);
-  console.log(`✅ Default client profile created`);
-  return defaultClient;
-};
 
 export const getUserProfile = async (uid: string): Promise<User | Lawyer | null> => {
   try {
@@ -441,6 +432,7 @@ export const getUserProfile = async (uid: string): Promise<User | Lawyer | null>
 
       // Normalize role (handle both string and enum)
       const userRole = userData.role === 'LAWYER' || userData.role === UserRole.LAWYER ? UserRole.LAWYER :
+        userData.role === 'ADMIN' || userData.role === UserRole.ADMIN ? UserRole.ADMIN :
         userData.role === 'CLIENT' || userData.role === UserRole.CLIENT ? UserRole.CLIENT :
           UserRole.CLIENT; // Default to CLIENT if role is unclear
 
@@ -455,11 +447,11 @@ export const getUserProfile = async (uid: string): Promise<User | Lawyer | null>
           return lawyerProfile;
         }
         console.log(`⚠️ Lawyer profile not found in 'lawyers' node, using basic user data`);
-        return { ...userData, role: userRole };
+        return { ...userData, id: uid, role: userRole };
       }
 
-      // Ensure role is properly set for clients
-      const finalUser = { ...userData, role: userRole };
+      // Ensure role is properly set for clients and add id
+      const finalUser = { ...userData, id: uid, role: userRole };
       console.log(`✅ Returning user profile:`, { id: finalUser.id, email: finalUser.email, role: finalUser.role });
       return finalUser;
     }
@@ -487,23 +479,21 @@ export const getUserProfile = async (uid: string): Promise<User | Lawyer | null>
       return { ...clientData, role: UserRole.CLIENT };
     }
 
-    // If user exists in Auth but not in DB, try to get email from Auth and create default profile
+    // If user exists in Auth but not in DB, we return null to allow retries.
+    // Creating a default profile here causes race conditions during registration.
     console.log(`⚠️ User profile not found anywhere for UID: ${uid}`);
-    console.log(`⚠️ Attempting to get user email from Auth to create default profile...`);
-
-    // Import auth to get current user
-    const { auth } = await import('../firebaseConfig');
-    const firebaseUser = auth.currentUser;
-
-    if (firebaseUser && firebaseUser.uid === uid) {
-      console.log(`✅ Found user in Auth (${firebaseUser.email}), creating default client profile`);
-      const defaultClient = await createDefaultClientProfile(uid, firebaseUser.email);
-      return defaultClient;
-    } else {
-      console.error(`❌ User not found in Auth either. Current user:`, firebaseUser?.uid);
+    
+    // Check if user is in Auth just for logging
+    try {
+      const { auth } = await import('../firebaseConfig');
+      const firebaseUser = auth.currentUser;
+      if (firebaseUser && firebaseUser.uid === uid) {
+         console.log(`ℹ️ User exists in Auth (${firebaseUser.email}) but has no DB profile yet.`);
+      }
+    } catch (e) {
+      // ignore
     }
 
-    console.error(`❌ Could not retrieve or create user profile for UID: ${uid}`);
     return null;
   } catch (error) {
     console.error(`❌ Error in getUserProfile for UID ${uid}:`, error);
@@ -1414,5 +1404,486 @@ export const deleteTask = async (userId: string, taskId: string): Promise<void> 
   } catch (error) {
     console.error('❌ Error deleting task:', error);
     throw error;
+  }
+};
+
+// --- OUTLOOK CALENDAR INTEGRATION ---
+
+/**
+ * Sauvegarde les credentials Outlook Calendar pour un avocat
+ */
+export const saveOutlookCalendarCredentials = async (
+  lawyerId: string,
+  credentials: {
+    accessToken: string;
+    refreshToken?: string;
+  }
+): Promise<void> => {
+  try {
+    console.log(`💾 Saving Outlook Calendar credentials for lawyer: ${lawyerId}`);
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+
+    // Chiffrer les tokens avant de les stocker
+    const encryptedAccessToken = encryptToken(credentials.accessToken);
+
+    const updateData: any = {
+      outlookCalendarConnected: true,
+      outlookCalendarAccessToken: encryptedAccessToken,
+      outlookCalendarLastSyncAt: new Date().toISOString(),
+    };
+
+    if (credentials.refreshToken) {
+      updateData.outlookCalendarRefreshToken = encryptToken(credentials.refreshToken);
+    }
+
+    await update(lawyerRef, updateData);
+
+    console.log(`✅ Outlook Calendar credentials saved successfully`);
+  } catch (error) {
+    console.error('❌ Error saving Outlook Calendar credentials:', error);
+    throw error;
+  }
+};
+
+/**
+ * Récupère les credentials Outlook Calendar d'un avocat
+ */
+export const getOutlookCalendarCredentials = async (
+  lawyerId: string
+): Promise<OutlookCalendarCredentials | null> => {
+  try {
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    const snapshot = await get(lawyerRef);
+
+    if (!snapshot.exists()) {
+      return null;
+    }
+
+    const lawyer = snapshot.val() as Lawyer;
+
+    if (!lawyer.outlookCalendarConnected || !lawyer.outlookCalendarAccessToken) {
+      return null;
+    }
+
+    // Déchiffrer les tokens
+    const accessToken = decryptToken(lawyer.outlookCalendarAccessToken);
+    const refreshToken = lawyer.outlookCalendarRefreshToken
+      ? decryptToken(lawyer.outlookCalendarRefreshToken)
+      : undefined;
+
+    return {
+      outlookCalendarConnected: lawyer.outlookCalendarConnected || false,
+      outlookCalendarAccessToken: accessToken,
+      outlookCalendarRefreshToken: refreshToken,
+      outlookCalendarLastSyncAt: lawyer.outlookCalendarLastSyncAt,
+    };
+  } catch (error) {
+    console.error('❌ Error getting Outlook Calendar credentials:', error);
+    return null;
+  }
+};
+
+/**
+ * Déconnecte le calendrier Outlook d'un avocat
+ */
+export const disconnectOutlookCalendar = async (lawyerId: string): Promise<void> => {
+  try {
+    console.log(`🔌 Disconnecting Outlook Calendar for lawyer: ${lawyerId}`);
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+
+    await update(lawyerRef, {
+      outlookCalendarConnected: false,
+      outlookCalendarAccessToken: null,
+      outlookCalendarRefreshToken: null,
+      outlookCalendarLastSyncAt: null,
+    });
+
+    console.log(`✅ Outlook Calendar disconnected successfully`);
+  } catch (error) {
+    console.error('❌ Error disconnecting Outlook Calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Met à jour le token d'accès Outlook Calendar (après rafraîchissement)
+ */
+export const updateOutlookCalendarAccessToken = async (
+  lawyerId: string,
+  accessToken: string
+): Promise<void> => {
+  try {
+    const lawyerRef = ref(database, `lawyers/${lawyerId}`);
+    const encryptedToken = encryptToken(accessToken);
+
+    await update(lawyerRef, {
+      outlookCalendarAccessToken: encryptedToken,
+      outlookCalendarLastSyncAt: new Date().toISOString(),
+    });
+
+    console.log(`✅ Outlook Calendar access token updated`);
+  } catch (error) {
+    console.error('❌ Error updating Outlook Calendar access token:', error);
+    throw error;
+  }
+};
+
+// --- PERSONAL EVENTS (CALENDAR) ---
+
+/**
+ * Crée un événement personnel dans le calendrier Jurilab
+ */
+export const createPersonalEvent = async (
+  userId: string,
+  eventData: {
+    title: string;
+    start: string;
+    end: string;
+    description?: string;
+    location?: string;
+    color?: string;
+    allDay?: boolean;
+    type?: 'EVENT' | 'AVAILABILITY';
+  }
+): Promise<PersonalEvent> => {
+  try {
+    console.log(`📅 Creating personal event for user: ${userId}`);
+    const eventsRef = ref(database, `personalEvents/${userId}`);
+    const newEventRef = push(eventsRef);
+
+    // Build event object without undefined values (Firebase doesn't accept undefined)
+    const newEvent: Record<string, any> = {
+      id: newEventRef.key!,
+      userId,
+      title: eventData.title,
+      start: eventData.start,
+      end: eventData.end,
+      allDay: eventData.allDay || false,
+      type: eventData.type || 'EVENT',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Only add optional fields if they have values
+    if (eventData.description) newEvent.description = eventData.description;
+    if (eventData.location) newEvent.location = eventData.location;
+    if (eventData.color) newEvent.color = eventData.color;
+
+    await set(newEventRef, newEvent);
+    console.log(`✅ Personal event created: ${newEvent.id}`);
+
+    // If it's an availability event, sync to profile
+    if (eventData.type === 'AVAILABILITY') {
+        await syncAvailabilityToProfile(userId);
+    }
+
+    return newEvent as PersonalEvent;
+  } catch (error) {
+    console.error('❌ Error creating personal event:', error);
+    throw error;
+  }
+};
+
+/**
+ * Récupère les événements personnels d'un utilisateur
+ */
+export const getPersonalEvents = async (
+  userId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<PersonalEvent[]> => {
+  try {
+    const eventsRef = ref(database, `personalEvents/${userId}`);
+    const snapshot = await get(eventsRef);
+
+    if (!snapshot.exists()) {
+      return [];
+    }
+
+    let events: PersonalEvent[] = Object.values(snapshot.val());
+
+    // Filtrer par dates si spécifiées
+    if (startDate && endDate) {
+      const start = new Date(startDate).getTime();
+      const end = new Date(endDate).getTime();
+
+      events = events.filter((event) => {
+        const eventStart = new Date(event.start).getTime();
+        const eventEnd = new Date(event.end).getTime();
+        return eventStart <= end && eventEnd >= start;
+      });
+    }
+
+    // Trier par date de début
+    events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+    return events;
+  } catch (error) {
+    console.error('❌ Error getting personal events:', error);
+    return [];
+  }
+};
+
+/**
+ * Met à jour un événement personnel
+ */
+export const updatePersonalEvent = async (
+  userId: string,
+  eventId: string,
+  updates: Partial<Omit<PersonalEvent, 'id' | 'userId' | 'createdAt'>>
+): Promise<void> => {
+  try {
+    const eventRef = ref(database, `personalEvents/${userId}/${eventId}`);
+
+    // Filter out undefined values (Firebase doesn't accept undefined)
+    const cleanUpdates: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value !== undefined) {
+        cleanUpdates[key] = value;
+      }
+    });
+
+    await update(eventRef, cleanUpdates);
+
+    console.log(`✅ Personal event updated: ${eventId}`);
+
+    // Sync availability if needed
+    // We don't know the type here easily without reading, but let's just sync to be safe
+    // Optimization: check if 'type' was in updates or if it was an availability event
+    await syncAvailabilityToProfile(userId);
+
+  } catch (error) {
+    console.error('❌ Error updating personal event:', error);
+    throw error;
+  }
+};
+
+/**
+ * Supprime un événement personnel
+ */
+export const deletePersonalEvent = async (userId: string, eventId: string): Promise<void> => {
+  try {
+    const eventRef = ref(database, `personalEvents/${userId}/${eventId}`);
+    await remove(eventRef);
+    console.log(`✅ Personal event deleted: ${eventId}`);
+    
+    // Sync availability
+    await syncAvailabilityToProfile(userId);
+
+  } catch (error) {
+    console.error('❌ Error deleting personal event:', error);
+    throw error;
+  }
+};
+
+/**
+ * Synchronise un événement personnel avec Google Calendar
+ */
+export const syncPersonalEventToGoogleCalendar = async (
+  event: PersonalEvent
+): Promise<string | null> => {
+  try {
+    console.log('🔄 Starting Google Calendar sync for personal event:', event.id);
+
+    // Récupérer les credentials Google Calendar de l'utilisateur
+    const credentials = await getGoogleCalendarCredentials(event.userId);
+
+    if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) {
+      console.log('⚠️ Google Calendar not connected for user, skipping sync');
+      return null;
+    }
+
+    const {
+      createGoogleCalendarEvent,
+      refreshGoogleAccessToken,
+    } = await import('./googleCalendarService');
+
+    let accessToken = credentials.googleCalendarAccessToken;
+
+    try {
+      const startTime = new Date(event.start);
+      const endTime = new Date(event.end);
+      const summary = event.title;
+      const description = event.description || '';
+      const location = event.location || '';
+
+      const googleEvent = await createGoogleCalendarEvent(
+        accessToken,
+        summary,
+        startTime.toISOString(),
+        endTime.toISOString(),
+        description,
+        location
+      );
+
+      // Stocker l'ID de l'événement Google Calendar
+      const eventRef = ref(database, `personalEvents/${event.userId}/${event.id}`);
+      await update(eventRef, { googleCalendarEventId: googleEvent.id });
+
+      console.log(`✅ Personal event synced to Google Calendar: ${googleEvent.id}`);
+      return googleEvent.id;
+
+    } catch (error: any) {
+      // Refresh token logic
+      if (error.message?.includes('401') || error.message?.includes('expired') || error.message?.includes('Invalid Credentials')) {
+        if (credentials.googleCalendarRefreshToken) {
+          const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
+          accessToken = newAccessToken;
+          await updateGoogleCalendarAccessToken(event.userId, accessToken);
+
+          // Retry
+          const startTime = new Date(event.start);
+          const endTime = new Date(event.end);
+          
+          const googleEvent = await createGoogleCalendarEvent(
+            accessToken,
+            event.title,
+            startTime.toISOString(),
+            endTime.toISOString(),
+            event.description,
+            event.location
+          );
+
+          const eventRef = ref(database, `personalEvents/${event.userId}/${event.id}`);
+          await update(eventRef, { googleCalendarEventId: googleEvent.id });
+          
+          return googleEvent.id;
+        }
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('❌ Error syncing personal event to Google Calendar:', error);
+    return null;
+  }
+};
+
+/**
+ * Met à jour un événement Google Calendar (Personal Event)
+ */
+export const updatePersonalEventGoogleCalendar = async (
+  event: PersonalEvent
+): Promise<void> => {
+    try {
+        if (!event.googleCalendarEventId) return;
+
+        const credentials = await getGoogleCalendarCredentials(event.userId);
+        if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) return;
+
+        const { updateGoogleCalendarEvent, refreshGoogleAccessToken } = await import('./googleCalendarService');
+        let accessToken = credentials.googleCalendarAccessToken;
+
+        try {
+            await updateGoogleCalendarEvent(accessToken, event.googleCalendarEventId, {
+                summary: event.title,
+                startTime: new Date(event.start).toISOString(),
+                endTime: new Date(event.end).toISOString(),
+                description: event.description,
+                location: event.location
+            });
+        } catch (error: any) {
+             if (error.message?.includes('401') || error.message?.includes('expired')) {
+                if (credentials.googleCalendarRefreshToken) {
+                    const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
+                    await updateGoogleCalendarAccessToken(event.userId, newAccessToken);
+                    
+                    // Retry
+                    await updateGoogleCalendarEvent(newAccessToken, event.googleCalendarEventId, {
+                         summary: event.title,
+                         startTime: new Date(event.start).toISOString(),
+                         endTime: new Date(event.end).toISOString(),
+                         description: event.description,
+                         location: event.location
+                    });
+                }
+             }
+        }
+    } catch (e) {
+        console.error("Failed to update Google Calendar event", e);
+    }
+}
+
+/**
+ * Supprime un événement Google Calendar (Personal Event)
+ */
+export const deletePersonalEventGoogleCalendar = async (
+    userId: string, 
+    googleCalendarEventId: string
+): Promise<void> => {
+     try {
+        const credentials = await getGoogleCalendarCredentials(userId);
+        if (!credentials || !credentials.googleCalendarConnected || !credentials.googleCalendarAccessToken) return;
+
+        const { deleteGoogleCalendarEvent, refreshGoogleAccessToken } = await import('./googleCalendarService');
+        let accessToken = credentials.googleCalendarAccessToken;
+
+        try {
+            await deleteGoogleCalendarEvent(accessToken, googleCalendarEventId);
+        } catch (error: any) {
+             if (error.message?.includes('401') || error.message?.includes('expired')) {
+                if (credentials.googleCalendarRefreshToken) {
+                    const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
+                    await updateGoogleCalendarAccessToken(userId, newAccessToken);
+                    
+                    // Retry
+                    await deleteGoogleCalendarEvent(newAccessToken, googleCalendarEventId);
+                }
+             }
+        }
+    } catch (e) {
+        console.error("Failed to delete Google Calendar event", e);
+    }
+}
+
+/**
+ * Synchronise les plages de disponibilité (basées sur les événements de type AVAILABILITY)
+ * vers le profil de l'avocat (availableSlots) pour le système de réservation
+ */
+export const syncAvailabilityToProfile = async (userId: string): Promise<void> => {
+  try {
+    console.log(`🔄 Syncing availability to profile for ${userId}...`);
+    
+    // 1. Get all personal events
+    const events = await getPersonalEvents(userId);
+    
+    // 2. Filter availability events
+    const availEvents = events.filter(e => e.type === 'AVAILABILITY');
+    
+    // 3. Generate 30-min slots
+    const slots: string[] = [];
+    
+    availEvents.forEach(e => {
+        const start = new Date(e.start);
+        const end = new Date(e.end);
+        
+        let current = new Date(start);
+        // Round to nearest 30 min if needed, but assuming input is clean for now
+        
+        while (current < end) {
+            slots.push(current.toISOString());
+            current = new Date(current.getTime() + 30 * 60 * 1000); // +30 mins
+        }
+    });
+    
+    // Remove duplicates and sort
+    const uniqueSlots = [...new Set(slots)].sort();
+    
+    // 4. Update lawyer profile in 'lawyers' node
+    // We only update if the user is a lawyer
+    const lawyerRef = ref(database, `lawyers/${userId}`);
+    const snapshot = await get(lawyerRef);
+    
+    if (snapshot.exists()) {
+        await update(lawyerRef, { availableSlots: uniqueSlots });
+        console.log(`✅ Synced ${uniqueSlots.length} availability slots to lawyer profile`);
+    } else {
+        console.log(`⚠️ User ${userId} is not a lawyer, skipping profile sync`);
+    }
+    
+  } catch(e) {
+    console.error("❌ Error syncing availability:", e);
   }
 };
