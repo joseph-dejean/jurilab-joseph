@@ -6,18 +6,27 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set } from 'firebase/database';
 import { Appointment } from '../types';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-// Configuration Firebase (copiée de firebaseConfig.ts)
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+
+// Configuration Firebase - load from environment variables
 const firebaseConfig = {
-  apiKey: "FIREBASE_API_KEY_REMOVED",
-  authDomain: "jurilab-8bc6d.firebaseapp.com",
-  databaseURL: "https://jurilab-8bc6d-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "jurilab-8bc6d",
-  storageBucket: "jurilab-8bc6d.firebasestorage.app",
-  messagingSenderId: "1025942707223",
-  appId: "1:1025942707223:web:3470e12a6fc7a589251052",
-  measurementId: "G-RWGMWP6H0X"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "jurilab-8bc6d.firebaseapp.com",
+  databaseURL: process.env.VITE_FIREBASE_DATABASE_URL || "https://jurilab-8bc6d-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "jurilab-8bc6d",
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "jurilab-8bc6d.firebasestorage.app",
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1025942707223",
+  appId: process.env.VITE_FIREBASE_APP_ID || "1:1025942707223:web:3470e12a6fc7a589251052",
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || "G-RWGMWP6H0X"
 };
+
+if (!firebaseConfig.apiKey) {
+  console.error('❌ Error: VITE_FIREBASE_API_KEY not found in .env file');
+  process.exit(1);
+}
 
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
