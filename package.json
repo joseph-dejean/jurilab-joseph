@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "upload-firebase": "node scripts/uploadToFirebase.cjs"
+    "upload-firebase": "node scripts/uploadToFirebase.cjs",
+    "deploy": "npm run build && firebase deploy --only hosting",
+    "deploy:all": "npm run build && firebase deploy"
   },
   "dependencies": {
     "@daily-co/daily-js": "^0.87.0",
