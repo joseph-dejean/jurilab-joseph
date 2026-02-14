@@ -2,8 +2,48 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
+
+    // User-specific files: only the owner can read/write
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Documents folder: user isolation
+    match /documents/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Profile images: owner can write, anyone authenticated can read (for displaying avatars)
+    match /profiles/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Transcripts: only owner can access
+    match /transcripts/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Shared documents between lawyer and client
+    // Pattern: /shared/{lawyerId}_{clientId}/...
+    match /shared/{sharedFolder}/{allPaths=**} {
+      allow read, write: if request.auth != null && (
+        sharedFolder.matches('.*_' + request.auth.uid + '.*') ||
+        sharedFolder.matches('.*' + request.auth.uid + '_.*')
+      );
+    }
+
+    // Appointments attachments: participants only
+    match /appointments/{appointmentId}/{allPaths=**} {
       allow read, write: if request.auth != null;
+      // Note: Ideally check if user is participant, but requires Firestore lookup
+      // For now, authenticated users can access appointment files
+      // TODO: Add custom claims or metadata check for stricter control
+    }
+
+    // Deny everything else by default
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
