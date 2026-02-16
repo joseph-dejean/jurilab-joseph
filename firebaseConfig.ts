@@ -7,15 +7,16 @@ import { getDatabase } from "firebase/database";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
 
+// Firebase config - these are client-side values (secured by Firebase Security Rules, not by hiding keys)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBSVLAU9KmJh4PX_ndQaqr1C5nMkr4tc80",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "jurilab-8bc6d.firebaseapp.com",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://jurilab-8bc6d-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "jurilab-8bc6d",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "jurilab-8bc6d.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1025942707223",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1025942707223:web:3470e12a6fc7a589251052",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-RWGMWP6H0X"
+  apiKey: "AIzaSyBSVLAU9KmJh4PX_ndQaqr1C5nMkr4tc80",
+  authDomain: "jurilab-8bc6d.firebaseapp.com",
+  databaseURL: "https://jurilab-8bc6d-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "jurilab-8bc6d",
+  storageBucket: "jurilab-8bc6d.firebasestorage.app",
+  messagingSenderId: "1025942707223",
+  appId: "1:1025942707223:web:3470e12a6fc7a589251052",
+  measurementId: "G-RWGMWP6H0X"
 };
 
 import { getStorage } from "firebase/storage";
