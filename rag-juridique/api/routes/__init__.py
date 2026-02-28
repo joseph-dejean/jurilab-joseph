@@ -8,6 +8,7 @@ from api.routes import (
     audit,
     chatbot,
     downloads,
+    gemini_proxy,
     machine_actes,
     super_chercheur,
     synthese,
@@ -22,5 +23,6 @@ __all__ = [
     "chatbot",
     "templates",
     "downloads",
+    "gemini_proxy",
 ]
 

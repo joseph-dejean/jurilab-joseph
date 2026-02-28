@@ -7,7 +7,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 from config.logging_config import get_logger
 from config.settings import get_settings
@@ -22,12 +23,8 @@ from api.models import (
 logger = get_logger(__name__)
 settings = get_settings()
 
-# Configuration Gemini avec clé API
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    logger.debug("Gemini configuré avec clé API")
-else:
-    logger.warning("⚠️ GEMINI_API_KEY non définie dans .env")
+# Vertex AI init (uses ADC — no API key needed on Cloud Run)
+vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
 
 
 class ConversationManager:
@@ -109,14 +106,10 @@ class ChatbotAvocat:
         self.vertex_client = VertexSearchClient()
         self.conversation_manager = ConversationManager()
         
-        # Configuration Gemini avec API directe
+        # Configuration Gemini via Vertex AI (ADC)
         try:
-            if not settings.GEMINI_API_KEY:
-                logger.warning("⚠️ GEMINI_API_KEY non définie - mode dégradé activé")
-                self.model = None
-            else:
-                self.model = genai.GenerativeModel(settings.GEMINI_FLASH_MODEL)
-                logger.debug(f"✅ Modèle Gemini configuré: {settings.GEMINI_FLASH_MODEL}")
+            self.model = GenerativeModel(settings.GEMINI_FLASH_MODEL)
+            logger.debug(f"✅ Modèle Gemini configuré: {settings.GEMINI_FLASH_MODEL}")
         except Exception as e:
             logger.warning(f"⚠️ Impossible de configurer Gemini: {e}")
             self.model = None
@@ -312,7 +305,7 @@ RÉPONSE:
         
         try:
             # Configuration de génération
-            generation_config = genai.types.GenerationConfig(
+            generation_config = GenerationConfig(
                 temperature=0.3,  # Peu créatif (factuel)
                 top_p=0.95,
                 top_k=40,

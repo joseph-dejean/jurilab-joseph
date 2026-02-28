@@ -10,16 +10,16 @@ from pathlib import Path
 from typing import Any
 
 import fitz  # PyMuPDF
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 from loguru import logger
 
 from config.settings import get_settings
 
 settings = get_settings()
 
-# Configuration Gemini
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+# Vertex AI init (uses ADC — no API key needed on Cloud Run)
+vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
 
 
 class PDFStyleAnalyzer:
@@ -37,11 +37,7 @@ class PDFStyleAnalyzer:
     
     def __init__(self):
         """Initialise l'analyseur"""
-        if settings.GEMINI_API_KEY:
-            self.model = genai.GenerativeModel(settings.GEMINI_PRO_MODEL)
-        else:
-            logger.warning("⚠️ GEMINI_API_KEY non définie")
-            self.model = None
+        self.model = GenerativeModel(settings.GEMINI_PRO_MODEL)
     
     def analyze_pdf(self, pdf_path: str | Path) -> dict[str, Any]:
         """

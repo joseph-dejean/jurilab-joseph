@@ -5,7 +5,9 @@ import { useCalendar } from '../../context/CalendarContext';
 export const GoogleSyncModal = () => {
   const { isGoogleAuthModalOpen, closeGoogleAuthModal, saveGoogleConfig } = useCalendar();
   
-  const [apiKey, setApiKey] = useState(import.meta.env.VITE_GEMINI_API_KEY || '');
+  // apiKey is kept for backward compatibility with saveGoogleConfig but is no longer used
+  // (Gemini calls now go through the backend via ADC)
+  const [apiKey, setApiKey] = useState('');
   const [clientId, setClientId] = useState('');
 
   if (!isGoogleAuthModalOpen) return null;
