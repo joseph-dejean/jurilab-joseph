@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     GEMINI_FLASH_MODEL: str = Field(default="gemini-2.0-flash")
     
     # ==============================================================================
+    # DAILY.CO (visioconférence — clé serveur, jamais exposée au browser)
+    # ==============================================================================
+    DAILY_API_KEY: str = Field(default="")
+
+    # ==============================================================================
     # MCP (MODEL CONTEXT PROTOCOL)
     # ==============================================================================
     MCP_SERVER_URL: str = Field(default="http://localhost:3000")
