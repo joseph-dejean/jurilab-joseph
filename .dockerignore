@@ -40,8 +40,5 @@ coverage
 *.md
 !README.md
 
-# RAG service (separate deployment)
-rag-juridique
-
 # Secrets folder
 secrets
