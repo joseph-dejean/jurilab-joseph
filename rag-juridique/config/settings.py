@@ -55,11 +55,10 @@ class Settings(BaseSettings):
     HF_DATASET_NAME: str = Field(default="antoinejeannot/decisions-justice")
     
     # ==============================================================================
-    # MODÈLES GEMINI
+    # MODÈLES GEMINI (via Vertex AI / ADC - pas de clé API nécessaire en prod)
     # ==============================================================================
-    GEMINI_API_KEY: str = Field(default="", description="Clé API Gemini (Google AI Studio)")
-    GEMINI_PRO_MODEL: str = Field(default="models/gemini-pro-latest")
-    GEMINI_FLASH_MODEL: str = Field(default="models/gemini-flash-latest")
+    GEMINI_PRO_MODEL: str = Field(default="gemini-1.5-pro")
+    GEMINI_FLASH_MODEL: str = Field(default="gemini-2.0-flash")
     
     # ==============================================================================
     # MCP (MODEL CONTEXT PROTOCOL)

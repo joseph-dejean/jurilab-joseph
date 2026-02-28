@@ -1,18 +1,18 @@
-# Stage 1: Build the React app
-FROM node:20-alpine AS builder
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 — Build the React / Vite frontend
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build arguments for environment variables (injected at build time)
+# Build-time env vars injected by Cloud Build
+# NOTE: VITE_GEMINI_API_KEY is intentionally removed — Gemini calls go through
+#       the FastAPI backend which uses ADC (no key in the browser bundle).
 ARG VITE_FIREBASE_API_KEY
 ARG VITE_FIREBASE_AUTH_DOMAIN
 ARG VITE_FIREBASE_PROJECT_ID
@@ -22,15 +22,11 @@ ARG VITE_FIREBASE_APP_ID
 ARG VITE_FIREBASE_DATABASE_URL
 ARG VITE_FIREBASE_MEASUREMENT_ID
 ARG VITE_GOOGLE_CLIENT_ID
-ARG VITE_GOOGLE_CLIENT_SECRET
 ARG VITE_GOOGLE_DEVELOPER_KEY
 ARG VITE_GOOGLE_APP_ID
-ARG VITE_GEMINI_API_KEY
 ARG VITE_DAILY_API_KEY
 ARG VITE_STREAM_API_KEY
-ARG VITE_STREAM_API_SECRET
 
-# Set env vars for build
 ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
 ENV VITE_FIREBASE_AUTH_DOMAIN=$VITE_FIREBASE_AUTH_DOMAIN
 ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
@@ -40,28 +36,32 @@ ENV VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
 ENV VITE_FIREBASE_DATABASE_URL=$VITE_FIREBASE_DATABASE_URL
 ENV VITE_FIREBASE_MEASUREMENT_ID=$VITE_FIREBASE_MEASUREMENT_ID
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
-ENV VITE_GOOGLE_CLIENT_SECRET=$VITE_GOOGLE_CLIENT_SECRET
 ENV VITE_GOOGLE_DEVELOPER_KEY=$VITE_GOOGLE_DEVELOPER_KEY
 ENV VITE_GOOGLE_APP_ID=$VITE_GOOGLE_APP_ID
-ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
 ENV VITE_DAILY_API_KEY=$VITE_DAILY_API_KEY
 ENV VITE_STREAM_API_KEY=$VITE_STREAM_API_KEY
-ENV VITE_STREAM_API_SECRET=$VITE_STREAM_API_SECRET
 
-# Build the app
 RUN npm run build
 
-# Stage 2: Serve with nginx
-FROM nginx:alpine
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — Python FastAPI backend serving both API and React static files
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copy built files from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Install Python dependencies
+COPY rag-juridique/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port 8080 (Cloud Run default)
+# Copy FastAPI application
+COPY rag-juridique/ ./
+
+# Copy React build output → served at "/" by FastAPI StaticFiles
+COPY --from=frontend-builder /app/dist ./static
+
+# Cloud Run listens on port 8080
 EXPOSE 8080
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# ADC is provided automatically by the Cloud Run service account
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

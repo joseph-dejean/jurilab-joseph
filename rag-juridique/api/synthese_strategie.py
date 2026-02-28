@@ -12,7 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 from loguru import logger
 
 from api.models import (
@@ -37,9 +38,8 @@ from prompts.prompts import (
 setup_logging()
 settings = get_settings()
 
-# Configuration Gemini
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+# Vertex AI init (uses ADC — no API key needed on Cloud Run)
+vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
 
 
 def extract_text_from_file(file_path: str) -> str:
@@ -117,13 +117,9 @@ class SynthesisAideStrategie:
         self.vertex_client = VertexSearchClient()
         
         # Configuration Gemini
-        if settings.GEMINI_API_KEY:
-            self.model_pro = genai.GenerativeModel(settings.GEMINI_PRO_MODEL)
-            self.model_flash = genai.GenerativeModel(settings.GEMINI_FLASH_MODEL)
-        else:
-            logger.warning("⚠️ GEMINI_API_KEY non définie - synthèse désactivée")
-            self.model_pro = None
-            self.model_flash = None
+        # Configuration Gemini via Vertex AI (ADC)
+        self.model_pro = GenerativeModel(settings.GEMINI_PRO_MODEL)
+        self.model_flash = GenerativeModel(settings.GEMINI_FLASH_MODEL)
         
         # Map type → prompt template
         self.prompt_templates = {
@@ -272,7 +268,7 @@ class SynthesisAideStrategie:
         if not self.model_pro:
             return SynthesisResponse(
                 synthesis_type=synthesis_type,
-                summary="❌ Gemini non configuré (GEMINI_API_KEY manquante)",
+                summary="❌ Gemini non configuré (Vertex AI indisponible)",
                 key_points=[],
                 recommendations=[],
                 confidence=0.0,
@@ -316,9 +312,9 @@ class SynthesisAideStrategie:
         try:
             # Vérifier que le modèle est disponible
             if model is None:
-                raise ValueError("Modèle Gemini non initialisé (GEMINI_API_KEY manquante)")
-            
-            logger.info(f"🤖 Génération avec {model.model_name}...")
+                raise ValueError("Modèle Gemini non initialisé (Vertex AI indisponible)")
+
+            logger.info(f"🤖 Génération avec Vertex AI...")
             logger.debug(f"📝 Prompt length: {len(prompt)} caractères")
             
             # Vérifier la taille du prompt (limite Gemini)

@@ -10,7 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 from loguru import logger
 
 from api.models import AuditRequest, AuditResponse, AuditIssue, IssueSeverity
@@ -21,9 +22,8 @@ from rag.vertex_search import VertexSearchClient
 setup_logging()
 settings = get_settings()
 
-# Configuration Gemini
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+# Vertex AI init (uses ADC — no API key needed on Cloud Run)
+vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
 
 
 # ==============================================================================
@@ -193,12 +193,8 @@ class AuditConformite:
         """Initialise le système d'audit"""
         self.vertex_client = VertexSearchClient()
         
-        # Configuration Gemini
-        if settings.GEMINI_API_KEY:
-            self.model = genai.GenerativeModel(settings.GEMINI_PRO_MODEL)
-        else:
-            logger.warning("⚠️ GEMINI_API_KEY non définie - recommandations désactivées")
-            self.model = None
+        # Configuration Gemini via Vertex AI (ADC)
+        self.model = GenerativeModel(settings.GEMINI_PRO_MODEL)
         
         # Patterns de références juridiques (droit français)
         self.patterns = {

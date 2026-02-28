@@ -12,16 +12,19 @@ Documentation : http://localhost:8000/docs
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from api.routes import (
     audit,
     chatbot,
     downloads,
+    gemini_proxy,
     machine_actes,
     super_chercheur,
     synthese,
@@ -146,7 +149,7 @@ async def health_check():
     return {
         "status": "healthy",
         "api": "operational",
-        "gemini": "configured" if settings.GEMINI_API_KEY else "not_configured",
+        "gemini": "vertex_ai_adc" if settings.GCP_PROJECT_ID else "not_configured",
         "vertex_ai": "configured" if settings.GCP_PROJECT_ID else "not_configured",
     }
 
@@ -193,6 +196,20 @@ app.include_router(
     prefix="/api/v1/download",
     tags=["Téléchargements"]
 )
+
+app.include_router(
+    gemini_proxy.router,
+    prefix="/api/v1/gemini",
+    tags=["Gemini Proxy (frontend)"]
+)
+
+
+# Serve React static build — must be mounted LAST (catches all remaining routes)
+_static_dir = Path(__file__).parent.parent / "static"
+if _static_dir.exists():
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")
+else:
+    logger.warning(f"⚠️ Répertoire static introuvable : {_static_dir} (normal en dev)")
 
 
 # Gestionnaire d'erreurs global

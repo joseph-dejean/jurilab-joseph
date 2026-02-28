@@ -9,7 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 from loguru import logger
 
 from api.models import (
@@ -28,9 +29,8 @@ from prompts.prompts import PROMPT_ACT_GENERATION, PROMPT_ACT_GENERATION_CUSTOM
 setup_logging()
 settings = get_settings()
 
-# Configuration Gemini
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+# Vertex AI init (uses ADC — no API key needed on Cloud Run)
+vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
 
 
 def extract_text_from_file(file_path: str) -> str:
@@ -103,13 +103,10 @@ class MachineActes:
     def __init__(self):
         """Initialise la machine à actes"""
         
-        # Configuration Gemini (Flash pour génération d'actes - quota plus élevé)
-        if settings.GEMINI_API_KEY:
-            self.model = genai.GenerativeModel(settings.GEMINI_FLASH_MODEL)
-            logger.info(f"✅ Utilisation de {settings.GEMINI_FLASH_MODEL} (quota: 10M tokens/min)")
-        else:
-            logger.warning("⚠️ GEMINI_API_KEY non définie - génération désactivée")
-            self.model = None
+        # Configuration Gemini via Vertex AI (ADC)
+        self.model_name = settings.GEMINI_FLASH_MODEL
+        self.model = GenerativeModel(self.model_name)
+        logger.info(f"✅ Utilisation de {self.model_name}")
         
         logger.info("✅ MachineActes initialisé")
     
@@ -260,9 +257,9 @@ class MachineActes:
         """
         if not self.model:
             return (
-                "❌ Gemini non configuré (GEMINI_API_KEY manquante)",
+                "❌ Gemini non configuré (Vertex AI indisponible)",
                 0.0,
-                ["Configuration Gemini manquante"]
+                ["Configuration Vertex AI manquante"]
             )
         
         warnings = []
@@ -287,7 +284,7 @@ class MachineActes:
         
         # Générer avec Gemini
         try:
-            logger.info(f"🤖 Génération avec {self.model.model_name}...")
+            logger.info(f"🤖 Génération avec {self.model_name}...")
             response = self.model.generate_content(prompt)
             generated_act = response.text.strip()
             
