@@ -23,6 +23,7 @@ from loguru import logger
 from api.routes import (
     audit,
     chatbot,
+    daily_proxy,
     downloads,
     gemini_proxy,
     machine_actes,
@@ -201,6 +202,12 @@ app.include_router(
     gemini_proxy.router,
     prefix="/api/v1/gemini",
     tags=["Gemini Proxy (frontend)"]
+)
+
+app.include_router(
+    daily_proxy.router,
+    prefix="/api/v1/daily",
+    tags=["Daily.co Proxy (frontend)"]
 )
 
 

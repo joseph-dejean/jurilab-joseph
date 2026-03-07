@@ -55,7 +55,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // Environment variables - loaded from .env file
       'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
-      'import.meta.env.VITE_DAILY_API_KEY': JSON.stringify(env.VITE_DAILY_API_KEY || ''),
+      // VITE_DAILY_API_KEY intentionally removed — Daily.co calls proxied through FastAPI backend
       'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(env.VITE_GOOGLE_CLIENT_ID || ''),
       'import.meta.env.VITE_GOOGLE_DEVELOPER_KEY': JSON.stringify(env.VITE_GOOGLE_DEVELOPER_KEY || ''),
       'import.meta.env.VITE_GOOGLE_APP_ID': JSON.stringify(env.VITE_GOOGLE_APP_ID || ''),
