@@ -6,7 +6,10 @@ La clé API Daily.co (DAILY_API_KEY) n'est jamais exposée dans le bundle browse
 """
 
 import asyncio
-import math
+import random
+import string
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -19,6 +22,13 @@ from config.settings import get_settings
 settings = get_settings()
 
 DAILY_API_BASE = "https://api.daily.co/v1"
+_TIMEOUT = httpx.Timeout(30.0)
+
+# Shared async client — connection pooling across all requests
+_client = httpx.AsyncClient(
+    timeout=_TIMEOUT,
+    limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
+)
 
 router = APIRouter()
 
@@ -69,34 +79,32 @@ class ProcessMeetingRequest(BaseModel):
 
 @router.post("/rooms")
 async def create_room(req: CreateRoomRequest) -> dict[str, str]:
-    """Create a Daily.co room — replaces frontend createRoom()."""
+    """Create a Daily.co room."""
     if not settings.DAILY_API_KEY:
         return {"error": "DAILY_API_KEY not configured on server"}
 
-    import time
     room_name = f"jurilab-{req.appointmentId}-{int(time.time() * 1000)}"
     expiration = int(time.time()) + (req.durationMinutes * 60) + 3600
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{DAILY_API_BASE}/rooms",
-            headers=_headers(),
-            json={
-                "name": room_name,
-                "privacy": "private",
-                "properties": {
-                    "enable_screenshare": True,
-                    "enable_chat": True,
-                    "enable_prejoin_ui": False,
-                    "enable_network_ui": True,
-                    "enable_people_ui": False,
-                    "exp": expiration,
-                    "max_participants": req.maxParticipants,
-                    "start_video_off": False,
-                    "start_audio_off": False,
-                },
+    resp = await _client.post(
+        f"{DAILY_API_BASE}/rooms",
+        headers=_headers(),
+        json={
+            "name": room_name,
+            "privacy": "private",
+            "properties": {
+                "enable_screenshare": True,
+                "enable_chat": True,
+                "enable_prejoin_ui": False,
+                "enable_network_ui": True,
+                "enable_people_ui": False,
+                "exp": expiration,
+                "max_participants": req.maxParticipants,
+                "start_video_off": False,
+                "start_audio_off": False,
             },
-        )
+        },
+    )
 
     if not resp.is_success:
         logger.error(f"Daily.co create room error: {resp.status_code} {resp.text}")
@@ -113,11 +121,10 @@ async def delete_room(room_id: str) -> dict[str, Any]:
     if not settings.DAILY_API_KEY:
         return {"error": "DAILY_API_KEY not configured on server"}
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.delete(
-            f"{DAILY_API_BASE}/rooms/{room_id}",
-            headers=_headers(),
-        )
+    resp = await _client.delete(
+        f"{DAILY_API_BASE}/rooms/{room_id}",
+        headers=_headers(),
+    )
 
     if not resp.is_success and resp.status_code != 404:
         logger.error(f"Daily.co delete room error: {resp.status_code}")
@@ -133,11 +140,10 @@ async def get_room_info(room_id: str) -> dict[str, Any]:
     if not settings.DAILY_API_KEY:
         return {"error": "DAILY_API_KEY not configured on server"}
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{DAILY_API_BASE}/rooms/{room_id}",
-            headers=_headers(),
-        )
+    resp = await _client.get(
+        f"{DAILY_API_BASE}/rooms/{room_id}",
+        headers=_headers(),
+    )
 
     if resp.status_code == 404:
         return {"room": None}
@@ -151,31 +157,32 @@ async def get_room_info(room_id: str) -> dict[str, Any]:
 # TOKENS
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _token_payload(room_name: str, user_id: str, user_name: str, is_owner: bool) -> dict:
+    expiration = int(time.time()) + (24 * 60 * 60)
+    return {
+        "properties": {
+            "room_name": room_name,
+            "user_id": user_id,
+            "user_name": user_name,
+            "is_owner": is_owner,
+            "exp": expiration,
+            "enable_screenshare": True,
+            "enable_recording": False,
+        },
+    }
+
+
 @router.post("/meeting-tokens")
 async def generate_token(req: GenerateTokenRequest) -> dict[str, str]:
-    """Generate a meeting token — replaces frontend generateToken()."""
+    """Generate a meeting token."""
     if not settings.DAILY_API_KEY:
         return {"error": "DAILY_API_KEY not configured on server"}
 
-    import time
-    expiration = int(time.time()) + (24 * 60 * 60)
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{DAILY_API_BASE}/meeting-tokens",
-            headers=_headers(),
-            json={
-                "properties": {
-                    "room_name": req.roomId,
-                    "user_id": req.userId,
-                    "user_name": req.userName,
-                    "is_owner": req.isOwner,
-                    "exp": expiration,
-                    "enable_screenshare": True,
-                    "enable_recording": False,
-                },
-            },
-        )
+    resp = await _client.post(
+        f"{DAILY_API_BASE}/meeting-tokens",
+        headers=_headers(),
+        json=_token_payload(req.roomId, req.userId, req.userName, req.isOwner),
+    )
 
     if not resp.is_success:
         logger.error(f"Daily.co token error: {resp.status_code} {resp.text}")
@@ -187,32 +194,17 @@ async def generate_token(req: GenerateTokenRequest) -> dict[str, str]:
 
 @router.post("/meeting-tokens/guest")
 async def generate_guest_token(req: GenerateGuestTokenRequest) -> dict[str, str]:
-    """Generate a guest token — replaces frontend generateGuestToken()."""
+    """Generate a guest token."""
     if not settings.DAILY_API_KEY:
         return {"error": "DAILY_API_KEY not configured on server"}
 
-    import time
-    import random
-    import string
     guest_id = f"guest-{int(time.time() * 1000)}-{''.join(random.choices(string.ascii_lowercase + string.digits, k=9))}"
-    expiration = int(time.time()) + (24 * 60 * 60)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{DAILY_API_BASE}/meeting-tokens",
-            headers=_headers(),
-            json={
-                "properties": {
-                    "room_name": req.roomId,
-                    "user_id": guest_id,
-                    "user_name": req.guestName,
-                    "is_owner": False,
-                    "exp": expiration,
-                    "enable_screenshare": True,
-                    "enable_recording": False,
-                },
-            },
-        )
+    resp = await _client.post(
+        f"{DAILY_API_BASE}/meeting-tokens",
+        headers=_headers(),
+        json=_token_payload(req.roomId, guest_id, req.guestName, False),
+    )
 
     if not resp.is_success:
         logger.error(f"Daily.co guest token error: {resp.status_code} {resp.text}")
@@ -230,18 +222,30 @@ def _parse_vtt(vtt_content: str) -> str:
     """Extract plain text from a WebVTT string."""
     lines = vtt_content.splitlines()
     texts: list[str] = []
-    skip_header = True
+    past_header = False
     for line in lines:
         line = line.strip()
-        if skip_header:
+        if not past_header:
             if line == "WEBVTT":
-                skip_header = False
+                past_header = True
             continue
-        # Skip cue identifiers (numbers or blank lines), timestamps, and NOTE blocks
         if not line or line.isdigit() or "-->" in line or line.startswith("NOTE"):
             continue
         texts.append(line)
     return " ".join(texts)
+
+
+async def _fetch_vtt(url: str, session_id: str) -> str:
+    """Fetch and parse a single VTT file (used in parallel gather)."""
+    try:
+        resp = await _client.get(url)
+        if resp.is_success:
+            text = _parse_vtt(resp.text)
+            logger.info(f"Parsed VTT for session {session_id}: {len(text)} chars")
+            return text
+    except Exception as exc:
+        logger.warning(f"Failed to fetch VTT for session {session_id}: {exc}")
+    return ""
 
 
 @router.get("/transcript")
@@ -257,73 +261,71 @@ async def get_transcript(
     if not settings.DAILY_API_KEY:
         return {"error": "DAILY_API_KEY not configured on server", "ready": False}
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{DAILY_API_BASE}/transcript",
-            headers=_headers(),
-            params={"room_name": room_id},
-        )
+    resp = await _client.get(
+        f"{DAILY_API_BASE}/transcript",
+        headers=_headers(),
+        params={"room_name": room_id},
+    )
 
     if resp.status_code == 404:
         return {"transcript": "", "ready": False}
-
     if not resp.is_success:
         logger.error(f"Daily.co transcript API error: {resp.status_code} {resp.text}")
         return {"transcript": "", "ready": False}
 
-    data = resp.json()
-    transcripts = data.get("data", [])
-
+    transcripts = resp.json().get("data", [])
     if not transcripts:
         return {"transcript": "", "ready": False}
 
     # Filter to appointment window if provided
     if appointment_date and duration_minutes:
-        from datetime import datetime, timedelta, timezone
         apt_start = datetime.fromisoformat(appointment_date.replace("Z", "+00:00"))
         window_start = apt_start - timedelta(minutes=15)
         window_end = apt_start + timedelta(minutes=duration_minutes + 60)
         transcripts = [
             t for t in transcripts
-            if t.get("start_ts") and
-            window_start <= datetime.fromtimestamp(t["start_ts"], tz=timezone.utc) <= window_end
+            if t.get("start_ts")
+            and window_start <= datetime.fromtimestamp(t["start_ts"], tz=timezone.utc) <= window_end
         ]
+        if not transcripts:
+            return {"transcript": "", "ready": False}
 
-    if not transcripts:
-        return {"transcript": "", "ready": False}
-
-    # Keep only sessions with multiple participants or significant duration
+    # Keep sessions with >=2 participants or significant duration, fallback to all
     relevant = [
         t for t in transcripts
-        if (t.get("participants_count", 0) >= 2 or
-            (t.get("participants") and len(t["participants"]) >= 2) or
-            t.get("duration", 0) > 30)
+        if (t.get("participants_count", 0) >= 2
+            or (t.get("participants") and len(t["participants"]) >= 2)
+            or t.get("duration", 0) > 30)
     ]
     if not relevant:
-        relevant = transcripts  # fall back to all if none qualify
+        relevant = transcripts
 
     relevant.sort(key=lambda t: t.get("start_ts", 0))
 
-    parts: list[str] = []
-    for t in relevant:
-        text = ""
-        if t.get("transcript"):
-            text = t["transcript"]
-        elif t.get("text"):
-            text = t["text"]
-        elif t.get("vtt_url"):
-            # Fetch and parse the VTT file
-            try:
-                async with httpx.AsyncClient() as client:
-                    vtt_resp = await client.get(t["vtt_url"])
-                if vtt_resp.is_success:
-                    text = _parse_vtt(vtt_resp.text)
-                    logger.info(f"Parsed VTT transcript for session {t.get('id')}: {len(text)} chars")
-            except Exception as exc:
-                logger.warning(f"Failed to fetch VTT for session {t.get('id')}: {exc}")
+    # Extract text from each transcript; fetch VTT files in parallel
+    vtt_tasks: list[tuple[int, asyncio.Task]] = []
+    texts: list[str | None] = []
 
-        if text.strip():
-            from datetime import datetime, timezone
+    for i, t in enumerate(relevant):
+        if t.get("transcript"):
+            texts.append(t["transcript"])
+        elif t.get("text"):
+            texts.append(t["text"])
+        elif t.get("vtt_url"):
+            texts.append(None)  # placeholder
+            task = asyncio.create_task(_fetch_vtt(t["vtt_url"], t.get("id", str(i))))
+            vtt_tasks.append((i, task))
+        else:
+            texts.append("")
+
+    # Await all VTT fetches concurrently
+    for idx, task in vtt_tasks:
+        texts[idx] = await task
+
+    # Combine non-empty segments
+    parts: list[str] = []
+    for t, text in zip(relevant, texts):
+        if text and text.strip():
             ts_label = (
                 datetime.fromtimestamp(t["start_ts"], tz=timezone.utc).strftime("%d/%m/%Y %H:%M")
                 if t.get("start_ts") else "Session"
@@ -347,9 +349,7 @@ async def process_meeting(req: ProcessMeetingRequest) -> dict[str, Any]:
     """
     Single-attempt transcript fetch + Gemini summary.
     Returns {"transcript": "...", "summary": "...", "ready": bool}.
-    The frontend is responsible for the retry loop (calling this every 2 min).
     """
-    # 1. Fetch transcript
     result = await get_transcript(
         room_id=req.roomId,
         appointment_date=req.appointmentDate,
@@ -361,7 +361,6 @@ async def process_meeting(req: ProcessMeetingRequest) -> dict[str, Any]:
 
     transcript = result["transcript"]
 
-    # 2. Generate summary via Gemini (reuse existing Vertex AI setup)
     try:
         import vertexai
         from vertexai.generative_models import GenerationConfig, GenerativeModel
@@ -383,8 +382,9 @@ Génère un résumé en français avec les sections : Contexte, Points clés, D�
             settings.GEMINI_FLASH_MODEL,
             generation_config=GenerationConfig(temperature=0.3, max_output_tokens=2048),
         )
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
+        response = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: model.generate_content(prompt)
+        )
         summary = response.text.strip()
         logger.info(f"Meeting summary generated ({len(summary)} chars)")
     except Exception as exc:
