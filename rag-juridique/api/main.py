@@ -11,14 +11,20 @@ Point d'entrée principal de l'API exposant les 5 piliers :
 Documentation : http://localhost:8000/docs
 """
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+
 from loguru import logger
+
+# Supabase config — read from env vars at runtime (set in Cloud Run service config)
+# Supports both _VITE_SUPABASE_URL (Cloud Build substitution style) and VITE_SUPABASE_URL
+_SUPABASE_URL = os.environ.get('_VITE_SUPABASE_URL') or os.environ.get('VITE_SUPABASE_URL', '')
+_SUPABASE_ANON_KEY = os.environ.get('_VITE_SUPABASE_ANON_KEY') or os.environ.get('VITE_SUPABASE_ANON_KEY', '')
 
 from api.routes import (
     audit,
@@ -195,12 +201,29 @@ app.include_router(
 )
 
 
-# Serve React static build — must be mounted LAST (catches all remaining routes)
+# Serve React static build — catch-all injects runtime config into index.html
 _static_dir = Path(__file__).parent.parent / "static"
-if _static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")
-else:
-    logger.warning(f"⚠️ Répertoire static introuvable : {_static_dir} (normal en dev)")
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_spa(full_path: str):
+    if not _static_dir.exists():
+        return JSONResponse({"error": "static dir not found"}, status_code=404)
+    # Serve static assets (JS, CSS, images, fonts) directly
+    static_file = _static_dir / full_path
+    if static_file.exists() and static_file.is_file():
+        return FileResponse(str(static_file))
+    # For all SPA routes, serve index.html with runtime config injected
+    index_path = _static_dir / "index.html"
+    if not index_path.exists():
+        return JSONResponse({"error": "index.html not found"}, status_code=404)
+    content = index_path.read_text()
+    config_script = (
+        f'<script>window.__JURILAB_CONFIG__='
+        f'{{supabaseUrl:"{_SUPABASE_URL}",'
+        f'supabaseAnonKey:"{_SUPABASE_ANON_KEY}"}}</script>'
+    )
+    content = content.replace("</head>", config_script + "</head>", 1)
+    return HTMLResponse(content=content)
 
 
 # Gestionnaire d'erreurs global
