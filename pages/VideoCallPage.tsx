@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { generateToken, generateGuestToken } from '../services/dailyService';
 import { processCompletedMeeting } from '../services/meetingProcessor';
-import { getLawyerById } from '../services/firebaseService';
+import { getLawyerById } from '../services/supabaseService';
 import { UserRole } from '../types';
 import { X, AlertCircle } from 'lucide-react';
 import DailyIframe, { DailyCall, DailyEvent, DailyEventObject, DailyParticipant } from '@daily-co/daily-js';
@@ -357,7 +357,7 @@ const VideoCallPage: React.FC = () => {
     // Process transcript and generate summary
     if (appointmentId && currentUser) {
       try {
-        const { getAllAppointments } = await import('../services/firebaseService');
+        const { getAllAppointments } = await import('../services/supabaseService');
         const appointments = await getAllAppointments();
         const appointment = appointments.find(a => a.id === appointmentId);
 
@@ -456,7 +456,7 @@ const VideoCallPage: React.FC = () => {
     if (!appointmentId) return;
 
     try {
-      const { getAllAppointments } = await import('../services/firebaseService');
+      const { getAllAppointments } = await import('../services/supabaseService');
       const appointments = await getAllAppointments();
       const appointment = appointments.find(a => a.id === appointmentId);
 

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { LegalSpecialty, UserRole, Lawyer } from '../types';
 import { Button } from '../components/Button';
-import { registerLawyer, getAuthErrorMessage } from '../services/firebaseService';
+import { registerLawyer, getAuthErrorMessage } from '../services/supabaseService';
 import {
   User, Briefcase, MapPin, DollarSign, Languages,
   FileText, Upload, Check, ChevronRight, ChevronLeft,

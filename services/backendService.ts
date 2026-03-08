@@ -2,21 +2,7 @@
  * Backend Service - Manages conversations and AI interactions
  */
 
-import { db } from '../firebaseConfig';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-  Timestamp,
-} from 'firebase/firestore';
+import { supabase } from '../supabaseClient';
 import { sendMessageToGemini } from './geminiService';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -49,159 +35,98 @@ interface ContextData {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// FIRESTORE OPERATIONS
+// SUPABASE OPERATIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Get all conversations for a lawyer
- */
+function rowToConversation(row: any): Conversation {
+  return {
+    id: row.id,
+    lawyerId: row.user_id,
+    title: row.title || 'Nouvelle conversation',
+    messages: row.messages || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export async function getConversations(lawyerId: string): Promise<Conversation[]> {
-  try {
-    const conversationsRef = collection(db, 'conversations');
-    const q = query(
-      conversationsRef,
-      where('lawyerId', '==', lawyerId),
-      orderBy('updatedAt', 'desc')
-    );
-    
-    const snapshot = await getDocs(q);
-    const conversations: Conversation[] = [];
-    
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      conversations.push({
-        id: doc.id,
-        lawyerId: data.lawyerId,
-        title: data.title,
-        messages: data.messages || {},
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      });
-    });
-    
-    return conversations;
-  } catch (error) {
-    console.error('Error getting conversations:', error);
-    throw new Error('Failed to load conversations');
-  }
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('user_id', lawyerId)
+    .order('updated_at', { ascending: false });
+
+  if (error) throw new Error('Failed to load conversations');
+  return (data || []).map(rowToConversation);
 }
 
-/**
- * Get a single conversation by ID
- */
 export async function getConversation(conversationId: string): Promise<Conversation | null> {
-  try {
-    const docRef = doc(db, 'conversations', conversationId);
-    const docSnap = await getDoc(docRef);
-    
-    if (!docSnap.exists()) {
-      return null;
-    }
-    
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      lawyerId: data.lawyerId,
-      title: data.title,
-      messages: data.messages || {},
-      createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      updatedAt: data.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error('Error getting conversation:', error);
-    throw new Error('Failed to load conversation');
-  }
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('id', conversationId)
+    .single();
+
+  if (error || !data) return null;
+  return rowToConversation(data);
 }
 
-/**
- * Create a new conversation
- */
 export async function createConversation(lawyerId: string, title: string): Promise<Conversation> {
-  try {
-    const conversationsRef = collection(db, 'conversations');
-    const now = serverTimestamp();
-    
-    const docRef = await addDoc(conversationsRef, {
-      lawyerId,
-      title,
-      messages: {},
-      createdAt: now,
-      updatedAt: now,
-    });
-    
-    return {
-      id: docRef.id,
-      lawyerId,
-      title,
-      messages: {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error('Error creating conversation:', error);
-    throw new Error('Failed to create conversation');
-  }
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert({ user_id: lawyerId, title, messages: [] })
+    .select()
+    .single();
+
+  if (error) throw new Error('Failed to create conversation');
+  return rowToConversation(data);
 }
 
-/**
- * Update conversation title
- */
 export async function updateConversationTitle(conversationId: string, title: string): Promise<void> {
-  try {
-    const docRef = doc(db, 'conversations', conversationId);
-    await updateDoc(docRef, {
-      title,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error('Error updating conversation title:', error);
-    throw new Error('Failed to update conversation title');
-  }
+  const { error } = await supabase
+    .from('conversations')
+    .update({ title })
+    .eq('id', conversationId);
+  if (error) throw new Error('Failed to update conversation title');
 }
 
-/**
- * Delete a conversation
- */
 export async function deleteConversation(conversationId: string): Promise<void> {
-  try {
-    const docRef = doc(db, 'conversations', conversationId);
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error('Error deleting conversation:', error);
-    throw new Error('Failed to delete conversation');
-  }
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', conversationId);
+  if (error) throw new Error('Failed to delete conversation');
 }
 
-/**
- * Add a message to a conversation
- */
 async function addMessageToConversation(
   conversationId: string,
   role: 'user' | 'model',
   text: string
 ): Promise<ConversationMessage> {
-  try {
-    const docRef = doc(db, 'conversations', conversationId);
-    const messageId = Date.now().toString();
-    const timestamp = new Date().toISOString();
-    
-    const message: ConversationMessage = {
-      id: messageId,
-      role,
-      text,
-      timestamp,
-    };
-    
-    await updateDoc(docRef, {
-      [`messages.${messageId}`]: message,
-      updatedAt: serverTimestamp(),
-    });
-    
-    return message;
-  } catch (error) {
-    console.error('Error adding message to conversation:', error);
-    throw new Error('Failed to add message');
-  }
+  const message: ConversationMessage = {
+    id: Date.now().toString(),
+    role,
+    text,
+    timestamp: new Date().toISOString(),
+  };
+
+  // messages is a JSONB array — fetch current, append, update
+  const { data: current } = await supabase
+    .from('conversations')
+    .select('messages')
+    .eq('id', conversationId)
+    .single();
+
+  const messages = Array.isArray(current?.messages) ? current.messages : [];
+  messages.push(message);
+
+  const { error } = await supabase
+    .from('conversations')
+    .update({ messages })
+    .eq('id', conversationId);
+
+  if (error) throw new Error('Failed to add message');
+  return message;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -223,8 +148,8 @@ export async function* sendMessageStream(
     
     // Get conversation history
     const conversation = await getConversation(conversationId);
-    const history = conversation?.messages 
-      ? Object.values(conversation.messages).sort((a, b) => 
+    const history: ConversationMessage[] = Array.isArray(conversation?.messages)
+      ? (conversation.messages as ConversationMessage[]).sort((a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         )
       : [];

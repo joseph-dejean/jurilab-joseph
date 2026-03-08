@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, ExternalLink, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Button } from './Button';
 import { useApp } from '../store/store';
-import { OAuthProvider, linkWithPopup, reauthenticateWithPopup, signInWithPopup } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { supabase } from '../supabaseClient';
 import {
   getOutlookCalendarCredentials,
   disconnectOutlookCalendar,
   saveOutlookCalendarCredentials,
-} from '../services/firebaseService';
+} from '../services/supabaseService';
 import { getOutlookCalendarList, refreshOutlookAccessToken } from '../services/outlookCalendarService';
 
 interface OutlookCalendarConnectionProps {
@@ -31,7 +30,22 @@ export const OutlookCalendarConnection: React.FC<OutlookCalendarConnectionProps>
   const [lastSync, setLastSync] = useState<string | null>(null);
 
   useEffect(() => {
-    loadConnectionStatus();
+    const handleOAuthCallback = async () => {
+      const calendarConnect = localStorage.getItem('jurilab_calendar_connect');
+      if (calendarConnect === 'outlook') {
+        localStorage.removeItem('jurilab_calendar_connect');
+        localStorage.removeItem('jurilab_calendar_lawyer_id');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.provider_token) {
+          await saveOutlookCalendarCredentials(lawyerId, {
+            accessToken: session.provider_token,
+            refreshToken: session.provider_refresh_token ?? undefined,
+          });
+        }
+      }
+      loadConnectionStatus();
+    };
+    handleOAuthCallback();
   }, [lawyerId]);
 
   const loadConnectionStatus = async () => {
@@ -89,7 +103,7 @@ export const OutlookCalendarConnection: React.FC<OutlookCalendarConnectionProps>
   };
 
   const handleConnect = async () => {
-    if (!auth.currentUser) {
+    if (!currentUser) {
       alert('Vous devez être connecté pour connecter votre calendrier.');
       return;
     }
@@ -97,76 +111,35 @@ export const OutlookCalendarConnection: React.FC<OutlookCalendarConnectionProps>
     try {
       setIsConnecting(true);
 
-      // Créer un provider Microsoft avec les scopes Calendar
-      const provider = new OAuthProvider('microsoft.com');
-      provider.addScope('https://graph.microsoft.com/Calendars.ReadWrite');
-      provider.addScope('https://graph.microsoft.com/User.Read');
-      provider.addScope('offline_access');
-      provider.setCustomParameters({
-        prompt: 'consent',
-      });
-
-      let result;
-      let credential;
-
-      // Vérifier si l'utilisateur est déjà connecté avec Microsoft
-      const isMicrosoftUser = auth.currentUser.providerData.some(
-        (providerData) => providerData.providerId === 'microsoft.com'
-      );
-
-      if (isMicrosoftUser) {
-        try {
-          result = await reauthenticateWithPopup(auth.currentUser, provider);
-          credential = OAuthProvider.credentialFromResult(result);
-        } catch (reauthError: any) {
-          if (reauthError.code === 'auth/popup-closed-by-user') {
-            throw reauthError;
-          }
-          console.log('⚠️ Reauthentication failed, trying signInWithPopup...');
-          result = await signInWithPopup(auth, provider);
-          credential = OAuthProvider.credentialFromResult(result);
-        }
-      } else {
-        try {
-          result = await linkWithPopup(auth.currentUser, provider);
-          credential = OAuthProvider.credentialFromResult(result);
-        } catch (linkError: any) {
-          if (linkError.code === 'auth/credential-already-in-use') {
-            alert('Votre compte Microsoft est déjà lié. Si vous avez besoin de mettre à jour le token, veuillez vous déconnecter et vous reconnecter avec Microsoft.');
-            return;
-          } else if (linkError.code === 'auth/popup-closed-by-user') {
-            throw linkError;
-          } else {
-            // Essayer signInWithPopup comme fallback
-            result = await signInWithPopup(auth, provider);
-            credential = OAuthProvider.credentialFromResult(result);
-          }
-        }
+      // Check if we already have a valid provider token from the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.provider_token) {
+        await saveOutlookCalendarCredentials(lawyerId, {
+          accessToken: session.provider_token,
+          refreshToken: session.provider_refresh_token ?? undefined,
+        });
+        await loadConnectionStatus();
+        alert('Calendrier Outlook connecté avec succès !');
+        return;
       }
 
-      if (!credential || !credential.accessToken) {
-        throw new Error("Impossible de récupérer le token d'accès Microsoft");
-      }
+      // Store lawyerId so we can save credentials after OAuth redirect
+      localStorage.setItem('jurilab_calendar_connect', 'outlook');
+      localStorage.setItem('jurilab_calendar_lawyer_id', lawyerId);
 
-      console.log('✅ Outlook Calendar token obtained');
-
-      // Sauvegarder les credentials
-      await saveOutlookCalendarCredentials(lawyerId, {
-        accessToken: credential.accessToken,
-        // Le refresh token n'est pas toujours disponible depuis Firebase Auth
+      // Redirect to Microsoft OAuth with calendar scopes
+      await supabase.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          scopes: 'https://graph.microsoft.com/Calendars.ReadWrite https://graph.microsoft.com/User.Read offline_access',
+          redirectTo: window.location.href,
+          queryParams: { prompt: 'consent' },
+        },
       });
-
-      await loadConnectionStatus();
-      alert('Calendrier Outlook connecté avec succès !');
+      // Page will redirect — no code after this point executes
     } catch (error: any) {
       console.error('❌ Error connecting Outlook Calendar:', error);
-
-      if (error.code === 'auth/popup-closed-by-user') {
-        alert('La connexion a été annulée.');
-      } else {
-        alert('Erreur lors de la connexion : ' + (error.message || 'Erreur inconnue'));
-      }
-    } finally {
+      alert('Erreur lors de la connexion : ' + (error.message || 'Erreur inconnue'));
       setIsConnecting(false);
     }
   };

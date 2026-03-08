@@ -17,7 +17,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { processCompletedMeeting } from '../services/meetingProcessor';
-import { getLawyerById } from '../services/firebaseService';
+import { getLawyerById } from '../services/supabaseService';
 import { useApp } from '../store/store';
 
 interface MeetingSummaryProps {
@@ -46,7 +46,7 @@ export const MeetingSummary: React.FC<MeetingSummaryProps> = ({
 
     setIsSharing(true);
     try {
-      const { shareSummaryWithClient: shareFunction } = await import('../services/firebaseService');
+      const { shareSummaryWithClient: shareFunction } = await import('../services/supabaseService');
       await shareFunction(appointment.id);
       
       if (onSummaryShared) {

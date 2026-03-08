@@ -26,7 +26,7 @@ import {
   createPersonalEvent,
   updatePersonalEvent,
   deletePersonalEvent,
-} from './firebaseService';
+} from './supabaseService';
 
 // Types pour le calendrier unifié
 export interface UnifiedCalendarEvent {

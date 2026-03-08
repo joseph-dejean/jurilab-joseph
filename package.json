@@ -7,9 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "upload-firebase": "node scripts/uploadToFirebase.cjs",
-    "deploy": "npm run build && firebase deploy --only hosting",
-    "deploy:all": "npm run build && firebase deploy"
+    "deploy": "npm run build"
   },
   "dependencies": {
     "@daily-co/daily-js": "^0.87.0",
@@ -21,6 +19,7 @@
     "@google/generative-ai": "^0.24.1",
     "@mistralai/mistralai": "^1.14.0",
     "@mlc-ai/web-llm": "^0.2.80",
+    "@supabase/supabase-js": "^2.98.0",
     "@types/file-saver": "^2.0.7",
     "@types/papaparse": "^5.5.0",
     "@types/react-big-calendar": "^1.16.3",
@@ -32,9 +31,6 @@
     "docx": "^9.5.1",
     "dotenv": "^17.2.3",
     "file-saver": "^2.0.5",
-    "firebase": "^12.6.0",
-    "firebase-admin": "^13.6.0",
-    "firebase-functions": "^7.0.0",
     "jose": "^6.1.2",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.553.0",

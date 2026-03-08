@@ -7,21 +7,11 @@ steps:
       - 'europe-west1-docker.pkg.dev/$PROJECT_ID/jurilab/jurilab-app:$COMMIT_SHA'
       - '-t'
       - 'europe-west1-docker.pkg.dev/$PROJECT_ID/jurilab/jurilab-app:latest'
-      # Firebase public config (not secrets — secured by Firebase Security Rules)
+      # Supabase public config (anon key is safe in browser — RLS enforces security)
       - '--build-arg'
-      - 'VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}'
+      - 'VITE_SUPABASE_URL=${_VITE_SUPABASE_URL}'
       - '--build-arg'
-      - 'VITE_FIREBASE_AUTH_DOMAIN=${_VITE_FIREBASE_AUTH_DOMAIN}'
-      - '--build-arg'
-      - 'VITE_FIREBASE_PROJECT_ID=${_VITE_FIREBASE_PROJECT_ID}'
-      - '--build-arg'
-      - 'VITE_FIREBASE_STORAGE_BUCKET=${_VITE_FIREBASE_STORAGE_BUCKET}'
-      - '--build-arg'
-      - 'VITE_FIREBASE_MESSAGING_SENDER_ID=${_VITE_FIREBASE_MESSAGING_SENDER_ID}'
-      - '--build-arg'
-      - 'VITE_FIREBASE_APP_ID=${_VITE_FIREBASE_APP_ID}'
-      - '--build-arg'
-      - 'VITE_FIREBASE_DATABASE_URL=${_VITE_FIREBASE_DATABASE_URL}'
+      - 'VITE_SUPABASE_ANON_KEY=${_VITE_SUPABASE_ANON_KEY}'
       # Google APIs — browser keys (restrict by HTTP referrer in GCP Console)
       - '--build-arg'
       - 'VITE_GOOGLE_CLIENT_ID=${_VITE_GOOGLE_CLIENT_ID}'
@@ -34,7 +24,6 @@ steps:
       - 'VITE_STREAM_API_KEY=${_VITE_STREAM_API_KEY}'
       # NOTE: VITE_GEMINI_API_KEY intentionally removed — Gemini uses ADC on the backend
       # NOTE: VITE_DAILY_API_KEY intentionally removed — Daily.co calls proxied through FastAPI backend
-      # NOTE: VITE_GOOGLE_CLIENT_SECRET intentionally removed — OAuth secrets must not be in the browser
       - '.'
 
   # Push image to Artifact Registry
@@ -49,9 +38,10 @@ steps:
       - 'europe-west1-docker.pkg.dev/$PROJECT_ID/jurilab/jurilab-app:latest'
 
   # Deploy to Cloud Run
-  # The service account must have:
-  #   - roles/aiplatform.user        (Vertex AI / Gemini via ADC)
-  #   - roles/discoveryengine.viewer (Vertex AI Search via ADC)
+  # Cloud Run service account must have (run scripts/setup-gcp.sh once):
+  #   - roles/aiplatform.user           (Vertex AI / Gemini via ADC)
+  #   - roles/discoveryengine.viewer    (Vertex AI Search via ADC)
+  #   - roles/secretmanager.secretAccessor  (read secrets at runtime)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -75,9 +65,13 @@ steps:
       - '0'
       - '--max-instances'
       - '10'
-      # Runtime env vars for the Python backend (not baked into the image)
+      # Non-sensitive runtime env vars
       - '--set-env-vars'
-      - 'GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=europe-west1,PISTE_CLIENT_ID=${_PISTE_CLIENT_ID},PISTE_CLIENT_SECRET=${_PISTE_CLIENT_SECRET},DAILY_API_KEY=${_DAILY_API_KEY}'
+      - 'GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=europe-west1'
+      # Sensitive secrets — fetched from Secret Manager at container startup.
+      # Create secrets once with: scripts/setup-gcp.sh
+      - '--set-secrets'
+      - 'DAILY_API_KEY=jurilab-daily-api-key:latest,PISTE_CLIENT_ID=jurilab-piste-client-id:latest,PISTE_CLIENT_SECRET=jurilab-piste-client-secret:latest'
 
 images:
   - 'europe-west1-docker.pkg.dev/$PROJECT_ID/jurilab/jurilab-app:$COMMIT_SHA'
@@ -88,18 +82,10 @@ options:
 
 # Substitution variables — set in Cloud Build trigger
 substitutions:
-  _VITE_FIREBASE_API_KEY: ''
-  _VITE_FIREBASE_AUTH_DOMAIN: ''
-  _VITE_FIREBASE_PROJECT_ID: ''
-  _VITE_FIREBASE_STORAGE_BUCKET: ''
-  _VITE_FIREBASE_MESSAGING_SENDER_ID: ''
-  _VITE_FIREBASE_APP_ID: ''
-  _VITE_FIREBASE_DATABASE_URL: ''
+  _VITE_SUPABASE_URL: ''
+  _VITE_SUPABASE_ANON_KEY: ''
   _VITE_GOOGLE_CLIENT_ID: ''
   _VITE_GOOGLE_DEVELOPER_KEY: ''
   _VITE_GOOGLE_APP_ID: ''
   _VITE_STREAM_API_KEY: ''
-  # Backend-only secrets (not in the browser bundle)
-  _PISTE_CLIENT_ID: ''
-  _PISTE_CLIENT_SECRET: ''
-  _DAILY_API_KEY: ''
+  # Backend-only secrets come from Secret Manager via --set-secrets above.

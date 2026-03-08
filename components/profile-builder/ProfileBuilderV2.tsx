@@ -24,7 +24,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProfileBlock, ProfileBlockType, UserRole, Lawyer } from '../../types';
 import { useApp } from '../../store/store';
-import { getLawyerById, updateLawyerProfileConfig } from '../../services/firebaseService';
+import { getLawyerById, updateLawyerProfileConfig } from '../../services/supabaseService';
 
 // New V2 components
 import { ProfileCanvas } from './Canvas/ProfileCanvas';

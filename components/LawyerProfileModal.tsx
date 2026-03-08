@@ -8,7 +8,7 @@ import { Star, X, Briefcase, Languages, Clock, MessageSquare, Paperclip, LogIn, 
 import { format, addDays, setHours, setMinutes, setSeconds, isPast, startOfDay, isSameDay, parseISO, getDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
-import { getGoogleCalendarCredentials } from '../services/firebaseService';
+import { getGoogleCalendarCredentials } from '../services/supabaseService';
 import { getAvailableSlots, refreshGoogleAccessToken, isSlotInAvailabilityHours } from '../services/googleCalendarService';
 
 // Map day index (0-6, Sunday-Saturday) to availability key

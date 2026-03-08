@@ -27,7 +27,7 @@ import { Button } from '../components/Button';
 import { DiligenceTracker } from '../components/DiligenceTracker';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { getClientById } from '../services/firebaseService';
+import { getClientById } from '../services/supabaseService';
 
 interface ClientPortfolioData {
     id: string;
