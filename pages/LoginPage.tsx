@@ -139,7 +139,7 @@ export const LoginPage: React.FC = () => {
     } catch (error: any) {
       console.error(error);
       setAuthStatus('error');
-      if (error.code !== 'auth/popup-closed-by-user') {
+      if (error.message !== 'popup_closed_by_user') {
         setErrors({ form: getAuthErrorMessage(error) });
       }
       setIsLoading(false);
@@ -167,7 +167,7 @@ export const LoginPage: React.FC = () => {
     } catch (error: any) {
       console.error(error);
       setAuthStatus('error');
-      if (error.code !== 'auth/popup-closed-by-user') {
+      if (error.message !== 'popup_closed_by_user') {
         setErrors({ form: getAuthErrorMessage(error) });
       }
       setIsLoading(false);

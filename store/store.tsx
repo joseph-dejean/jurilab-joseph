@@ -379,7 +379,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
               }
 
               if (userProfile) {
-              // Block disabled accounts (app-level). They can still sign-in to Firebase Auth,
+              // Block disabled accounts (app-level). They can still sign-in to Supabase Auth,
               // but we immediately sign them out and deny access to the UI.
               if ((userProfile as any).disabled === true) {
                 alert("Ce compte a été désactivé. Contactez le support si besoin.");
@@ -535,7 +535,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     return () => unsubscribe();
   }, [currentUser]);
 
-  // Load lawyers from Firebase with IndexedDB caching (for large datasets)
+  // Load lawyers from Supabase with IndexedDB caching (for large datasets)
   useEffect(() => {
     const DB_NAME = 'jurilab_cache';
     const STORE_NAME = 'lawyers';
