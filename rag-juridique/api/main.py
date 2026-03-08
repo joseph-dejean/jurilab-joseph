@@ -52,8 +52,14 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 DÉMARRAGE DE L'API LEGAL-RAG FRANCE")
     logger.info("="*70)
     logger.info(f"📍 Environnement : {settings.LOG_LEVEL}")
-    logger.info(f"📊 GCP Project : {settings.GCP_PROJECT_ID}")
+    logger.info(f"📊 GCP Project : {settings.GCP_PROJECT_ID or '(not set)'}")
     logger.info(f"🤖 Gemini Model : {settings.GEMINI_PRO_MODEL}")
+    if settings.GCP_PROJECT_ID:
+        import vertexai
+        vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
+        logger.success("✅ Vertex AI initialisé")
+    else:
+        logger.warning("⚠️ GCP_PROJECT_ID non configuré — Vertex AI désactivé")
     logger.success("✅ API prête à recevoir des requêtes")
     logger.info("="*70)
     

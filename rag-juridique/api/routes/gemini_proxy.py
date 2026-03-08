@@ -22,7 +22,9 @@ from config.settings import get_settings
 settings = get_settings()
 
 # Init Vertex AI once at module load (uses ADC automatically on Cloud Run)
-vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
+# Guard against empty GCP_PROJECT_ID so the app still starts without it configured
+if settings.GCP_PROJECT_ID:
+    vertexai.init(project=settings.GCP_PROJECT_ID, location=settings.GCP_REGION)
 
 router = APIRouter()
 
