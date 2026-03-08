@@ -122,34 +122,6 @@ app.add_middleware(
 )
 
 
-# Route racine
-@app.get("/", tags=["Root"])
-async def root():
-    """
-    Point d'entrée racine de l'API
-    
-    Returns:
-        Message de bienvenue et liens utiles
-    """
-    return {
-        "message": "🎯 LEGAL-RAG FRANCE API",
-        "version": "1.0.0",
-        "status": "operational",
-        "documentation": "/docs",
-        "pillars": {
-            "pillar_1": "/api/v1/machine-actes",
-            "pillar_2": "/api/v1/search",
-            "pillar_3": "/api/v1/audit",
-            "pillar_4": "/api/v1/synthese",
-            "pillar_5": "/api/v1/chat",
-        },
-        "resources": {
-            "templates": "/api/v1/templates",
-            "downloads": "/api/v1/download",
-        }
-    }
-
-
 # Health check
 @app.get("/health", tags=["Health"])
 async def health_check():
