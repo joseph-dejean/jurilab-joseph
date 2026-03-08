@@ -99,7 +99,7 @@ export const LegalChatbot: React.FC = () => {
 
     const history = historyMessages.map(m => ({
       role: m.role,
-      parts: [{ text: m.text }]
+      text: m.text,
     }));
 
     try {

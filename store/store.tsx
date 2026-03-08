@@ -586,30 +586,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           }
         }
         
-        // No valid cache, load from Firebase
-        console.log("🔥 Loading lawyers from Firebase...");
+        // No valid cache, load from Supabase
+        console.log("🗄️ Loading lawyers from Supabase...");
         const lawyersData = await loadLawyersFromFirebase();
 
         if (lawyersData.length === 0) {
           console.warn(
-            "⚠️ No lawyers in Firebase yet. You need to upload the CSV first."
+            "⚠️ No lawyers in Supabase yet. You need to upload the CSV first."
           );
         } else {
           setLawyers(lawyersData);
-          console.log(`✅ Loaded ${lawyersData.length} lawyers from Firebase`);
-          
+          console.log(`✅ Loaded ${lawyersData.length} lawyers from Supabase`);
+
           // Cache the data to IndexedDB (no size limit like localStorage)
           await setCachedLawyers(lawyersData);
           console.log("💾 Lawyers data cached to IndexedDB");
         }
       } catch (error) {
-        console.error("❌ Failed to load lawyers from Firebase:", error);
-        
+        console.error("❌ Failed to load lawyers from Supabase:", error);
+
         // Try to use cached data as fallback
         try {
           const cached = await getCachedLawyers();
           if (cached && cached.lawyers && cached.lawyers.length > 0) {
-            console.log(`⚠️ Using stale cache (${cached.lawyers.length} lawyers) due to Firebase error`);
+            console.log(`⚠️ Using stale cache (${cached.lawyers.length} lawyers) due to Supabase error`);
             setLawyers(cached.lawyers);
           }
         } catch (cacheError) {

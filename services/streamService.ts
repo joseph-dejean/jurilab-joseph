@@ -5,10 +5,12 @@
 
 import { StreamChat, Channel, User as StreamUser } from 'stream-chat';
 
-// Configuration depuis les variables d'environnement
-const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY || '';
+// Configuration depuis les variables d'environnement (build-time)
+// avec fallback sur la config injectée par FastAPI au runtime (window.__JURILAB_CONFIG__)
+const _runtimeConfig = (window as any).__JURILAB_CONFIG__ ?? {};
+const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY || _runtimeConfig.streamApiKey || '';
 const STREAM_API_SECRET = import.meta.env.VITE_STREAM_API_SECRET || '';
-const STREAM_APP_ID = import.meta.env.VITE_STREAM_APP_ID || '';
+const STREAM_APP_ID = import.meta.env.VITE_STREAM_APP_ID || _runtimeConfig.streamAppId || '';
 
 // Debug log
 if (typeof window !== 'undefined') {

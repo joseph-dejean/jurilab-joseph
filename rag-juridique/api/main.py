@@ -21,10 +21,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from loguru import logger
 
-# Supabase config — read from env vars at runtime (set in Cloud Run service config)
-# Supports both _VITE_SUPABASE_URL (Cloud Build substitution style) and VITE_SUPABASE_URL
+# Frontend config — read from env vars at runtime (set in Cloud Run service config)
+# Supports both _VITE_* (Cloud Build substitution style) and VITE_* names
 _SUPABASE_URL = os.environ.get('_VITE_SUPABASE_URL') or os.environ.get('VITE_SUPABASE_URL', '')
 _SUPABASE_ANON_KEY = os.environ.get('_VITE_SUPABASE_ANON_KEY') or os.environ.get('VITE_SUPABASE_ANON_KEY', '')
+_STREAM_API_KEY = os.environ.get('_VITE_STREAM_API_KEY') or os.environ.get('VITE_STREAM_API_KEY', '')
+_STREAM_APP_ID = os.environ.get('_VITE_STREAM_APP_ID') or os.environ.get('VITE_STREAM_APP_ID', '')
 
 from api.routes import (
     audit,
@@ -220,7 +222,9 @@ async def serve_spa(full_path: str):
     config_script = (
         f'<script>window.__JURILAB_CONFIG__='
         f'{{supabaseUrl:"{_SUPABASE_URL}",'
-        f'supabaseAnonKey:"{_SUPABASE_ANON_KEY}"}}</script>'
+        f'supabaseAnonKey:"{_SUPABASE_ANON_KEY}",'
+        f'streamApiKey:"{_STREAM_API_KEY}",'
+        f'streamAppId:"{_STREAM_APP_ID}"}}</script>'
     )
     content = content.replace("</head>", config_script + "</head>", 1)
     return HTMLResponse(content=content)
