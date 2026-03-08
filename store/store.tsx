@@ -12,7 +12,7 @@ import {
   checkAppointmentConflict,
   createAppointment,
   getUserProfile,
-  loadLawyersFromFirebase,
+  loadLawyers,
   loginUser,
   loginWithGoogle,
   loginWithMicrosoft,
@@ -459,9 +459,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
               // const userAppointments = await getUserAppointments(userProfile.id, userProfile.role);
               // setAppointments(userAppointments);
             } else {
-              // Fallback if profile creation is delayed (trigger may not have fired yet)
-              console.warn("⚠️ User profile not found in DB immediately. UID:", supabaseUser.id);
-              // Retry logic could go here, but for now relying on create logic to have finished
+              // New OAuth user — trigger created profiles row but clients row may be missing
+              console.warn("⚠️ User profile not found after retries. Creating for OAuth user:", supabaseUser.id);
+              const pendingRole = localStorage.getItem('jurilab_pending_role') as UserRole || UserRole.CLIENT;
+              localStorage.removeItem('jurilab_pending_role');
+              try {
+                // Ensure profiles row exists (trigger may have failed)
+                await supabase.from('profiles').upsert({
+                  id: supabaseUser.id,
+                  email: supabaseUser.email,
+                  name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
+                  role: pendingRole,
+                }, { onConflict: 'id' });
+                // Create role-specific row
+                if (pendingRole === UserRole.LAWYER) {
+                  await supabase.from('lawyers').upsert({ id: supabaseUser.id, specialty: 'General Practice', bio: '', location: '' }, { onConflict: 'id' });
+                } else {
+                  await supabase.from('clients').upsert({ id: supabaseUser.id }, { onConflict: 'id' });
+                }
+                // Re-fetch profile
+                const newProfile = await getUserProfile(supabaseUser.id);
+                if (newProfile) {
+                  console.log("✅ OAuth user profile created:", newProfile.name);
+                  setCurrentUser(newProfile);
+                }
+              } catch (createError) {
+                console.error("❌ Failed to create OAuth user profile:", createError);
+              }
             }
           } catch (e) {
             console.error("❌ Error fetching user profile:", e);
@@ -588,7 +612,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         
         // No valid cache, load from Supabase
         console.log("🗄️ Loading lawyers from Supabase...");
-        const lawyersData = await loadLawyersFromFirebase();
+        const lawyersData = await loadLawyers();
 
         if (lawyersData.length === 0) {
           console.warn(
@@ -622,7 +646,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     const refreshLawyersInBackground = async () => {
       try {
-        const lawyersData = await loadLawyersFromFirebase();
+        const lawyersData = await loadLawyers();
         if (lawyersData.length > 0) {
           setLawyers(lawyersData);
           await setCachedLawyers(lawyersData);

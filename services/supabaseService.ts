@@ -122,7 +122,7 @@ export const uploadFileToStorage = async (file: File, path: string): Promise<str
 // LAWYERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const loadLawyersFromFirebase = async (): Promise<Lawyer[]> => {
+export const loadLawyers = async (): Promise<Lawyer[]> => {
   const { data, error } = await supabase
     .from('lawyers')
     .select('*, profiles(*)');
@@ -137,7 +137,7 @@ export const loadLawyersFromFirebase = async (): Promise<Lawyer[]> => {
 
 export const subscribeToLawyers = (callback: (lawyers: Lawyer[]) => void) => {
   const fetch = async () => {
-    const lawyers = await loadLawyersFromFirebase().catch(() => []);
+    const lawyers = await loadLawyers().catch(() => []);
     callback(lawyers);
   };
 
@@ -151,7 +151,7 @@ export const subscribeToLawyers = (callback: (lawyers: Lawyer[]) => void) => {
   return () => { supabase.removeChannel(channel); };
 };
 
-export const uploadLawyersToFirebase = async (lawyers: Lawyer[]): Promise<void> => {
+export const uploadLawyers = async (lawyers: Lawyer[]): Promise<void> => {
   for (const lawyer of lawyers) {
     // Upsert profile
     await supabase.from('profiles').upsert({
@@ -207,8 +207,8 @@ export const getClientById = async (clientId: string): Promise<Client | User | n
   return getUserProfile(clientId);
 };
 
-export const addLawyerToFirebase = async (lawyer: Lawyer): Promise<void> => {
-  await uploadLawyersToFirebase([lawyer]);
+export const addLawyer = async (lawyer: Lawyer): Promise<void> => {
+  await uploadLawyers([lawyer]);
 };
 
 export const updateLawyerProfileConfig = async (

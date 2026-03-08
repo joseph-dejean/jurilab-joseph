@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './store/store';
 import { Layout } from './components/Layout';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -55,7 +55,7 @@ const AppContent: React.FC = () => {
 
   return (
       <CalendarProvider currentUser={currentUser}>
-        <HashRouter>
+        <BrowserRouter>
           <Layout>
             <Routes>
               <Route path="/" element={<RouteErrorBoundary><HomePage /></RouteErrorBoundary>} />
@@ -74,7 +74,7 @@ const AppContent: React.FC = () => {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Layout>
-        </HashRouter>
+        </BrowserRouter>
       </CalendarProvider>
   );
 };
