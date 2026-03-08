@@ -10,7 +10,7 @@ import {
   updateUserProfile,
   setUserRole,
   disconnectGoogleCalendar
-} from '../services/firebaseService';
+} from '../services/supabaseService';
 import { Button } from '../components/Button';
 import { 
   Trash2, 

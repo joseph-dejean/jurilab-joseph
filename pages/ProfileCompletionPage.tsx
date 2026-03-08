@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/store';
 import { UserRole, LegalSpecialty } from '../types';
 import { Button } from '../components/Button';
-import { updateUserProfile } from '../services/firebaseService';
+import { updateUserProfile } from '../services/supabaseService';
 import {
   User, Phone, MapPin, Check, ArrowRight, Sparkles,
   AlertCircle, Scale, UserCircle, ChevronRight, Heart

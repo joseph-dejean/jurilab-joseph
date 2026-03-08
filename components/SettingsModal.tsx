@@ -100,7 +100,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       let avatarUrl = currentUser?.avatarUrl;
 
       if (selectedFile && currentUser) {
-        const { uploadFileToStorage } = await import("../services/firebaseService");
+        const { uploadFileToStorage } = await import('../services/supabaseService');
         const path = `avatars/${currentUser.id}_${Date.now()}`;
         avatarUrl = await uploadFileToStorage(selectedFile, path);
       }

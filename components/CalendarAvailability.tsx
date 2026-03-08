@@ -6,7 +6,7 @@ import { fr } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { AvailabilityHours, DayAvailability, TimeSlot } from '../types';
-import { saveAvailabilityHours, getAvailabilityHours, getGoogleCalendarEvents } from '../services/firebaseService';
+import { saveAvailabilityHours, getAvailabilityHours, getGoogleCalendarEvents } from '../services/supabaseService';
 import { Button } from './Button';
 import { Save, Loader2, RefreshCw } from 'lucide-react';
 import { useApp } from '../store/store';

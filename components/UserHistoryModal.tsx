@@ -3,7 +3,7 @@ import { Appointment, User, Lawyer, UserRole } from '../types';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { X, Calendar, MessageSquare, FileText, Video, Phone, MapPin, Clock } from 'lucide-react';
-import { getAllAppointments } from '../services/firebaseService';
+import { getAllAppointments } from '../services/supabaseService';
 
 interface UserHistoryModalProps {
   user: User | Lawyer;

@@ -10,7 +10,7 @@
 
 import { getRoomTranscript, getRoomInfo, deleteRoom } from './dailyService';
 import { generateMeetingSummary } from './geminiService';
-import { updateAppointmentTranscript } from './firebaseService';
+import { updateAppointmentTranscript } from './supabaseService';
 import { Appointment } from '../types';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';

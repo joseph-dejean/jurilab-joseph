@@ -13,7 +13,7 @@ import {
   syncPersonalEventToGoogleCalendar,
   updatePersonalEventGoogleCalendar,
   deletePersonalEventGoogleCalendar
-} from '../services/firebaseService';
+} from '../services/supabaseService';
 import { User, GoogleCalendarEvent } from '../types';
 
 interface CalendarContextType {

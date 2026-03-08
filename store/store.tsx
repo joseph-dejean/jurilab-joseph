@@ -1,5 +1,3 @@
-import { onAuthStateChanged } from "firebase/auth";
-import { ref, update } from "firebase/database";
 import React, {
   createContext,
   ReactNode,
@@ -7,7 +5,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { auth, database } from "../firebaseConfig";
+import { supabase } from "../supabaseClient";
 import {
   acceptAppointment as acceptAppointmentService,
   cancelAppointment as cancelAppointmentService,
@@ -21,7 +19,8 @@ import {
   logoutUser,
   registerUser,
   subscribeToAppointments,
-} from "../services/firebaseService";
+  updateAppointmentField,
+} from "../services/supabaseService";
 import { Appointment, Lawyer, LegalSpecialty, User, UserRole } from "../types";
 
 type Language = "en" | "fr";
@@ -359,29 +358,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   // Auth listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        console.log(
-          "👤 User logged in:",
-          firebaseUser.email,
-          "UID:",
-          firebaseUser.uid
-        );
-          // Charger le profil de manière asynchrone pour ne pas bloquer
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const supabaseUser = session?.user ?? null;
+      if (supabaseUser) {
+        console.log("👤 User logged in:", supabaseUser.email, "UID:", supabaseUser.id);
           (async () => {
             try {
-              let userProfile = await getUserProfile(firebaseUser.uid);
+              let userProfile = await getUserProfile(supabaseUser.id);
 
               // Retry logic for race conditions (registration)
               if (!userProfile) {
                 console.log("⏳ Profile not found immediately, retrying in 1s...");
                 await new Promise(r => setTimeout(r, 1000));
-                userProfile = await getUserProfile(firebaseUser.uid);
+                userProfile = await getUserProfile(supabaseUser.id);
               }
               if (!userProfile) {
                 console.log("⏳ Profile still not found, retrying in 2s...");
                 await new Promise(r => setTimeout(r, 2000));
-                userProfile = await getUserProfile(firebaseUser.uid);
+                userProfile = await getUserProfile(supabaseUser.id);
               }
 
               if (userProfile) {
@@ -465,14 +459,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
               // const userAppointments = await getUserAppointments(userProfile.id, userProfile.role);
               // setAppointments(userAppointments);
             } else {
-              // Fallback if profile creation is delayed
-              console.warn(
-                "⚠️ User profile not found in DB immediately. UID:",
-                firebaseUser.uid
-              );
-              console.warn(
-                "⚠️ This might happen if the user was created manually in Firebase Auth but not in Realtime Database."
-              );
+              // Fallback if profile creation is delayed (trigger may not have fired yet)
+              console.warn("⚠️ User profile not found in DB immediately. UID:", supabaseUser.id);
               // Retry logic could go here, but for now relying on create logic to have finished
             }
           } catch (e) {
@@ -502,7 +490,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       }
     });
 
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
   // Real-time appointment listener
@@ -750,7 +738,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     // Si lawyers n'est pas encore chargé, utiliser getLawyerById
     let lawyer = lawyers.find((l) => l.id === lawyerId);
     if (!lawyer) {
-      const { getLawyerById } = await import("../services/firebaseService");
+      const { getLawyerById } = await import("../services/supabaseService");
       lawyer = await getLawyerById(lawyerId);
     }
     const lawyerName = lawyer?.name || "Avocat";
@@ -800,10 +788,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         );
 
         // Stocker le channelId dans l'appointment
-        const { ref, update } = await import("firebase/database");
-        const { database } = await import("../firebaseConfig");
-        const apptRef = ref(database, `appointments/${newAppt.id}`);
-        await update(apptRef, { channelId: channel.id });
+        await updateAppointmentField(newAppt.id, { channel_id: channel.id });
 
         console.log("✅ Chat channel created:", channel.id);
       } catch (streamError) {
@@ -832,7 +817,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     try {
       // Récupérer l'appointment pour vérifier qu'il est bien pour cet avocat
       const { getAllAppointments } = await import(
-        "../services/firebaseService"
+        "../services/supabaseService"
       );
       const allAppointments = await getAllAppointments();
       const appointment = allAppointments.find((a) => a.id === appointmentId);
@@ -889,8 +874,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       await acceptAppointmentService(appointmentId);
 
       if (dailyRoomUrl && dailyRoomId) {
-        const apptRef = ref(database, `appointments/${appointmentId}`);
-        await update(apptRef, { dailyRoomUrl, dailyRoomId });
+        await updateAppointmentField(appointmentId, { daily_room_url: dailyRoomUrl, daily_room_id: dailyRoomId });
       }
 
       // Récupérer l'appointment mis à jour (avec le statut CONFIRMED)
@@ -912,7 +896,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       });
       try {
         const { syncAppointmentToGoogleCalendar } = await import(
-          "../services/firebaseService"
+          "../services/supabaseService"
         );
         console.log("✅ syncAppointmentToGoogleCalendar imported successfully");
         const eventId = await syncAppointmentToGoogleCalendar(
@@ -930,7 +914,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   const cancelAppointment = async (appointmentId: string) => {
     try {
-      const { cancelAppointment: cancelService } = await import("../services/firebaseService");
+      const { cancelAppointment: cancelService } = await import("../services/supabaseService");
       await cancelService(appointmentId);
 
       // Mettre à jour l'état local
@@ -946,7 +930,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const updateProfile = async (data: Partial<User>) => {
     if (!currentUser) return;
     try {
-      const { updateUserProfile } = await import("../services/firebaseService");
+      const { updateUserProfile } = await import("../services/supabaseService");
       await updateUserProfile(currentUser.id, data);
 
       // Update local state immediately for responsiveness
@@ -960,7 +944,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   const deleteAppointment = async (appointmentId: string) => {
     try {
-      const { deleteAppointmentData } = await import("../services/firebaseService");
+      const { deleteAppointmentData } = await import("../services/supabaseService");
       await deleteAppointmentData(appointmentId);
       // setAppointments is handled by the real-time listener
     } catch (error) {
@@ -972,7 +956,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const deleteClientPortfolio = async (clientId: string) => {
     if (!currentUser) return;
     try {
-      const { deleteAppointmentData } = await import("../services/firebaseService");
+      const { deleteAppointmentData } = await import("../services/supabaseService");
       const appointmentsToDelete = appointments.filter(
         a => a.lawyerId === currentUser.id && a.clientId === clientId
       );

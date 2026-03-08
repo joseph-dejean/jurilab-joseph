@@ -4,20 +4,7 @@ import { Button } from './Button';
 import { DiligenceEntry } from '../types';
 import { format, parseISO, formatDistanceToNow, intervalToDuration } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { 
-    collection, 
-    addDoc, 
-    updateDoc, 
-    deleteDoc, 
-    doc, 
-    query, 
-    where, 
-    orderBy, 
-    onSnapshot,
-    serverTimestamp,
-    Timestamp 
-} from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { supabase } from '../supabaseClient';
 
 interface DiligenceTrackerProps {
     lawyerId: string;
@@ -49,54 +36,51 @@ export const DiligenceTracker: React.FC<DiligenceTrackerProps> = ({ lawyerId, cl
         'Autre'
     ];
 
-    // Charger les diligences depuis Firestore
+    // Charger et écouter les diligences depuis Supabase
     useEffect(() => {
-        const q = query(
-            collection(db, 'diligences'),
-            where('lawyerId', '==', lawyerId),
-            where('clientId', '==', clientId),
-            orderBy('createdAt', 'desc')
-        );
+        const fetchDiligences = async () => {
+            const { data, error } = await supabase
+                .from('diligences')
+                .select('*')
+                .eq('lawyer_id', lawyerId)
+                .eq('client_id', clientId)
+                .order('created_at', { ascending: false });
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const entries: DiligenceEntry[] = [];
-            let active: DiligenceEntry | null = null;
+            if (error) { console.error('❌ Error fetching diligences:', error); return; }
 
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                const entry: DiligenceEntry = {
-                    id: doc.id,
-                    lawyerId: data.lawyerId,
-                    clientId: data.clientId,
-                    startTime: data.startTime instanceof Timestamp ? data.startTime.toDate().toISOString() : data.startTime,
-                    endTime: data.endTime ? (data.endTime instanceof Timestamp ? data.endTime.toDate().toISOString() : data.endTime) : undefined,
-                    duration: data.duration,
-                    description: data.description,
-                    category: data.category,
-                    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-                    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
-                    billable: data.billable !== undefined ? data.billable : true
-                };
+            const entries: DiligenceEntry[] = (data || []).map(row => ({
+                id: row.id,
+                lawyerId: row.lawyer_id,
+                clientId: row.client_id,
+                startTime: row.start_time,
+                endTime: row.end_time ?? undefined,
+                duration: row.duration,
+                description: row.description,
+                category: row.category,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at,
+                billable: row.billable ?? true,
+            }));
 
-                entries.push(entry);
-
-                // Trouver l'entrée active (sans endTime)
-                if (!entry.endTime) {
-                    active = entry;
-                }
-            });
-
+            const active = entries.find(e => !e.endTime) ?? null;
             setDiligences(entries);
             setActiveEntry(active);
-
-            // Si une entrée est active, calculer le temps écoulé
             if (active) {
-                const elapsed = Math.floor((Date.now() - new Date(active.startTime).getTime()) / 1000);
-                setElapsedSeconds(elapsed);
+                setElapsedSeconds(Math.floor((Date.now() - new Date(active.startTime).getTime()) / 1000));
             }
-        });
+        };
 
-        return () => unsubscribe();
+        fetchDiligences();
+
+        const channel = supabase
+            .channel(`diligences_${lawyerId}_${clientId}`)
+            .on('postgres_changes', {
+                event: '*', schema: 'public', table: 'diligences',
+                filter: `lawyer_id=eq.${lawyerId}`,
+            }, fetchDiligences)
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
     }, [lawyerId, clientId]);
 
     // Mettre à jour le chronomètre toutes les secondes
@@ -123,41 +107,31 @@ export const DiligenceTracker: React.FC<DiligenceTrackerProps> = ({ lawyerId, cl
 
     // Démarrer une nouvelle diligence
     const startDiligence = async () => {
-        if (activeEntry) return; // Ne peut pas démarrer si une entrée est déjà active
-
+        if (activeEntry) return;
         const now = new Date().toISOString();
-        await addDoc(collection(db, 'diligences'), {
-            lawyerId,
-            clientId,
-            startTime: now,
+        await supabase.from('diligences').insert({
+            lawyer_id: lawyerId,
+            client_id: clientId,
+            start_time: now,
             description: '',
             category: category || 'Autre',
-            createdAt: now,
-            updatedAt: now,
-            billable: true
+            billable: true,
         });
-
         setDescription('');
     };
 
     // Arrêter la diligence active
     const stopDiligence = async () => {
         if (!activeEntry) return;
-
         const endTime = new Date();
-        const startTime = new Date(activeEntry.startTime);
-        const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-
-        const entryRef = doc(db, 'diligences', activeEntry.id);
-        await updateDoc(entryRef, {
-            endTime: endTime.toISOString(),
+        const duration = Math.floor((endTime.getTime() - new Date(activeEntry.startTime).getTime()) / 1000);
+        await supabase.from('diligences').update({
+            end_time: endTime.toISOString(),
             duration,
             description: description || 'Travail sur le dossier',
             category: category || activeEntry.category || 'Autre',
             billable,
-            updatedAt: new Date().toISOString()
-        });
-
+        }).eq('id', activeEntry.id);
         setDescription('');
         setCategory('');
         setBillable(true);
@@ -166,17 +140,15 @@ export const DiligenceTracker: React.FC<DiligenceTrackerProps> = ({ lawyerId, cl
     // Supprimer une diligence
     const deleteDiligence = async (id: string) => {
         if (window.confirm('Supprimer cette diligence ?')) {
-            await deleteDoc(doc(db, 'diligences', id));
+            await supabase.from('diligences').delete().eq('id', id);
         }
     };
 
     // Mettre à jour une diligence
     const updateDiligence = async (id: string) => {
-        const entryRef = doc(db, 'diligences', id);
-        await updateDoc(entryRef, {
+        await supabase.from('diligences').update({
             description: editDescription,
-            updatedAt: new Date().toISOString()
-        });
+        }).eq('id', id);
         setEditingId(null);
         setEditDescription('');
     };

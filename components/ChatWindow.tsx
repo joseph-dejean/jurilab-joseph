@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ref, onValue, off } from 'firebase/database';
-import { database } from '../firebaseConfig';
+import { supabase } from '../supabaseClient';
 import { useApp } from '../store/store';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -98,22 +97,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ channelId, onBack }) => 
 
     loadPermission();
 
-    // Écouter les changements en temps réel depuis Firebase
-    const permissionRef = ref(database, `chatPermissions/${channelId}/clientCanMessage`);
-    
-    const unsubscribe = onValue(permissionRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setClientCanMessage(snapshot.val() as boolean);
-      } else {
-        setClientCanMessage(true); // Par défaut autorisé si pas de valeur
-      }
-    }, (error) => {
-      console.error('Error listening to permission:', error);
-      setClientCanMessage(true); // Par défaut autorisé en cas d'erreur
-    });
+    // Écouter les changements en temps réel depuis Supabase
+    const channel = supabase
+      .channel(`chat_permissions_${channelId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'chat_permissions',
+        filter: `channel_id=eq.${channelId}`,
+      }, (payload: any) => {
+        const newVal = payload.new?.client_can_message;
+        setClientCanMessage(newVal ?? true);
+      })
+      .subscribe();
 
     return () => {
-      off(permissionRef);
+      supabase.removeChannel(channel);
     };
   }, [channelId]);
 

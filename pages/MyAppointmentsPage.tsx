@@ -213,10 +213,8 @@ export const MyAppointmentsPage: React.FC = () => {
         const channel = await createOrGetChatChannel(appointment.lawyerId, appointment.clientId, appointment.id);
         channelId = channel.id;
 
-        const { ref, update } = await import('firebase/database');
-        const { database } = await import('../firebaseConfig');
-        const apptRef = ref(database, `appointments/${appointment.id}`);
-        await update(apptRef, { channelId: channel.id });
+        const { updateAppointmentField } = await import('../services/supabaseService');
+        await updateAppointmentField(appointment.id, { channel_id: channel.id });
       }
 
       navigate(`/messages?channel=${channelId}`);

@@ -101,9 +101,15 @@ app = FastAPI(
 )
 
 # Configuration CORS
+# In production the React build is served by FastAPI itself (same origin),
+# so CORS is only needed for the local Vite dev server.
+_allowed_origins = ["http://localhost:5173", "http://localhost:3000"]
+if settings.FRONTEND_URL:
+    _allowed_origins.append(settings.FRONTEND_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # À restreindre en production
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

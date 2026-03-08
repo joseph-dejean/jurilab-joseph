@@ -29,7 +29,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProfileBlock, ProfileBlockType, UserRole, Lawyer } from '../../types';
 import { useApp } from '../../store/store';
-import { getLawyerById, updateLawyerProfileConfig } from '../../services/firebaseService';
+import { getLawyerById, updateLawyerProfileConfig } from '../../services/supabaseService';
 import { DraggableGrid } from './DraggableGrid';
 import { Toolbox } from './Toolbox';
 import { TemplateSelector } from './TemplateSelector';

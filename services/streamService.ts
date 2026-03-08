@@ -170,7 +170,7 @@ export const createOrGetChatChannel = async (
 
   try {
     // Récupérer les noms pour le channel
-    const { getUserProfile } = await import('./firebaseService');
+    const { getUserProfile } = await import('./supabaseService');
     const [lawyerProfile, clientProfile] = await Promise.all([
       getUserProfile(lawyerId).catch(() => null),
       getUserProfile(clientId).catch(() => null),
@@ -214,20 +214,13 @@ export const createOrGetChatChannel = async (
       // Ajouter les membres APRÈS la création (GetStream créera les utilisateurs automatiquement)
       await channel.addMembers([lawyerId, clientId]);
 
-      // Initialiser la permission dans Firebase (par défaut, le client peut envoyer des messages)
+      // Initialiser la permission dans Supabase (par défaut, le client peut envoyer des messages)
       try {
-        const { ref, set } = await import('firebase/database');
-        const { database } = await import('../firebaseConfig');
-        const permissionRef = ref(database, `chatPermissions/${channelId}`);
-        await set(permissionRef, {
-          clientCanMessage: true,
-          lawyerId,
-          clientId,
-          channelId,
-        });
-        console.log('✅ Chat permission initialized in Firebase');
-      } catch (firebaseError) {
-        console.warn('⚠️ Error initializing chat permission in Firebase (non-blocking):', firebaseError);
+        const { setChatPermission } = await import('./supabaseService');
+        await setChatPermission(channelId, true, lawyerId, clientId);
+        console.log('✅ Chat permission initialized in Supabase');
+      } catch (supabaseError) {
+        console.warn('⚠️ Error initializing chat permission in Supabase (non-blocking):', supabaseError);
       }
 
       console.log('✅ New channel created:', channelId);
@@ -337,39 +330,16 @@ export const toggleClientMessagePermission = async (
   clientCanMessage: boolean
 ): Promise<void> => {
   try {
-    const { ref, get, set } = await import('firebase/database');
-    const { database } = await import('../firebaseConfig');
-
-    // Récupérer le channel pour obtenir lawyerId et clientId
     const channel = await getChannelById(channelId);
-    if (!channel) {
-      throw new Error('Channel not found');
-    }
+    if (!channel) throw new Error('Channel not found');
 
     const lawyerId = (channel.data as any)?.lawyerId as string;
     const clientId = (channel.data as any)?.clientId as string;
 
-    if (!lawyerId || !clientId) {
-      throw new Error('Channel missing lawyerId or clientId');
-    }
+    if (!lawyerId || !clientId) throw new Error('Channel missing lawyerId or clientId');
 
-    // Vérifier si la permission existe déjà
-    const permissionRef = ref(database, `chatPermissions/${channelId}`);
-    const snapshot = await get(permissionRef);
-
-    if (snapshot.exists()) {
-      // Mettre à jour seulement clientCanMessage
-      const { update } = await import('firebase/database');
-      await update(permissionRef, { clientCanMessage });
-    } else {
-      // Créer la permission avec toutes les infos nécessaires
-      await set(permissionRef, {
-        clientCanMessage,
-        lawyerId,
-        clientId,
-        channelId,
-      });
-    }
+    const { setChatPermission } = await import('./supabaseService');
+    await setChatPermission(channelId, clientCanMessage, lawyerId, clientId);
 
     console.log(`✅ Client message permission ${clientCanMessage ? 'enabled' : 'disabled'}`);
   } catch (error) {
@@ -387,21 +357,10 @@ export const getClientMessagePermission = async (
   channelId: string
 ): Promise<boolean> => {
   try {
-    const { ref, get } = await import('firebase/database');
-    const { database } = await import('../firebaseConfig');
-
-    const permissionRef = ref(database, `chatPermissions/${channelId}/clientCanMessage`);
-    const snapshot = await get(permissionRef);
-
-    if (snapshot.exists()) {
-      return snapshot.val() as boolean;
-    }
-
-    // Par défaut, le client peut envoyer des messages
-    return true;
+    const { getChatPermission } = await import('./supabaseService');
+    return await getChatPermission(channelId);
   } catch (error) {
     console.error('❌ Error getting client message permission:', error);
-    // En cas d'erreur, on autorise par défaut
     return true;
   }
 };

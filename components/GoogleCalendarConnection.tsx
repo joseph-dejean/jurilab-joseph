@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, ExternalLink, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Button } from './Button';
 import { useApp } from '../store/store';
-import { GoogleAuthProvider, linkWithPopup, reauthenticateWithPopup, signInWithPopup } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
-import { getGoogleCalendarCredentials, disconnectGoogleCalendar, saveGoogleCalendarCredentials } from '../services/firebaseService';
+import { supabase } from '../supabaseClient';
+import { getGoogleCalendarCredentials, disconnectGoogleCalendar, saveGoogleCalendarCredentials, updateGoogleCalendarAccessToken } from '../services/supabaseService';
 
 interface GoogleCalendarConnectionProps {
   lawyerId: string;
@@ -25,9 +24,24 @@ export const GoogleCalendarConnection: React.FC<GoogleCalendarConnectionProps> =
   const [isConnecting, setIsConnecting] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
-  // Charger l'état de connexion au montage et vérifier la validité du token
+  // Charger l'état de connexion au montage et gérer le retour OAuth
   useEffect(() => {
-    loadConnectionStatus();
+    const handleOAuthCallback = async () => {
+      const calendarConnect = localStorage.getItem('jurilab_calendar_connect');
+      if (calendarConnect === 'google') {
+        localStorage.removeItem('jurilab_calendar_connect');
+        localStorage.removeItem('jurilab_calendar_lawyer_id');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.provider_token) {
+          await saveGoogleCalendarCredentials(lawyerId, {
+            accessToken: session.provider_token,
+            refreshToken: session.provider_refresh_token ?? undefined,
+          });
+        }
+      }
+      loadConnectionStatus();
+    };
+    handleOAuthCallback();
   }, [lawyerId]);
 
   const loadConnectionStatus = async () => {
@@ -53,8 +67,7 @@ export const GoogleCalendarConnection: React.FC<GoogleCalendarConnectionProps> =
           if (credentials.googleCalendarRefreshToken) {
             try {
               const { refreshGoogleAccessToken } = await import('../services/googleCalendarService');
-              const { updateGoogleCalendarAccessToken } = await import('../services/firebaseService');
-              
+
               const newAccessToken = await refreshGoogleAccessToken(credentials.googleCalendarRefreshToken);
               await updateGoogleCalendarAccessToken(lawyerId, newAccessToken);
               
@@ -97,121 +110,43 @@ export const GoogleCalendarConnection: React.FC<GoogleCalendarConnectionProps> =
   };
 
   const handleConnect = async () => {
-    if (!auth.currentUser) {
+    if (!currentUser) {
       alert('Vous devez être connecté pour connecter votre calendrier.');
       return;
     }
 
     try {
       setIsConnecting(true);
-      
-      // Vérifier d'abord si on a déjà un token valide
-      const existingCredentials = await getGoogleCalendarCredentials(lawyerId);
-      if (existingCredentials && existingCredentials.googleCalendarConnected) {
-        // Tester si le token est encore valide en faisant une requête simple
-        try {
-          const { getGoogleCalendarList } = await import('../services/googleCalendarService');
-          await getGoogleCalendarList(existingCredentials.googleCalendarAccessToken);
-          // Si ça fonctionne, le token est valide, pas besoin de reconnecter
-          console.log('✅ Google Calendar token is still valid');
-          await loadConnectionStatus();
-          alert('Votre calendrier Google est déjà connecté et fonctionne correctement.');
-          return;
-        } catch (tokenError: any) {
-          // Token expiré, on continue pour obtenir un nouveau token
-          console.log('⚠️ Token expired, refreshing...');
-        }
-      }
-      
-      // Créer un provider Google avec le scope Calendar
-      const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/calendar');
-      provider.addScope('https://www.googleapis.com/auth/calendar.events');
-      provider.setCustomParameters({
-        prompt: 'consent', // Forcer le consentement pour obtenir le refresh token
-        access_type: 'offline', // Nécessaire pour obtenir le refresh token
-      });
-      
-      let result;
-      let credential;
-      
-      // Vérifier si l'utilisateur est déjà connecté avec Google
-      const isGoogleUser = auth.currentUser.providerData.some(
-        (providerData) => providerData.providerId === 'google.com'
-      );
-      
-      if (isGoogleUser) {
-        // Si déjà connecté avec Google, essayer d'obtenir le token directement
-        // Firebase Auth stocke le token dans la session
-        try {
-          // Essayer de récupérer le token depuis l'ID token
-          const idTokenResult = await auth.currentUser.getIdTokenResult();
-          // Malheureusement, Firebase Auth ne donne pas directement l'access token Google
-          // Il faut utiliser reauthenticateWithPopup pour obtenir un nouveau token
-          console.log('🔄 User already connected with Google, reauthenticating to get Calendar token...');
-          result = await reauthenticateWithPopup(auth.currentUser, provider);
-          credential = GoogleAuthProvider.credentialFromResult(result);
-        } catch (reauthError: any) {
-          // Si reauthenticate échoue, essayer signInWithPopup
-          if (reauthError.code === 'auth/popup-closed-by-user') {
-            throw reauthError;
-          }
-          console.log('⚠️ Reauthentication failed, trying signInWithPopup...');
-          result = await signInWithPopup(auth, provider);
-          credential = GoogleAuthProvider.credentialFromResult(result);
-        }
-      } else {
-        // Sinon, essayer de lier le compte
-        try {
-          result = await linkWithPopup(auth.currentUser, provider);
-          credential = GoogleAuthProvider.credentialFromResult(result);
-        } catch (linkError: any) {
-          // Si linkWithPopup échoue (credential-already-in-use), c'est que le compte Google
-          // est déjà lié à cet utilisateur Firebase, donc on peut récupérer le token
-          if (linkError.code === 'auth/credential-already-in-use') {
-            console.log('✅ Google account already linked to this user');
-            // Le compte est déjà lié, on peut juste utiliser signInWithPopup pour obtenir le token
-            // Mais attention : cela va changer l'utilisateur actuel
-            // Une meilleure solution serait d'utiliser le token existant s'il est valide
-            // Pour l'instant, on informe l'utilisateur
-            alert('Votre compte Google est déjà lié. Si vous avez besoin de mettre à jour le token, veuillez vous déconnecter et vous reconnecter avec Google.');
-            return;
-          } else {
-            throw linkError;
-          }
-        }
-      }
-      
-      if (!credential || !credential.accessToken) {
-        throw new Error('Impossible de récupérer le token d\'accès Google');
+
+      // Check if we already have a valid provider token from the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.provider_token) {
+        await saveGoogleCalendarCredentials(lawyerId, {
+          accessToken: session.provider_token,
+          refreshToken: session.provider_refresh_token ?? undefined,
+        });
+        await loadConnectionStatus();
+        alert('Calendrier Google connecté avec succès !');
+        return;
       }
 
-      console.log('✅ Google Calendar token obtained');
-      
-      // Sauvegarder les credentials
-      await saveGoogleCalendarCredentials(lawyerId, {
-        accessToken: credential.accessToken,
-        // refreshToken n'est pas disponible directement depuis Firebase Auth
-        // Il faudrait un backend pour l'obtenir
-      });
+      // Store lawyerId so we can save credentials after OAuth redirect
+      localStorage.setItem('jurilab_calendar_connect', 'google');
+      localStorage.setItem('jurilab_calendar_lawyer_id', lawyerId);
 
-      // Recharger l'état
-      await loadConnectionStatus();
-      
-      alert('Calendrier Google connecté avec succès !');
+      // Redirect to Google OAuth with calendar scopes
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
+          redirectTo: window.location.href,
+          queryParams: { access_type: 'offline', prompt: 'consent' },
+        },
+      });
+      // Page will redirect — no code after this point executes
     } catch (error: any) {
       console.error('❌ Error connecting Google Calendar:', error);
-      
-      if (error.code === 'auth/credential-already-in-use') {
-        alert('Ce compte Google est déjà lié à votre compte. La connexion devrait fonctionner automatiquement.');
-        // Recharger l'état au cas où
-        await loadConnectionStatus();
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        alert('La connexion a été annulée.');
-      } else {
-        alert('Erreur lors de la connexion : ' + (error.message || 'Erreur inconnue'));
-      }
-    } finally {
+      alert('Erreur lors de la connexion : ' + (error.message || 'Erreur inconnue'));
       setIsConnecting(false);
     }
   };

@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     DAILY_API_KEY: str = Field(default="")
 
     # ==============================================================================
+    # DEPLOYMENT
+    # ==============================================================================
+    FRONTEND_URL: str = Field(default="", description="Production Cloud Run URL for CORS (e.g. https://jurilab-app-xxx-ew.a.run.app)")
+
+    # ==============================================================================
     # MCP (MODEL CONTEXT PROTOCOL)
     # ==============================================================================
     MCP_SERVER_URL: str = Field(default="http://localhost:3000")

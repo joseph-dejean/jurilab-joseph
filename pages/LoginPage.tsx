@@ -3,7 +3,7 @@ import { useApp } from '../store/store';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { UserRole } from '../types';
 import { Button } from '../components/Button';
-import { getAuthErrorMessage } from '../services/firebaseService';
+import { getAuthErrorMessage } from '../services/supabaseService';
 import {
   Mail, Lock, User, ArrowRight, Scale, Sparkles, ChevronLeft,
   Eye, EyeOff, CheckCircle2, AlertCircle, UserCircle, Briefcase,
