@@ -97,9 +97,9 @@ export const CalendarProvider = ({ children, currentUser }: PropsWithChildren<{ 
           sourceEventId: pe.googleCalendarEventId // Store Google ID here for syncing
         }));
 
-        // Check if Google Calendar is connected in Firebase
+        // Check if Google Calendar is connected (lawyers only)
         try {
-          const googleCreds = await getGoogleCalendarCredentials(currentUser.id);
+          const googleCreds = currentUser.role === 'LAWYER' ? await getGoogleCalendarCredentials(currentUser.id) : null;
           if (googleCreds && googleCreds.googleCalendarConnected) {
              console.log("✅ Found Google Calendar credentials in Firebase, syncing...");
              // Automatically sync Google Events if connected

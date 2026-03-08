@@ -12,7 +12,7 @@ import {
   checkAppointmentConflict,
   createAppointment,
   getUserProfile,
-  loadLawyers,
+  loadLawyers as fetchLawyersFromDB,
   loginUser,
   loginWithGoogle,
   loginWithMicrosoft,
@@ -612,7 +612,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         
         // No valid cache, load from Supabase
         console.log("🗄️ Loading lawyers from Supabase...");
-        const lawyersData = await loadLawyers();
+        const lawyersData = await fetchLawyersFromDB();
 
         if (lawyersData.length === 0) {
           console.warn(
@@ -646,7 +646,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     const refreshLawyersInBackground = async () => {
       try {
-        const lawyersData = await loadLawyers();
+        const lawyersData = await fetchLawyersFromDB();
         if (lawyersData.length > 0) {
           setLawyers(lawyersData);
           await setCachedLawyers(lawyersData);
